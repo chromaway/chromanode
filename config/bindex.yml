@@ -1,0 +1,16 @@
+bindex:
+  network: testnet
+  loopInterval: 5 # in seconds
+
+postgresql:
+  user: bindex
+  host: localhost
+  dbname: bindex_testnet
+  password:
+
+bitcoind:
+  ssl: false
+  user: bitcoinrpc
+  password: uMXXbdR2D7gh8BDofJC47dB6WyBEa8sRmM1N4JyPHv6
+  host: localhost
+  port: 18332
