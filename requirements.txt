@@ -1,4 +1,0 @@
-PyYAML==3.11
-psycopg2==2.6
-python-bitcoinlib==0.3.0
-wsgiref==0.1.2

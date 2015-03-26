@@ -1,0 +1,44 @@
+{
+  "name": "chromanode",
+  "description": "",
+  "author": "Fomichev Kirill <fanatid@ya.ru>",
+  "main": "chromanode.js",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:chromaway/chromanode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/chromaway/chromanode/issues"
+  },
+  "license": "MIT",
+  "keywords": [
+    "bitcoin",
+    "mainnet",
+    "testnet3",
+    "blockchain",
+    "blockchain api",
+    "bitcoin api"
+  ],
+  "scripts": {
+    "lint": "standard"
+  },
+  "dependencies": {
+    "bitcoind-rpc": "^0.2.1",
+    "bitcore": "^0.11.4",
+    "bluebird": "^2.9.15",
+    "error-system": "^0.1.0",
+    "glob": "^5.0.3",
+    "js-yaml": "^3.2.7",
+    "lodash": "^3.6.0",
+    "pg": "^4.3.0",
+    "pg-native": "^1.8.0",
+    "winston": "^0.9.0",
+    "yargs": "^3.6.0"
+  },
+  "devDependencies": {
+    "standard": "^3.3.0"
+  },
+  "standard": {
+    "ignore": []
+  }
+}

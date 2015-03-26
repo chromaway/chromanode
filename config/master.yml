@@ -1,0 +1,19 @@
+chromanode:
+  network: testnet # livenet | testnet
+  loopInterval: 5 # in seconds
+
+logger:
+  level: verbose
+  filename:
+
+postgresql:
+  url: postgres://bindex@localhost/bindex_testnet
+  poolSize: 1
+
+bitcoind:
+  protocol: http
+  user: bitcoinrpc
+  pass: uMXXbdR2D7gh8BDofJC47dB6WyBEa8sRmM1N4JyPHv6
+  host: localhost
+  port: 18332
+  datadir: /media/storage1/bitcoindb
