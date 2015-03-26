@@ -51,7 +51,7 @@ class Indexer(object):
         with self._getConn() as conn:
             cur = conn.cursor()
 
-            #
+            # todo: remove
             cur.execute('DROP TABLE info,blocks,transactions,transactions_mempool,history,history_mempool')
             #
             cur.execute('select COUNT(*) from information_schema.tables where table_name=%s', ['info'])
@@ -67,30 +67,30 @@ class Indexer(object):
 
                 cur.execute('CREATE TABLE blocks ('
                             '  height INTEGER PRIMARY KEY,'
-                            '  blockid CHAR(64) NOT NULL,'
-                            '  header CHAR(160) NOT NULL)')
+                            '  blockid BYTEA NOT NULL,'
+                            '  header BYTEA NOT NULL)')
                 cur.execute('CREATE INDEX ON blocks (blockid)')
 
                 cur.execute('CREATE TABLE transactions ('
-                            '  txid CHAR(64) PRIMARY KEY,'
+                            '  txid BYTEA PRIMARY KEY,'
                             '  height INTEGER NOT NULL,'
                             '  tx BYTEA NOT NULL)')
                 cur.execute('CREATE INDEX ON transactions (height)')
 
                 cur.execute('CREATE TABLE transactions_mempool ('
-                            '  txid CHAR(64) PRIMARY KEY,'
+                            '  txid BYTEA PRIMARY KEY,'
                             '  tx BYTEA NOT NULL)')
 
                 cur.execute('CREATE TABLE history ('
-                            '  address CHAR(35) NOT NULL,'
-                            '  txid CHAR(64) NOT NULL,'
+                            '  address BYTEA NOT NULL,'
+                            '  txid BYTEA NOT NULL,'
                             '  height INTEGER NOT NULL)')
                 cur.execute('CREATE INDEX ON history (address, height)')
                 cur.execute('CREATE INDEX ON history (height)')
 
                 cur.execute('CREATE TABLE history_mempool ('
-                            '  address CHAR(35) NOT NULL,'
-                            '  txid CHAR(64) NOT NULL)')
+                            '  address BYTEA NOT NULL,'
+                            '  txid BYTEA NOT NULL)')
                 cur.execute('CREATE INDEX ON history_mempool (address)')
 
             cur.execute('SELECT value FROM info WHERE key = %s', ['version'])
@@ -112,7 +112,7 @@ class Indexer(object):
             if row is None:
                 row = [-1, '0' * 64]
             self.bestHeight = row[0]
-            self.bestBlockId = row[1]
+            self.bestBlockId = str(row[1])
 
     def _mainLoop(self, config):
         while True:
@@ -151,6 +151,7 @@ class Indexer(object):
                         # ScriptHash | ?
                         # MultiSig   | OP_0 [canonicalSignature|OP_0]
                         pass
+
                     for outp in tx.vout:
                         # PubKey     | canonicalPubKey OP_CHECKSIG
                         # PubKeyHash | OP_DUP OP_HASH160 pubKeyHash OP_EQUALVERIFY OP_CHECKSIG
@@ -185,7 +186,7 @@ class Indexer(object):
                     # or get block and import
                     blockHeight = self.bestHeight + 1
                     blockId = self._bitcoind.getblockhash(blockHeight)
-                    print 'Import block ' + blockId
+                    print 'Import block #%d, %s' % (blockHeight, blockId)
 
                     block_hex = self._bitcoind.getblock(blockId, False)
                     block = bitcoin.core.CBlock.deserialize(bitcoin.core.x(block_hex))
