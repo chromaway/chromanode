@@ -9,6 +9,9 @@ var RpcClient = require('bitcoind-rpc')
 var timers = require('timers')
 var yargs = require('yargs')
 
+var Address = bitcore.Address
+var Hash = bitcore.crypto.Hash
+
 var argv = yargs
   .usage('Usage: $0 [-h] [-c CONFIG]')
   .options('c', {
@@ -113,30 +116,68 @@ Indexer.prototype.getBlock = function (height) {
  * @return {Promise}
  */
 Indexer.prototype.storeTransactions = function (client, transactions, height) {
-  var indexedTransactions = _.indexBy(transactions, 'id')
   var queries = {
     blockchain: {
-      storeTx: 'INSERT INTO transactions (txid, tx, height) VALUES ($1, $2, $3)'
+      storeTx: 'INSERT INTO transactions (txid, tx, height) VALUES ($1, $2, $3)',
+      storeOut: 'INSERT INTO history (address, txid, index, value, height) VALUES ($1, $2, $3, $4, $5)'
     },
     mempool: {
-      storeTx: 'INSERT INTO transactions (txid, tx) VALUES ($1, $2)'
+      storeTx: 'INSERT INTO transactions_mempool (txid, tx) VALUES ($1, $2)',
+      storeOut: 'INSERT INTO history (address, txid, index, value) VALUES ($1, $2, $3, $4)'
     }
   }
 
+  var network = this.network
+  var indexedTransactions = _.indexBy(transactions, 'id')
   var isMempool = height === undefined
   queries = isMempool ? queries.mempool : queries.blockchain
 
-  return transactions.reduce(function (promise, tx) {
-    return promise
-      .then(function () {
-        var params = ['\\x' + tx.id, '\\x' + tx.toString(), height]
-        if (isMempool) { params.pop() }
-        return client.queryAsync(queries.storeTx, params)
-      })
-      .then(function () {
+  function saveTx (tx) {
+    var params = ['\\x' + tx.id, '\\x' + tx.toString()]
+    if (!isMempool) { params.push(height) }
+    return client.queryAsync(queries.storeTx, params)
+  }
 
+  function saveInputs (tx) {
+    return Promise.resolve()
+  }
+
+  function saveOutputs (tx) {
+    var txid = tx.id
+    return tx.outputs.map(function (output, index) {
+      var script = output.script
+      var addresses = []
+
+      if (script.isPublicKeyHashOut()) {
+        addresses = [new Address(script.chunks[2].buf, network, Address.PayToPublicKeyHash)]
+
+      } else if (script.isScriptHashOut()) {
+        addresses = [new Address(script.chunks[1].buf, network, Address.PayToScriptHash)]
+
+      } else if (script.isMultisigOut()) {
+        addresses = script.chunks.slice(1, -2).map(function (pubKey) {
+          var hash = Hash.sha256ripemd160(script.chunks[0].buf)
+          return new Address(hash, network, Address.PayToPublicKeyHash)
+        })
+
+      } else if (script.isPublicKeyOut()) {
+        var hash = Hash.sha256ripemd160(script.chunks[0].buf)
+        addresses = [new Address(hash, network, Address.PayToPublicKeyHash)]
+
+      } else { return }
+
+      var params = [txid, index, output.satoshis]
+      if (!isMempool) { params.push(height) }
+      return addresses.map(function (address) {
+        params = [address.toString()].concat(params)
+        return client.queryAsync(queries.storeOut, params)
       })
-  }, Promise.resolve())
+    })
+  }
+
+  return Promise.all(_.flatten(transactions.map(function (tx) {
+    return [saveTx(tx), saveInputs(tx), saveOutputs(tx)]
+  })))
 }
 
 function SyncComplete () {}
