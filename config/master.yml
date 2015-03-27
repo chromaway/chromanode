@@ -1,6 +1,6 @@
 chromanode:
   network: testnet # livenet | testnet
-  loopInterval: 5 # in seconds
+  loopInterval: 5000 # in milliseconds
 
 logger:
   level: verbose
