@@ -8,7 +8,6 @@ logger:
 
 postgresql:
   url: postgres://bindex@localhost/bindex_testnet
-  poolSize: 1
 
 bitcoind:
   protocol: http

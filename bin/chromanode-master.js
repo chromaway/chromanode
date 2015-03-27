@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 /* globals Promise:true */
 
+var _ = require('lodash')
 var bitcore = require('bitcore')
 var Promise = require('bluebird')
 var RpcClient = require('bitcoind-rpc')
 var yargs = require('yargs')
-
-var errors = require('../lib/errors')
 
 var argv = yargs
   .usage('Usage: $0 [-h] [-c CONFIG]')
@@ -25,30 +24,36 @@ var argv = yargs
 // load config
 var config = require('../lib/config').load(argv.config)
 
-// logging unhadled errors
+// load from lib after config initialization
+var errors = require('../lib/errors')
 var logger = require('../lib/logger').logger
+var Storage = require('../lib/storage')
+
+// logging unhadled errors
 Promise.onPossiblyUnhandledRejection(function (err) {
   logger.error(err.stack || err.toString())
 })
 
-// shared objects
-var network
-var bitcoind
+var storageOpts = _.extend(config.get('postgresql'), {network: config.get('chromanode.network')})
 
-//
+// shared objects
+var network = bitcore.Networks.get(config.get('chromanode.network'))
+var bitcoind = Promise.promisifyAll(new RpcClient(config.get('bitcoind')))
+var storage = new Storage(storageOpts)
+
+// pre sync and run ???
 Promise.try(function () {
   // check network
-  network = bitcore.Networks.get(config.get('chromanode.network'))
   if (network === undefined) {
     throw new errors.InvalidNetwork(config.get('chromanode.network'))
   }
 
-  // connect to bitcoind and request info
-  bitcoind = Promise.promisifyAll(new RpcClient(config.get('bitcoind')))
+  // request info
   return bitcoind.getInfoAsync()
 })
 .then(function (info) {
   logger.info('Connected to bitcoind! (ver. %d)', info.result.version)
 
   // init storage
+  return storage.init()
 })
