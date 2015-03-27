@@ -208,8 +208,8 @@ Indexer.prototype.storeTransactions = function (client, transactions, height) {
     }
 
     if (script.isMultisigOut()) {
-      return script.chunks.slice(1, -2).map(function (pubKey) {
-        var hash = Hash.sha256ripemd160(script.chunks[0].buf)
+      return script.chunks.slice(1, -2).map(function (chunk) {
+        var hash = Hash.sha256ripemd160(chunk.buf)
         return new Address(hash, network, Address.PayToPublicKeyHash)
       })
     }

@@ -15,4 +15,3 @@ bitcoind:
   pass: uMXXbdR2D7gh8BDofJC47dB6WyBEa8sRmM1N4JyPHv6
   host: localhost
   port: 18332
-  datadir: /media/storage1/bitcoindb
