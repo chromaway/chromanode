@@ -159,11 +159,6 @@ Indexer.prototype.storeTransactions = function (client, transactions, height) {
       return Promise.resolve([new Address(hash, network, Address.PayToPublicKeyHash).toString()])
     }
 
-    if (txid === '0000000000000000000000000000000000000000000000000000000000000000' &&
-        outindex === 0xffffffff) {
-      return Promise.resolve([])
-    }
-
     // first check current block
     var tx = indexedTransactions[txid]
     if (tx !== undefined) {
@@ -186,8 +181,14 @@ Indexer.prototype.storeTransactions = function (client, transactions, height) {
     var txid = tx.id
     return tx.inputs.map(function (input, index) {
       var prevTxId = input.prevTxId.toString('hex')
+      if (prevTxId === '0000000000000000000000000000000000000000000000000000000000000000' &&
+          input.outputIndex === 0xffffffff) {
+        return Promise.resolve()
+      }
+
       var params = ['\\x' + txid, index, '\\x' + prevTxId, input.outputIndex]
       if (!isMempool) { params.push(height) }
+
       return getInScriptAddresses(input.script, prevTxId, input.outputIndex)
         .then(function (addresses) {
           return Promise.all(addresses.map(function (address) {
