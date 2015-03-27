@@ -119,13 +119,28 @@ Indexer.prototype.storeTransactions = function (client, transactions, height) {
   var queries = {
     blockchain: {
       storeTx: 'INSERT INTO transactions (txid, tx, height) VALUES ($1, $2, $3)',
-      storeOut: 'INSERT INTO history (address, txid, index, value, height) VALUES ($1, $2, $3, $4, $5)'
+      storeIn: 'INSERT INTO history' +
+               '  (address, txid, index, prevtxid, outputindex, value, height)' +
+               '  VALUES ($1, $2, $3, $4, $5, NULL, $6)',
+      storeOut: 'INSERT INTO history' +
+                '  (address, txid, index, prevtxid, outputindex, value, height)' +
+                '  VALUES ($1, $2, $3, NULL, NULL, $4, $5)'
     },
     mempool: {
       storeTx: 'INSERT INTO transactions_mempool (txid, tx) VALUES ($1, $2)',
-      storeOut: 'INSERT INTO history (address, txid, index, value) VALUES ($1, $2, $3, $4)'
+      storeIn: 'INSERT INTO history' +
+               '  (address, txid, index, prevtxid, outputindex, value)' +
+               '  VALUES ($1, $2, $3, $4, $5, NULL)',
+      storeOut: 'INSERT INTO history' +
+                '  (address, txid, index, prevtxid, outputindex, value)' +
+                '  VALUES ($1, $2, $3, NULL, NULL, $4)'
     }
   }
+
+  var selectAddresses = [
+    'SELECT address FROM history WHERE txid = $1 AND index = $2',
+    'SELECT address FROM history_mempool WHERE txid = $1 AND index = $2'
+  ]
 
   var network = this.network
   var indexedTransactions = _.indexBy(transactions, 'id')
@@ -138,44 +153,88 @@ Indexer.prototype.storeTransactions = function (client, transactions, height) {
     return client.queryAsync(queries.storeTx, params)
   }
 
+  function getInScriptAddresses (script, txid, outindex) {
+    if (script.isPublicKeyHashIn()) {
+      var hash = Hash.sha256ripemd160(script.chunks[1].buf)
+      return Promise.resolve([new Address(hash, network, Address.PayToPublicKeyHash).toString()])
+    }
+
+    if (txid === '0000000000000000000000000000000000000000000000000000000000000000' &&
+        outindex === 0xffffffff) {
+      return Promise.resolve([])
+    }
+
+    // first check current block
+    var tx = indexedTransactions[txid]
+    if (tx !== undefined) {
+      var addresses = getOutScriptAddresses(tx.outputs[outindex].script)
+      return Promise.resolve(_.invoke(addresses, 'toString'))
+    }
+
+    // load from storage
+    var params = ['\\x' + txid, outindex]
+    return Promise.all([
+      client.queryAsync(selectAddresses[0], params),
+      client.queryAsync(selectAddresses[1], params)
+    ])
+    .spread(function (res1, res2) {
+      return _.pluck(res1.rows.concat(res2.rows), 'address')
+    })
+  }
+
   function saveInputs (tx) {
-    return Promise.resolve()
+    var txid = tx.id
+    return tx.inputs.map(function (input, index) {
+      var prevTxId = input.prevTxId.toString('hex')
+      var params = ['\\x' + txid, index, '\\x' + prevTxId, input.outputIndex]
+      if (!isMempool) { params.push(height) }
+      return getInScriptAddresses(input.script, prevTxId, input.outputIndex)
+        .then(function (addresses) {
+          return Promise.all(addresses.map(function (address) {
+            var lparams = [address].concat(params)
+            return client.queryAsync(queries.storeIn, lparams)
+          }))
+        })
+    })
+  }
+
+  function getOutScriptAddresses (script) {
+    if (script.isPublicKeyHashOut()) {
+      return [new Address(script.chunks[2].buf, network, Address.PayToPublicKeyHash)]
+    }
+
+    if (script.isScriptHashOut()) {
+      return [new Address(script.chunks[1].buf, network, Address.PayToScriptHash)]
+    }
+
+    if (script.isMultisigOut()) {
+      return script.chunks.slice(1, -2).map(function (pubKey) {
+        var hash = Hash.sha256ripemd160(script.chunks[0].buf)
+        return new Address(hash, network, Address.PayToPublicKeyHash)
+      })
+    }
+
+    if (script.isPublicKeyOut()) {
+      var hash = Hash.sha256ripemd160(script.chunks[0].buf)
+      return [new Address(hash, network, Address.PayToPublicKeyHash)]
+    }
+
+    return []
   }
 
   function saveOutputs (tx) {
     var txid = tx.id
     return tx.outputs.map(function (output, index) {
-      var script = output.script
-      var addresses = []
-
-      if (script.isPublicKeyHashOut()) {
-        addresses = [new Address(script.chunks[2].buf, network, Address.PayToPublicKeyHash)]
-
-      } else if (script.isScriptHashOut()) {
-        addresses = [new Address(script.chunks[1].buf, network, Address.PayToScriptHash)]
-
-      } else if (script.isMultisigOut()) {
-        addresses = script.chunks.slice(1, -2).map(function (pubKey) {
-          var hash = Hash.sha256ripemd160(script.chunks[0].buf)
-          return new Address(hash, network, Address.PayToPublicKeyHash)
-        })
-
-      } else if (script.isPublicKeyOut()) {
-        var hash = Hash.sha256ripemd160(script.chunks[0].buf)
-        addresses = [new Address(hash, network, Address.PayToPublicKeyHash)]
-
-      } else { return }
-
-      var params = [txid, index, output.satoshis]
+      var params = ['\\x' + txid, index, output.satoshis]
       if (!isMempool) { params.push(height) }
-      return addresses.map(function (address) {
-        params = [address.toString()].concat(params)
-        return client.queryAsync(queries.storeOut, params)
+      return getOutScriptAddresses(output.script).map(function (address) {
+        var lparams = [address.toString()].concat(params)
+        return client.queryAsync(queries.storeOut, lparams)
       })
     })
   }
 
-  return Promise.all(_.flatten(transactions.map(function (tx) {
+  return Promise.all(_.flattenDeep(transactions.map(function (tx) {
     return [saveTx(tx), saveInputs(tx), saveOutputs(tx)]
   })))
 }
@@ -221,7 +280,7 @@ Indexer.prototype.catchUp = function () {
     .then(function () {
       // reorg check
       if (self.bestBlock.height >= self.bitcoindBestBlock.height) {
-        logger.warning('Reorg to height: %d', self.bitcoindBestBlock.height)
+        logger.warn('Reorg to height: %d', self.bitcoindBestBlock.height)
         return self.storage.executeTransaction(function (client) {
           var height = self.bitcoindBestBlock.height
           return Promise.all([
