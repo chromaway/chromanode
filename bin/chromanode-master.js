@@ -128,10 +128,10 @@ Indexer.prototype.storeTransactions = function (client, transactions, height) {
     },
     mempool: {
       storeTx: 'INSERT INTO transactions_mempool (txid, tx) VALUES ($1, $2)',
-      storeIn: 'INSERT INTO history' +
+      storeIn: 'INSERT INTO history_mempool' +
                '  (address, txid, index, prevtxid, outputindex, value)' +
                '  VALUES ($1, $2, $3, $4, $5, NULL)',
-      storeOut: 'INSERT INTO history' +
+      storeOut: 'INSERT INTO history_mempool' +
                 '  (address, txid, index, prevtxid, outputindex, value)' +
                 '  VALUES ($1, $2, $3, NULL, NULL, $4)'
     }
@@ -326,7 +326,7 @@ Indexer.prototype.catchUp = function () {
       })
       .then(function () {
         self.bestBlock = {height: height, blockid: block.id}
-        logger.verbose('Import #%d (blockId: %s', height, block.id)
+        logger.verbose('Import #%d (blockId: %s)', height, block.id)
       })
     })
     .catch(ReorgFound, function () {})
@@ -344,7 +344,47 @@ Indexer.prototype.catchUp = function () {
  * @return {Promise}
  */
 Indexer.prototype.updateMempool = function () {
-  return Promise.resolve()
+  var self = this
+  return self.storage.executeTransaction(function (client) {
+    return Promise.all([
+      client.queryAsync('SELECT txid FROM transactions_mempool'),
+      self.bitcoind.getRawMemPoolAsync()
+    ])
+    .spread(function (sres, bres) {
+      sres = _.pluck(sres.rows, 'txid').map(function (buf) {
+        return buf.toString('hex')
+      })
+      bres = bres.result
+
+      var newtxs = self.bitcoind.batchAsync(function () {
+        _.difference(bres, sres).map(function (txid) {
+          self.bitcoind.getRawTransaction(txid)
+        })
+      })
+      var oldtxs = _.difference(sres, bres).map(function (txid) {
+        txid = '\\x' + txid
+        return [
+          client.queryAsync('DELETE FROM transactions_mempool WHERE txid = $1', [txid]),
+          client.queryAsync('DELETE FROM history_mempool WHERE txid = $1', [txid])
+        ]
+      })
+
+      return Promise.all(_.flatten(oldtxs).concat(newtxs))
+        .spread(function () {
+          var newtxs = _.chain(arguments)
+            .last()
+            .pluck('result')
+            .map(bitcore.Transaction)
+            .value()
+          return self.storeTransactions(client, newtxs)
+        })
+        .then(function () {
+          var diff = _.difference(bres, sres).length - oldtxs.length
+          if (diff >= 0) { diff = '+' + diff.toString() }
+          logger.verbose('Mempool updated... %s transactions', diff.toString())
+        })
+    })
+  })
 }
 
 /**
