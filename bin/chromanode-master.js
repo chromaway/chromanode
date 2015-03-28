@@ -204,7 +204,7 @@ Indexer.prototype.storeTransactions = function (client, transactions, height) {
   }
 
   function getOutScriptAddresses (script) {
-    if (script.isPublicKeyHashOut()) {
+    if (script.isPublicKeyHashOut() && script.chunks[2].len === 20) {
       return [new Address(script.chunks[2].buf, network, Address.PayToPublicKeyHash)]
     }
 
