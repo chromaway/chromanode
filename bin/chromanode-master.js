@@ -168,13 +168,17 @@ Indexer.prototype.storeTransactions = function (client, transactions, height) {
 
     // load from storage
     var params = ['\\x' + txid, outindex]
-    return Promise.all([
-      client.queryAsync(selectAddresses[0], params),
-      client.queryAsync(selectAddresses[1], params)
-    ])
-    .spread(function (res1, res2) {
-      return _.pluck(res1.rows.concat(res2.rows), 'address')
-    })
+    return client.queryAsync(selectAddresses[0], params)
+      .then(function (res) {
+        if (res.rows.length > 0) {
+          return _.pluck(res.rows, 'address')
+        }
+
+        return client.queryAsync(selectAddresses[1], params)
+          .then(function (res) {
+            return _.pluck(res.rows, 'address')
+          })
+      })
   }
 
   function saveInputs (tx) {
