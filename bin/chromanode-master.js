@@ -230,13 +230,13 @@ Indexer.prototype.storeTransactions = function (client, transactions, height) {
   function saveOutputs (tx) {
     var txid = tx.id
     return tx.outputs.map(function (output, index) {
-      var script
-      try { script = output.script } catch (e) { return }
+      // script validation
+      try { output.script } catch (e) { return }
 
       var params = ['\\x' + txid, index, output.satoshis]
       if (!isMempool) { params.push(height) }
 
-      return getOutScriptAddresses(script).map(function (address) {
+      return getOutScriptAddresses(output.script).map(function (address) {
         var lparams = [address.toString()].concat(params)
         return client.queryAsync(queries.storeOut, lparams)
       })

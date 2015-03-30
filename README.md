@@ -22,7 +22,7 @@
 
   Edit configs:
 
-    $ vim master.yml slave.yml
+    $ vim config/master.yml config/slave.yml
 
   Run master node:
 
@@ -37,6 +37,7 @@
   * [Insight-api](https://github.com/bitpay/insight-api)
   * [Toshi](https://github.com/coinbase/toshi)
   * [Electrum-server](https://github.com/spesmilo/electrum-server)
+  * [MyChain](https://github.com/thofmann/mychain)
 
 ## License
 
