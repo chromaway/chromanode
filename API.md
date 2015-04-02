@@ -1,6 +1,6 @@
 # API
 
-Chromanode using [socket.io](https://github.com/Automattic/socket.io) as transport layer and similar [json-rpc](http://www.jsonrpc.org/) interface for calling api methods.
+Chromanode using [socket.io](https://github.com/Automattic/socket.io) as transport layer and [json-rpc](http://www.jsonrpc.org/) protocol for calling api methods.
 
 ## Methods:
 
@@ -13,6 +13,15 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) as transpo
   * [sendtx](#sendtx)
   * [queryaddresses](#queryaddresses)
   * [subscribe](#subscribe)
+
+## Errors
+
+| code  | message                                     |
+|:------|:--------------------------------------------|
+| -1000 | Tx not found                                |
+| -1001 | From not found                              |
+| -1002 | To not found                                |
+| -1010 | Distance between from and to more than 2016 |
 
 ### version
 
@@ -84,9 +93,9 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) as transpo
 
   **error**
 
-    {"name": "FromNotFound"}
-    {"name": "ToNotFound"}
-    {"name": "ToVeryFar"}
+    {"code": -1001, "message": "From not found"}
+    {"code": -1002, "message": "To not found"}
+    {"code": -1010, "message": "Distance between from and to more than 2016"}
 
 ### gettx
 
@@ -100,7 +109,7 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) as transpo
 
   **error**
 
-    {"name": "TxNotFound"}
+    {"code": -1000, "message": "Tx not found"}
 
 ### getmerkle
 
@@ -131,7 +140,7 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) as transpo
 
   **error**
 
-    {"name": "TxNotFound"}
+    {"code": -1000, "message": "Tx not found"}
 
 ### sendtx
 
@@ -145,7 +154,8 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) as transpo
 
   **error**
 
-    {"name": "SendTx", "message": "already in block chain"}
+    // code and message from bitcoind
+    {"code": -26, "message": "transaction already in block chain"}
 
 ### queryaddresses
 

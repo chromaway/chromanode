@@ -1,6 +1,3 @@
-chromanode:
-  network: testnet # livenet | testnet
-
 logger:
   level: verbose # verbose, info, warning, error
   filename: slave.log
