@@ -408,7 +408,7 @@ Indexer.prototype.mainLoop = function () {
     })
     .finally(function () {
       var et = Date.now() - st
-      var delay = config.get('chromanode.loopInterval') - et
+      var delay = config.get('chromanode.updateInterval') - et
       setTimeout(once, Math.max(0, delay))
     })
   }

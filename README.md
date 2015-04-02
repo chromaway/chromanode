@@ -1,6 +1,7 @@
 # chromanode
 
 [![build status](https://img.shields.io/travis/chromaway/chromanode.svg?branch=master&style=flat-square)](http://travis-ci.org/chromaway/chromanode)
+[![js-standard-style](https://img.shields.io/badge/code%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/feross/standard)
 
 *Chromanode* is open source bitcoin blockchain API (http and websocket support) writeen on JavaScript and uses PostgreSQL for storage.
 
@@ -28,9 +29,25 @@
 
     $ ./bin/chromanode-master.js -c config/master.yml
 
-  Run slave node:
+  Run slave node (only one slave instance supported now):
 
     $ ./bin/chromanode-slave.js -c config/slave.yml
+
+## API
+
+Chromanode using [socket.io](https://github.com/Automattic/socket.io) as transport layer and similar [json-rpc](http://www.jsonrpc.org/) interface for calling api methods.
+
+### Methods:
+
+  * [version](API.md#version)
+  * [getinfo](API.md#getinfo)
+  * [getlastheader](API.md#getlastheader)
+  * [getheaders](API.md#getheaders)
+  * [gettx](API.md#gettx)
+  * [getmerkle](#getmerkle)
+  * [sendtx](API.md#sendtx)
+  * [queryaddresses](API.md#queryaddresses)
+  * [subscribe](API.md#subscribe)
 
 ## Other open source blockchain apis
 

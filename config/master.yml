@@ -1,17 +1,17 @@
 chromanode:
   network: testnet # livenet | testnet
-  loopInterval: 5000 # in milliseconds
+  updateInterval: 5000 # in milliseconds
 
 logger:
-  level: verbose
-  filename:
+  level: verbose # verbose, info, warning, error
+  filename: master.log
 
 postgresql:
-  url: postgres://bindex@localhost/bindex_testnet
+  url: postgres://user:pass@host:port/database_name
 
-bitcoind:
+bitcoind: # config for https://github.com/bitpay/bitcoind-rpc
   protocol: http
-  user: bitcoinrpc
-  pass: uMXXbdR2D7gh8BDofJC47dB6WyBEa8sRmM1N4JyPHv6
+  user: user
+  pass: pass
   host: localhost
   port: 18332

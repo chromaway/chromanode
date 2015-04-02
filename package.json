@@ -2,7 +2,6 @@
   "name": "chromanode",
   "description": "",
   "author": "Fomichev Kirill <fanatid@ya.ru>",
-  "main": "chromanode.js",
   "repository": {
     "type": "git",
     "url": "git@github.com:chromaway/chromanode.git"
@@ -22,9 +21,12 @@
   "scripts": {
     "lint": "standard"
   },
+  "engines": {
+    "node": "~0.10.36"
+  },
   "dependencies": {
     "bitcoind-rpc": "^0.2.1",
-    "bitcore": "^0.11.4",
+    "bitcore": "^0.11.6",
     "bluebird": "^2.9.15",
     "error-system": "^0.1.0",
     "glob": "^5.0.3",

@@ -1,0 +1,9 @@
+chromanode:
+  network: testnet # livenet | testnet
+
+logger:
+  level: verbose # verbose, info, warning, error
+  filename: slave.log
+
+postgresql:
+  url: postgres://user:pass@host:port/database_name
