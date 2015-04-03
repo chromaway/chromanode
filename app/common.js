@@ -3,7 +3,7 @@
 var Promise = require('bluebird')
 var yargs = require('yargs')
 
-module.exports.run = function (getNode) {
+module.exports.run = function (init) {
   var argv = yargs
     .usage('Usage: $0 [-h] [-c CONFIG]')
     .options('c', {
@@ -30,10 +30,9 @@ module.exports.run = function (getNode) {
   // check network
   require('../lib/util').checkNetwork(config.get('chromanode.network'))
 
-  // create and initialize
-  var Node = getNode()
-  new Node().init().catch(function (err) {
-    logger.error('Error on slave initialization: %s', err)
+  // initialize
+  init().catch(function (err) {
+    logger.error('Error on initialization: %s', err)
     process.exit(1)
   })
 }

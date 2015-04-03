@@ -387,4 +387,10 @@ Master.prototype.start = function () {
   once()
 }
 
-module.exports = Master
+/**
+ * @return {Promise}
+ */
+module.exports.run = function () {
+  var master = new Master()
+  return master.init()
+}

@@ -2,7 +2,7 @@ var expressWinston = require('express-winston')
 var bodyParser = require('body-parser')
 var compression = require('compression')
 
-var logger = require('../../lib/logger').logger
+var logger = require('../../../lib/logger').logger
 
 module.exports = function (app) {
   app.set('showStackError', true)
@@ -27,4 +27,6 @@ module.exports = function (app) {
   app.use(bodyParser.json())
   app.use(bodyParser.urlencoded({extended: true}))
   app.use(compression())
+
+  /** @todo 404 handler */
 }

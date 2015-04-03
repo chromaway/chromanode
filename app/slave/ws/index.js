@@ -1,4 +1,4 @@
-var logger = require('../../lib/logger').logger
+var logger = require('../../../lib/logger').logger
 
 var ios = null // global is not good?
 
