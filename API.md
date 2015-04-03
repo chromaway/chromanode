@@ -1,6 +1,6 @@
 # API
 
-Chromanode using [socket.io](https://github.com/Automattic/socket.io) as transport layer and [json-rpc](http://www.jsonrpc.org/) protocol for calling api methods.
+Chromanode using [socket.io](https://github.com/Automattic/socket.io) as transport layer and similiar [json-rpc](http://www.jsonrpc.org/) protocol for calling api methods.
 
 ## Methods:
 

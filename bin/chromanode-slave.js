@@ -1,5 +1,5 @@
 #!/usr/bin/env node
 
-require('../lib/bin/common').run(function () {
-  return require('../lib/bin/slave')
+require('../app/common').run(function () {
+  return require('../app/slave/slave')
 })

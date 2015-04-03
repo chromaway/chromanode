@@ -19,16 +19,16 @@ module.exports.run = function (getNode) {
     .argv
 
   // load config
-  var config = require('../config').load(argv.config)
+  var config = require('../lib/config').load(argv.config)
 
   // logging unhadled errors
-  var logger = require('../logger').logger
+  var logger = require('../lib/logger').logger
   Promise.onPossiblyUnhandledRejection(function (err) {
     logger.error(err.stack || err.toString())
   })
 
   // check network
-  require('../util').checkNetwork(config.get('chromanode.network'))
+  require('../lib/util').checkNetwork(config.get('chromanode.network'))
 
   // create and initialize
   var Node = getNode()

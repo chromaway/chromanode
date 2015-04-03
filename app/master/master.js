@@ -10,9 +10,9 @@ var timers = require('timers')
 var Address = bitcore.Address
 var Hash = bitcore.crypto.Hash
 
-var config = require('../config')
-var logger = require('../logger').logger
-var Storage = require('../storage')
+var config = require('../../lib/config')
+var logger = require('../../lib/logger').logger
+var Storage = require('../../lib/storage')
 
 /**
  * @class Master
