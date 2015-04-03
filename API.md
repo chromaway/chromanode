@@ -163,7 +163,7 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) as transpo
 
   **params**
 
-    // get all affected transactions for addresses
+    // get all affected transactions for addresses (from blocks and mempool)
     {
       "addresses": [
         "mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2",
@@ -171,7 +171,7 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) as transpo
       ]
     }
 
-    // all affected transactions with unspent outputs from height #103548
+    // all affected transactions that have at least one unspent output from height #103548
     {
       "addresses": ["mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2"],
       "source": "blocks",
@@ -195,7 +195,7 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) as transpo
 
   **result**
 
-    // source is blocks
+    // source is blocks and mempool (height is null)
     {
       "transactions": [{
         "txid": "5f450e47d9ae60f156d366418442f7c454fd4a343523edde7776af7a7d335ac6",
@@ -203,20 +203,14 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) as transpo
       }, ... {
         "txid": "fba4a74006c51bdf5efdc69c7a9a6e188a2a0de62486f2719d8335bb96984932",
         "height": 329740
+      }, {
+        "txid": "ab139c6e7054d086ca65f1b7173ee31ef39a1d0ad1797b4addd82f4028dfa0d1",
+        "height": null
       }],
       lastBlock: {
         "height": 329750,
         "blockid": "0000000045dd9bad2000dd00b31762c3da32ac46f40cdf4ddd350bcc3571a253"
       }
-    }
-
-    // source is mempool
-    {
-      "transactions": [
-        "ab139c6e7054d086ca65f1b7173ee31ef39a1d0ad1797b4addd82f4028dfa0d1",
-        ...
-        "c839eafa86638520d4f05b48dc2a38cd1498bde5165df59242e6003fdde86a15"
-      ]
     }
 
   **error**
