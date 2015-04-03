@@ -12,7 +12,7 @@ var Hash = bitcore.crypto.Hash
 
 var config = require('../../lib/config')
 var logger = require('../../lib/logger').logger
-var Storage = require('../../lib/storage')
+var storage = require('../../lib/storage').default()
 
 /**
  * @class Master
@@ -33,12 +33,11 @@ Master.prototype.init = function () {
     logger.info('Connected to bitcoind! (ver. %d)', ret.result.version)
 
     // init storage
-    self.storage = new Storage()
-    return self.storage.init()
+    return storage.init()
   })
   .then(function () {
     return Promise.all([
-      self.storage.getBestBlock(),
+      storage.getBestBlock(),
       self.getBitcoindBestBlock()
     ])
     .spread(function (sBestBlock, bBestBlock) {
@@ -259,7 +258,7 @@ Master.prototype.catchUp = function () {
       // reorg check
       if (self.bestBlock.height >= self.bitcoindBestBlock.height) {
         logger.warn('Reorg to height: %d', self.bitcoindBestBlock.height)
-        return self.storage.executeTransaction(function (client) {
+        return storage.executeTransaction(function (client) {
           var height = self.bitcoindBestBlock.height
           return Promise.all([
             client.queryAsync('DELETE FROM blocks WHERE height >= $1', [height]),
@@ -268,7 +267,7 @@ Master.prototype.catchUp = function () {
             tryTruncateMempool()
           ])
         })
-        .then(function () { return self.storage.getBestBlock() })
+        .then(function () { return storage.getBestBlock() })
         .then(function (sBestBlock) {
           self.bestBlock = sBestBlock
           throw new ReorgFound()
@@ -280,7 +279,7 @@ Master.prototype.catchUp = function () {
     })
     .then(function (block) {
       var height = self.bestBlock.height + 1
-      return self.storage.executeTransaction(function (client) {
+      return storage.executeTransaction(function (client) {
         var blockQuery = 'INSERT INTO blocks (height, blockid, header, txids) VALUES ($1, $2, $3, $4)'
 
         return tryTruncateMempool(client)
@@ -318,7 +317,7 @@ Master.prototype.catchUp = function () {
  */
 Master.prototype.updateMempool = function () {
   var self = this
-  return self.storage.executeTransaction(function (client) {
+  return storage.executeTransaction(function (client) {
     return Promise.all([
       client.queryAsync('SELECT txid FROM transactions_mempool'),
       self.bitcoind.getRawMemPoolAsync()

@@ -35,19 +35,7 @@
 
 ## API
 
-Chromanode using [socket.io](https://github.com/Automattic/socket.io) as transport layer and similiar [json-rpc](http://www.jsonrpc.org/) protocol for calling api methods.
-
-### Methods:
-
-  * [version](API.md#version)
-  * [getinfo](API.md#getinfo)
-  * [getlastheader](API.md#getlastheader)
-  * [getheaders](API.md#getheaders)
-  * [gettx](API.md#gettx)
-  * [getmerkle](#getmerkle)
-  * [sendtx](API.md#sendtx)
-  * [queryaddresses](API.md#queryaddresses)
-  * [subscribe](API.md#subscribe)
+[draft](API_draft.md)
 
 ## Other open source blockchain apis
 

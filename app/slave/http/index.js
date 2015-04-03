@@ -1,14 +1,46 @@
-var expressWinston = require('express-winston')
+/* globals Promise:true */
+
 var bodyParser = require('body-parser')
+var cors = require('cors')
 var compression = require('compression')
+var fs = require('fs')
+var http = require('http')
+var https = require('https')
+var expressWinston = require('express-winston')
+var Promise = require('bluebird')
 
+var config = require('../../../lib/config')
 var logger = require('../../../lib/logger').logger
+var jsend = require('./jsend')
+var routes = require('./routes')
 
-module.exports = function (app) {
-  app.set('showStackError', true)
+module.exports.createServer = function (expressApp) {
+  var server = (function () {
+    if (!!config.get('chromanode.enableHTTPS') === false) {
+      return http.createServer(expressApp)
+    }
+
+    var opts = {}
+    opts.key = fs.readFileSync('etc/key.pem')
+    opts.cert = fs.readFileSync('etc/cert.pem')
+    return https.createServer(opts, expressApp)
+  })()
+
+  return Promise.promisifyAll(server)
+}
+
+module.exports.setupExpress = function (app) {
+  jsend.setup()
+
+  // app.set('showStackError', true)
   app.set('etag', false)
 
   app.enable('jsonp callback')
+
+  app.use(cors())
+  app.use(compression())
+  app.use(bodyParser.json())
+  app.use(bodyParser.urlencoded({extended: true}))
 
   app.use(function (req, res, next) {
     res.setHeader('Access-Control-Allow-Origin', '*')
@@ -24,9 +56,10 @@ module.exports = function (app) {
     expressFormat: true,
     colorStatus: true
   }))
-  app.use(bodyParser.json())
-  app.use(bodyParser.urlencoded({extended: true}))
-  app.use(compression())
 
-  /** @todo 404 handler */
+  app.use('/', routes.createRoutes())
+
+  app.use(function (req, res) {
+    res.jfail('The endpoint you are looking for does not exist!')
+  })
 }

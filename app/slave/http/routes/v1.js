@@ -1,3 +1,7 @@
-module.exports = function (app) {
-  /** @todo */
+var express = require('express')
+
+module.exports.createRoutes = function () {
+  var router = express.Router()
+
+  return router
 }
