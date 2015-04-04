@@ -57,7 +57,7 @@ module.exports.setupExpress = function (app) {
     colorStatus: true
   }))
 
-  app.use('/', routes.createRoutes())
+  app.use('/', routes.createRouter())
 
   app.use(function (req, res) {
     res.jfail('The endpoint you are looking for does not exist!')
