@@ -35,7 +35,7 @@
 
 ## API
 
-[draft](API_draft.md)
+[API v1](docs/API_v1.md)
 
 ## Other open source blockchain apis
 

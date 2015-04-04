@@ -10,3 +10,4 @@ logger:
 
 postgresql:
   url: postgres://user:pass@host:port/database_name
+  poolSize: 10

@@ -37,7 +37,7 @@ Master.prototype.init = function () {
   })
   .then(function () {
     return Promise.all([
-      storage.getBestBlock(),
+      storage.getLatestHeader(),
       self.getBitcoindBestBlock()
     ])
     .spread(function (sBestBlock, bBestBlock) {
@@ -267,7 +267,7 @@ Master.prototype.catchUp = function () {
             tryTruncateMempool()
           ])
         })
-        .then(function () { return storage.getBestBlock() })
+        .then(function () { return storage.getLatestHeader() })
         .then(function (sBestBlock) {
           self.bestBlock = sBestBlock
           throw new ReorgFound()

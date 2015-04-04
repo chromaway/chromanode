@@ -3,16 +3,43 @@
 var bodyParser = require('body-parser')
 var cors = require('cors')
 var compression = require('compression')
+var express = require('express')
+var expressWinston = require('express-winston')
 var fs = require('fs')
 var http = require('http')
 var https = require('https')
-var expressWinston = require('express-winston')
 var Promise = require('bluebird')
 
 var config = require('../../../lib/config')
+var errors = require('../../../lib/errors')
 var logger = require('../../../lib/logger').logger
-var jsend = require('./jsend')
 var routes = require('./routes')
+
+express.response.jsend = function (data) {
+  this.jsonp({status: 'success', data: data})
+}
+
+express.response.jfail = function (data) {
+  this.jsonp({status: 'fail', data: data})
+}
+
+express.response.jerror = function (message) {
+  this.jsonp({status: 'error', message: message})
+}
+
+express.response.promise = function (promise) {
+  var self = this
+  promise
+    .then(self.jsend.bind(self))
+    .catch(errors.Slave, function (err) {
+      logger.error(err)
+      self.jfail(err.message)
+    })
+    .catch(function (err) {
+      logger.error(err)
+      self.jerror(err.message)
+    })
+}
 
 module.exports.createServer = function (expressApp) {
   var server = (function () {
@@ -30,8 +57,6 @@ module.exports.createServer = function (expressApp) {
 }
 
 module.exports.setupExpress = function (app) {
-  jsend.setup()
-
   // app.set('showStackError', true)
   app.set('etag', false)
 
