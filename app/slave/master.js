@@ -37,52 +37,52 @@ Master.prototype.getLatestHeader = function () {
 /**
  * @param {Object} headersQuery
  * @param {number} headersQuery.from
- * @param {number} headersQuery.to
- * @param {string} headersQuery.count
+ * @param {number} [headersQuery.to]
+ * @param {string} [headersQuery.count]
  * @return {Promise<{from: number, count: number, headers: string}>}
  */
-Master.prototype.getHeaders = function (headersQuery) {
-  var queries = {
-    selectByHeight: 'SELECT ' +
-                    '  height as height ' +
-                    'FROM blocks ' +
-                    '  WHERE height = $1',
-    selectByBlockId: 'SELECT ' +
-                     '  height as height ' +
-                     'FROM blocks ' +
-                     '  WHERE blockid = $1',
-    selectHeaders: 'SELECT ' +
-                   '  header as header ' +
-                   'FROM blocks ' +
-                   '  WHERE height >= $1 AND height < $2'
+Master.prototype.headersQuery = function (query) {
+  var SQL = {
+    getHeightByHeight: 'SELECT ' +
+                       '  height as height ' +
+                       'FROM blocks ' +
+                       '  WHERE height = $1',
+    getHeightByBlockId: 'SELECT ' +
+                        '  height as height ' +
+                        'FROM blocks ' +
+                        '  WHERE blockid = $1',
+    getHeaders: 'SELECT ' +
+                '  header as header ' +
+                'FROM blocks ' +
+                '  WHERE height >= $1 AND height < $2'
   }
 
   function toArgs (param) {
     if (_.isNumber(param)) {
-      return [queries.selectByHeight, [param]]
+      return [SQL.getHeightByHeight, [param]]
     }
 
-    return [queries.selectByBlockId, ['\\x' + param]]
+    return [SQL.getHeightByBlockId, ['\\x' + param]]
   }
 
   return storage.executeTransaction(function (client) {
-    return client.queryAsync.apply(client, toArgs(headersQuery.from))
+    return client.queryAsync.apply(client, toArgs(query.from))
       .then(function (result) {
         if (result.rows.length === 0) {
-          var msg = 'from ' + headersQuery.from + ' not found'
+          var msg = 'from ' + query.from + ' not found'
           throw new errors.Slave.InvalidArguments(msg)
         }
 
         var from = result.rows[0].height
 
-        if (headersQuery.to === undefined) {
-          return [from, from + headersQuery.count]
+        if (query.to === undefined) {
+          return [from, from + query.count]
         }
 
-        return client.queryAsync.apply(client, toArgs(headersQuery.to))
+        return client.queryAsync.apply(client, toArgs(query.to))
           .then(function (result) {
             if (result.rows.length === 0) {
-              var msg = 'to ' + headersQuery.to + ' not found'
+              var msg = 'to ' + query.to + ' not found'
               throw new errors.Slave.InvalidArguments(msg)
             }
 
@@ -100,7 +100,7 @@ Master.prototype.getHeaders = function (headersQuery) {
 
         return Promise.all([
           from,
-          client.queryAsync(queries.selectHeaders, [from, to])
+          client.queryAsync(SQL.getHeaders, [from, to])
         ])
       })
       .spread(function (from, result) {
@@ -112,6 +112,27 @@ Master.prototype.getHeaders = function (headersQuery) {
 
         return {from: from, count: headers.length / 160, headers: headers}
       })
+  })
+}
+
+/**
+ * @typedef Master~AddressesQueryResult
+ * @property {Array.<{txid: string, height: ?number}>} transactions
+ * @property {{height: number, blockid: string}} latest
+ */
+
+/**
+ * @param {Object} query
+ * @param {string[]} query.addresses
+ * @param {string} [query.source]
+ * @param {(string|number)} [query.from]
+ * @param {(string|number)} [query.to]
+ * @param {string} [query.status]
+ * @return {Promise<Master~AddressesQueryResult}
+ */
+Master.prototype.addressesQuery = function (query) {
+  return storage.executeTransaction(function (client) {
+
   })
 }
 

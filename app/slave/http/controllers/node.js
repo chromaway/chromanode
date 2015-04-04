@@ -7,7 +7,6 @@ var util = require('../../../../lib/util')
 
 module.exports.status = function (req, res) {
   /* @todo */
-  /*
   var result = Promise.all([
     master.getLatestHeader()
   ])
@@ -20,7 +19,6 @@ module.exports.status = function (req, res) {
       }
     }
   })
-  */
 
   res.promise(result)
 }

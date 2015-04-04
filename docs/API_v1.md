@@ -2,6 +2,9 @@
 
 Chromanode using [socket.io](https://github.com/Automattic/socket.io) for notification and HTTP for request.
 
+  * [methods](#methods)
+  * [notifications](#notifications)
+
 ## Methods:
 
   * [status](#status)
@@ -14,11 +17,6 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) for notifi
     * [send](#send)
   * [addresses](#addresses)
     * [query](#query)
-
-## Notifications:
-
-  * [new-blocks](#new-blocks)
-  * [address-txid](#address-txid)
 
 ### Status
 
@@ -69,9 +67,9 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) for notifi
 
   Return raw headers for custom query.
 
-  *maximum 2016 headers (one chunk)*
+  \* *maximum 2016 headers (one chunk)*
 
-  *half-open interval for [from-to)*
+  \* *half-open interval for [from-to)*
 
   **url**
 
@@ -104,3 +102,72 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) for notifi
       "count": 2,
       "headers": "00000000f872dcf2242fdf93ecfe8da1ba02304e...69a632dcb" // 160 bytes
     }
+
+### Transactions
+
+#### Raw
+
+#### Merkle
+
+#### Send
+
+### Addresses
+
+#### Query
+
+  \* *half-close interval for (from-to]*
+
+  **url**
+
+    /v1/addresses/query
+
+  **params**
+
+| param     | description                                           |
+|:----------|:------------------------------------------------------|
+| addresses | array of addresses                                    |
+| source    | blocks or mempool, may be omitted (both will be used) |
+| from      | blockid or height, may be omitted                     |
+| to        | blockid or height, may be omitted                     |
+| status    | now only unspent available, may be omitted            |
+
+    // get all affected transactions for addresses (from blocks and mempool)
+    /v1/addresses/query?addresses=mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2,msGccLNBLYWBg9U1J2RVribprvsEF3uYGK
+
+    // all affected transactions from blocks that have at least one unspent output from height #103548
+    /v1/addresses/query?addresses=mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2&source=blocks&from=103548&status=unspent
+
+    // all affected transactions from mempool
+    /v1/addresses/query?addresses=mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2&source=mempool
+
+    // all affected transactions for half-closed interval (fromBlockId, toBlockId]
+    /v1/addresses/query?addresses=mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2&from=0000000048f98df71a9d3973c55ac5543735f8ef801603caea2bdf22d77e8354&to=0000000011ab0934769901d4acde41e48a98a7cdaf9d7626d094e66368443560
+
+  **result**
+
+    // for mempool height is null
+    {
+      "transactions": [{
+        "txid": "5f450e47d9ae60f156d366418442f7c454fd4a343523edde7776af7a7d335ac6",
+        "height": 318345
+      }, ... {
+        "txid": "fba4a74006c51bdf5efdc69c7a9a6e188a2a0de62486f2719d8335bb96984932",
+        "height": 329740
+      }, {
+        "txid": "ab139c6e7054d086ca65f1b7173ee31ef39a1d0ad1797b4addd82f4028dfa0d1",
+        "height": null
+      }],
+      latest: {
+        "height": 329750,
+        "blockid": "0000000045dd9bad2000dd00b31762c3da32ac46f40cdf4ddd350bcc3571a253"
+      }
+    }
+
+## Notifications:
+
+  * [new-blocks](#new-blocks)
+  * [address-txid](#address-txid)
+
+### New-blocks
+
+### Address-txid
