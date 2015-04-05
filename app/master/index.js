@@ -4,83 +4,54 @@ var _ = require('lodash')
 var bitcore = require('bitcore')
 var inherits = require('util').inherits
 var Promise = require('bluebird')
-var RpcClient = require('bitcoind-rpc')
 var timers = require('timers')
 
 var Address = bitcore.Address
 var Hash = bitcore.crypto.Hash
 
 var config = require('../../lib/config')
-var errors = require('../../lib/errors')
 var logger = require('../../lib/logger').logger
 var storage = require('../../lib/storage').default()
+var bitcoind = require('./bitcoind').default()
+var db = require('./db').default()
 
 /**
  * @class Master
  */
-function Master () {}
+function Master () {
+  /* @todo save to db */
+  this.isSyncing = true
+}
 
 /**
  * @return {Promise}
  */
 Master.prototype.init = function () {
   var self = this
-  return Promise.try(function () {
-    // request info
-    self.bitcoind = Promise.promisifyAll(new RpcClient(config.get('bitcoind')))
-    return self.bitcoind.getInfoAsync()
-  })
-  .then(function (ret) {
-    var bitcoindNetwork = ret.result.testnet ? 'testnet' : 'livenet'
-    if (bitcoindNetwork !== config.get('chromanode.network')) {
-      throw new errors.InvalidBitcoindNetwork()
-    }
 
-    logger.info('Connected to bitcoind! (ver. %d)', ret.result.version)
+  function once () {
+    var st = Date.now()
+    return Promise.all([db.getLatest(), bitcoind.getLatest()])
+      .spread(function (latest, bitcoindLatest) {
+        if (latest.blockid !== bitcoindLatest.blockid) {
+          return self.catchUp().then(function () { self.isSyncing = false })
+        }
 
-    // init storage
-    return storage.init()
-  })
-  .then(function () {
-    return Promise.all([
-      storage.getLatestHeader(),
-      self.getBitcoindBestBlock()
-    ])
-    .spread(function (sBestBlock, bBestBlock) {
-      self.bestBlock = sBestBlock
-      self.bitcoindBestBlock = bBestBlock
+        return self.updateMempool()
+      })
+      .finally(function () {
+        var et = Date.now() - st
+        var delay = config.get('chromanode.updateInterval') - et
+        setTimeout(once, Math.max(0, delay))
+      })
+  }
+
+  return Promise.all([bitcoind.init(), storage.init()])
+    .then(function () { return db.getLatest() })
+    .then(function (latest) {
+      logger.info('Start from %d (blockId: %s)', latest.height, latest.blockid)
+      timers.setImmediate(once)
     })
-  })
-  .then(function () {
-    timers.setImmediate(self.start.bind(self))
-  })
-}
-
-/**
- * @return {Promise<{height: number, blockid: string}>}
- */
-Master.prototype.getBitcoindBestBlock = function () {
-  var self = this
-  return self.bitcoind.getBlockCountAsync().then(function (ret) {
-    var height = ret.result
-    return self.bitcoind.getBlockHashAsync(height).then(function (ret) {
-      return {height: height, blockid: ret.result}
-    })
-  })
-}
-
-/**
- * @param {number} height
- * @return {Promise<bitcore.Block>}
- */
-Master.prototype.getBlock = function (height) {
-  var self = this
-  return self.bitcoind.getBlockHashAsync(height).then(function (ret) {
-    return self.bitcoind.getBlockAsync(ret.result, false).then(function (ret) {
-      var rawBlock = new Buffer(ret.result, 'hex')
-      return new bitcore.Block(rawBlock)
-    })
-  })
 }
 
 /**
@@ -245,73 +216,64 @@ Master.prototype.catchUp = function () {
     return client.queryAsync('TRUNCATE transactions_mempool, history_mempool')
   }
 
-  function once () {
-    return Promise.try(function () {
-      // check sync status first
-      if (self.bestBlock.height + 100 < self.bitcoindBestBlock.height) {
-        return
-      }
+  function runReorg (height) {
+    logger.warn('Reorg to height: %d', height)
+    return storage.executeTransaction(function (client) {
+      return Promise.all([
+        client.queryAsync('DELETE FROM blocks WHERE height >= $1', [height]),
+        client.queryAsync('DELETE FROM transactions WHERE height >= $1', [height]),
+        client.queryAsync('DELETE FROM history WHERE height >= $1', [height]),
+        tryTruncateMempool(client)
+      ])
+    })
+    .then(function () { throw new ReorgFound() })
+  }
 
-      // refresh bestBlock for bitcoind
-      return self.getBitcoindBestBlock().then(function (bBestBlock) {
-        self.bitcoindBestBlock = bBestBlock
-        if (self.bestBlock.blockid === self.bitcoindBestBlock.blockid) {
+  function once () {
+    return Promise.all([db.getLatest(), bitcoind.getLatest()])
+      .spread(function (latest, bitcoindLatest) {
+        if (latest.blockid === bitcoindLatest.blockid) {
           throw new SyncComplete()
         }
+
+        // get block from bitcoind
+        return Promise.all([latest, bitcoind.getBlock(latest.height + 1)])
       })
-    })
-    .then(function () {
-      // reorg check
-      if (self.bestBlock.height >= self.bitcoindBestBlock.height) {
-        logger.warn('Reorg to height: %d', self.bitcoindBestBlock.height)
+      .spread(function (latest, block) {
+        // run reorg
+        var prevHash = new Buffer(block.header.prevHash)
+        var prevBlockid = Array.prototype.reverse.call(prevHash).toString('hex')
+        if (latest.blockid !== prevBlockid) {
+          return runReorg(latest.height)
+        }
+
+        var height = latest.height + 1
         return storage.executeTransaction(function (client) {
-          var height = self.bitcoindBestBlock.height
-          return Promise.all([
-            client.queryAsync('DELETE FROM blocks WHERE height >= $1', [height]),
-            client.queryAsync('DELETE FROM transactions WHERE height >= $1', [height]),
-            client.queryAsync('DELETE FROM history WHERE height >= $1', [height]),
-            tryTruncateMempool()
-          ])
-        })
-        .then(function () { return storage.getLatestHeader() })
-        .then(function (sBestBlock) {
-          self.bestBlock = sBestBlock
-          throw new ReorgFound()
-        })
-      }
+          var blockQuery = 'INSERT INTO blocks (height, blockid, header, txids) VALUES ($1, $2, $3, $4)'
 
-      // get block from bitcoind
-      /* @todo check prevblockhash */
-      return self.getBlock(self.bestBlock.height + 1)
-    })
-    .then(function (block) {
-      var height = self.bestBlock.height + 1
-      return storage.executeTransaction(function (client) {
-        var blockQuery = 'INSERT INTO blocks (height, blockid, header, txids) VALUES ($1, $2, $3, $4)'
-
-        return tryTruncateMempool(client)
-          .then(function () {
-            var blockValues = [
-              height,
-              '\\x' + block.id,
-              '\\x' + block.header.toString(),
-              '\\x' + _.pluck(block.transactions, 'id').join('')
-            ]
-            return client.queryAsync(blockQuery, blockValues)
-          })
-          .then(function () {
-            return self.storeTransactions(client, block.transactions, height)
-          })
+          return tryTruncateMempool(client)
+            .then(function () {
+              var blockValues = [
+                height,
+                '\\x' + block.id,
+                '\\x' + block.header.toString(),
+                '\\x' + _.pluck(block.transactions, 'id').join('')
+              ]
+              return client.queryAsync(blockQuery, blockValues)
+            })
+            .then(function () {
+              return self.storeTransactions(client, block.transactions, height)
+            })
+        })
+        .then(function () {
+          /* @todo show progress when syncing and this message when finished */
+          logger.verbose('Import #%d (blockId: %s)', height, block.id)
+        })
       })
-      .then(function () {
-        self.bestBlock = {height: height, blockid: block.id}
-        logger.verbose('Import #%d (blockId: %s)', height, block.id)
-      })
-    })
-    .catch(ReorgFound, function () {})
-    .then(function () { timers.setImmediate(once) })
-    .catch(SyncComplete, function () { deferred.resolve() })
-    .catch(function (err) { deferred.reject(err) })
+      .catch(ReorgFound, function () {})
+      .then(function () { timers.setImmediate(once) })
+      .catch(SyncComplete, function () { deferred.resolve() })
+      .catch(function (err) { deferred.reject(err) })
   }
 
   once()
@@ -327,70 +289,34 @@ Master.prototype.updateMempool = function () {
   return storage.executeTransaction(function (client) {
     return Promise.all([
       client.queryAsync('SELECT txid FROM transactions_mempool'),
-      self.bitcoind.getRawMemPoolAsync()
+      bitcoind.getRawMemPool()
     ])
     .spread(function (sres, bres) {
       sres = _.pluck(sres.rows, 'txid').map(function (buf) {
         return buf.toString('hex')
       })
-      bres = bres.result
+      var oldtxs = _.difference(sres, bres)
 
-      var newtxs = self.bitcoind.batchAsync(function () {
-        _.difference(bres, sres).map(function (txid) {
-          self.bitcoind.getRawTransaction(txid)
-        })
-      })
-      var oldtxs = _.difference(sres, bres).map(function (txid) {
+      return Promise.map(oldtxs, function (txid) {
         txid = '\\x' + txid
-        return [
+        return Promise.all([
           client.queryAsync('DELETE FROM transactions_mempool WHERE txid = $1', [txid]),
           client.queryAsync('DELETE FROM history_mempool WHERE txid = $1', [txid])
-        ]
+        ])
       })
-
-      return Promise.all(_.flatten(oldtxs).concat(newtxs))
-        .spread(function () {
-          var newtxs = _.chain(arguments)
-            .last()
-            .pluck('result')
-            .map(bitcore.Transaction)
-            .value()
-          return self.storeTransactions(client, newtxs)
-        })
-        .then(function () {
-          var diff = _.difference(bres, sres).length - oldtxs.length
-          if (diff >= 0) { diff = '+' + diff.toString() }
-          logger.verbose('Mempool updated... %s transactions', diff.toString())
-        })
+      .then(function () {
+        return bitcoind.getTransactions(_.difference(bres, sres))
+      })
+      .then(function (newtxs) {
+        return self.storeTransactions(client, newtxs)
+      })
+      .then(function () {
+        var diff = _.difference(bres, sres).length - oldtxs.length
+        if (diff >= 0) { diff = '+' + diff.toString() }
+        logger.verbose('Mempool updated... %s transactions', diff.toString())
+      })
     })
   })
-}
-
-/**
- */
-Master.prototype.start = function () {
-  var self = this
-
-  function once () {
-    var st = Date.now()
-    self.getBitcoindBestBlock().then(function (bBestBlock) {
-      self.bitcoindBestBlock = bBestBlock
-      if (self.bestBlock.blockid !== self.bitcoindBestBlock.blockid) {
-        return self.catchUp()
-      }
-
-      return self.updateMempool()
-    })
-    .finally(function () {
-      var et = Date.now() - st
-      var delay = config.get('chromanode.updateInterval') - et
-      setTimeout(once, Math.max(0, delay))
-    })
-  }
-
-  logger.info('Start from %d (blockId: %s)',
-              self.bestBlock.height, self.bestBlock.blockid)
-  once()
 }
 
 /**
