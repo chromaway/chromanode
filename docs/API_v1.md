@@ -75,7 +75,7 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) for notifi
 
     /v1/headers/query
 
-  **params**
+  **query**
 
 | param | description                                              |
 |:------|:---------------------------------------------------------|
@@ -103,6 +103,15 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) for notifi
       "headers": "00000000f872dcf2242fdf93ecfe8da1ba02304e...69a632dcb" // 160 bytes
     }
 
+  **errors**
+
+    {"type": "InvalidHeight"}
+    {"type": "InvalidHash"}
+    {"type": "FromNotFound"}
+    {"type": "ToNotFound"}
+    {"type": "InvalidRequestedCount"}
+    {"type": "InvalidCount"}
+
 ### Transactions
 
 #### Raw
@@ -121,7 +130,7 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) for notifi
 
     /v1/addresses/query
 
-  **params**
+  **query**
 
 | param     | description                                           |
 |:----------|:------------------------------------------------------|
@@ -162,6 +171,17 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) for notifi
         "blockid": "0000000045dd9bad2000dd00b31762c3da32ac46f40cdf4ddd350bcc3571a253"
       }
     }
+
+  **errors**
+
+    {"type": "AddressesRequired"}
+    {"type": "InvalidAddresses"}
+    {"type": "InvalidSource"}
+    {"type": "InvalidHeight"}
+    {"type": "InvalidHash"}
+    {"type": "FromNotFound"}
+    {"type": "ToNotFound"}
+    {"type": "InvalidStatus"}
 
 ## Notifications:
 

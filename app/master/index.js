@@ -30,6 +30,7 @@ Master.prototype.init = function () {
     return self.bitcoind.getInfoAsync()
   })
   .then(function (ret) {
+    /** @todo check is testnet or livenet */
     logger.info('Connected to bitcoind! (ver. %d)', ret.result.version)
 
     // init storage
@@ -275,6 +276,7 @@ Master.prototype.catchUp = function () {
       }
 
       // get block from bitcoind
+      /* @todo check prevblockhash */
       return self.getBlock(self.bestBlock.height + 1)
     })
     .then(function (block) {

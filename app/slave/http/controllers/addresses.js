@@ -3,16 +3,16 @@
 var Promise = require('bluebird')
 
 var master = require('../../master').default()
-var util = require('../util')
+var qutil = require('../util/query')
 
 module.exports.query = function (req, res) {
   var result = Promise.try(function () {
     var query = {
-      addresses: util.exctractAddresses(req.query.addresses),
-      source: util.checkSource(req.query.source),
-      from: util.convertFromToQueryArg(req.query.from),
-      to: util.convertFromToQueryArg(req.query.to),
-      status: util.checkStatus(req.query.status)
+      addresses: qutil.transformAddresses(req.query.addresses),
+      source: qutil.transformSource(req.query.source),
+      from: qutil.transformFrom(req.query.from),
+      to: qutil.transformTo(req.query.to),
+      status: qutil.transformStatus(req.query.status)
     }
 
     return master.addressesQuery(query)

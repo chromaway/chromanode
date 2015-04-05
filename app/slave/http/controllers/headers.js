@@ -3,7 +3,7 @@
 var Promise = require('bluebird')
 
 var master = require('../../master').default()
-var util = require('../util')
+var qutil = require('../util/query')
 
 module.exports.latest = function (req, res) {
   res.promise(master.getLatestHeader())
@@ -12,13 +12,9 @@ module.exports.latest = function (req, res) {
 module.exports.query = function (req, res) {
   var result = Promise.try(function () {
     var query = {
-      from: util.convertFromToQueryArg(req.query.from, 'from'),
-      to: util.convertFromToQueryArg(req.query.to, 'to'),
-      count: req.query.count
-    }
-
-    if (query.to === undefined && query.count === undefined) {
-      query.count = 2016
+      from: qutil.transformFrom(req.query.from),
+      to: qutil.transformTo(req.query.to),
+      count: qutil.transformCount(req.query.count) || 2016
     }
 
     return master.headersQuery(query)

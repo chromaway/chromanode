@@ -69,8 +69,7 @@ Master.prototype.headersQuery = function (query) {
     return client.queryAsync.apply(client, toArgs(query.from))
       .then(function (result) {
         if (result.rows.length === 0) {
-          var msg = 'from ' + query.from + ' not found'
-          throw new errors.Slave.InvalidArguments(msg)
+          throw new errors.Slave.FromNotFound()
         }
 
         var from = result.rows[0].height
@@ -82,8 +81,7 @@ Master.prototype.headersQuery = function (query) {
         return client.queryAsync.apply(client, toArgs(query.to))
           .then(function (result) {
             if (result.rows.length === 0) {
-              var msg = 'to ' + query.to + ' not found'
-              throw new errors.Slave.InvalidArguments(msg)
+              throw new errors.Slave.ToNotFound()
             }
 
             return [from, result.rows[0].height]
@@ -92,10 +90,7 @@ Master.prototype.headersQuery = function (query) {
       .spread(function (from, to) {
         var count = to - from
         if (count <= 0 || count > 2016) {
-          var msg = count > 2016
-                      ? 'requested too many headers'
-                      : 'requested wrong count of headers'
-          throw new errors.Slave.InvalidArguments(msg)
+          throw new errors.Slave.InvalidRequestedCount()
         }
 
         return Promise.all([

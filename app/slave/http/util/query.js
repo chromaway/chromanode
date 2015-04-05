@@ -1,0 +1,120 @@
+/* globals Promise:true */
+
+var _ = require('lodash')
+var assert = require('assert')
+var bitcore = require('bitcore')
+var Address = bitcore.Address
+var isHexa = bitcore.util.js.isHexa
+
+var config = require('../../../../lib/config')
+var errors = require('../../../../lib/errors')
+
+/**
+ * @param {string} name
+ * @return {function}
+ */
+function createTransformFromTo (name) {
+  return function (val) {
+    if (val === undefined) {
+      return val
+    }
+
+    var num = parseInt(val, 10)
+    if (!_.isNaN(num)) {
+      if (num >= 0 && num < 1000000) {
+        return num
+      }
+
+      throw new errors.Slave.InvalidHeight()
+    }
+
+    if (val.length === 64 && isHexa(val)) {
+      return val
+    }
+
+    throw new errors.Slave.InvalidHash()
+  }
+}
+
+/**
+ * @param {string} val
+ * @return {(string|number)}
+ * @throws {errors.Slave}
+ */
+module.exports.transformFrom = createTransformFromTo('from')
+
+/**
+ * @param {string} val
+ * @return {(string|number)}
+ * @throws {errors.Slave}
+ */
+module.exports.transformTo = createTransformFromTo('to')
+
+/**
+ * @param {string} val
+ * @return {number}
+ * @throws {errors.Slave.InvalidCount}
+ */
+module.exports.transformCount = function (val) {
+  if (val === undefined) {
+    return val
+  }
+
+  var num = parseInt(val, 10)
+  if (!_.isNaN(num) && num > 0 && num <= 2016) {
+    return num
+  }
+
+  throw new errors.Slave.InvalidCount()
+}
+
+/**
+ * @param {string} val
+ * @return {string[]}
+ * @throws {errors.Slave}
+ */
+module.exports.transformAddresses = function (val) {
+  if (val === undefined) {
+    throw new errors.Slave.AddressesRequired()
+  }
+
+  var network = bitcore.Networks.get(config.get('chromanode.network'))
+
+  var addresses = val.indexOf(',') === -1 ? val.split(',') : [val]
+  addresses.forEach(function (address) {
+    try {
+      assert.equal(Address.fromString(address).network.name, network.name)
+
+    } catch (err) {
+      throw new errors.Slave.InvalidAddresses()
+    }
+  })
+
+  return addresses
+}
+
+/**
+ * @param {string} val
+ * @return {string}
+ * @throws {errors.Slave.InvalidSource}
+ */
+module.exports.transformSource = function (val) {
+  if (val !== undefined && ['blocks', 'mempool'].indexOf(val) === -1) {
+    throw new errors.Slave.InvalidSource()
+  }
+
+  return val
+}
+
+/**
+ * @param {string} val
+ * @return {string}
+ * @throws {errors.Slave.InvalidStatus}
+ */
+module.exports.transformStatus = function (val) {
+  if (val !== undefined && ['unspent'].indexOf(val) === -1) {
+    throw new errors.Slave.InvalidStatus()
+  }
+
+  return val
+}
