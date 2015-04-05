@@ -11,6 +11,7 @@ var Address = bitcore.Address
 var Hash = bitcore.crypto.Hash
 
 var config = require('../../lib/config')
+var errors = require('../../lib/errors')
 var logger = require('../../lib/logger').logger
 var storage = require('../../lib/storage').default()
 
@@ -30,7 +31,11 @@ Master.prototype.init = function () {
     return self.bitcoind.getInfoAsync()
   })
   .then(function (ret) {
-    /** @todo check is testnet or livenet */
+    var bitcoindNetwork = ret.result.testnet ? 'testnet' : 'livenet'
+    if (bitcoindNetwork !== config.get('chromanode.network')) {
+      throw new errors.InvalidBitcoindNetwork()
+    }
+
     logger.info('Connected to bitcoind! (ver. %d)', ret.result.version)
 
     // init storage
