@@ -1,6 +1,8 @@
 /* globals Promise:true */
 
 var _ = require('lodash')
+var bitcore = require('bitcore')
+var bufferEqual = require('buffer-equal')
 var Promise = require('bluebird')
 
 var errors = require('../../lib/errors')
@@ -66,11 +68,83 @@ var SQL = {
   selectMempoolRawTxByTxId: 'SELECT ' +
                             '  tx as tx ' +
                             'FROM transactions_mempool ' +
-                            '  WHERE txid = $1'
+                            '  WHERE txid = $1',
+
+  blocksGetHeightByTxId: 'SELECT ' +
+                         '  height as height ' +
+                         'FROM transactions ' +
+                         '  WHERE txid = $1',
+
+  selectTxIdsByHeight: 'SELECT ' +
+                       '  height as height, ' +
+                       '  blockid as blockid, ' +
+                       '  txids as txids ' +
+                       'FROM blocks ' +
+                       '  WHERE height = $1',
+
+  mempoolHasTx: 'SELECT ' +
+                '  COUNT(*) ' +
+                'FROM transactions_mempool ' +
+                '  WHERE txid = $1'
 }
 
+/**
+ * @param {string[]}
+ * @return {string}
+ */
 function convertToAnyParam (arr) {
   return '{"' + arr.join('","') + '"}'
+}
+
+/**
+ * @param {string} s
+ * @return {Buffer}
+ */
+function decode (s) {
+  return Array.prototype.reverse.call(new Buffer(s, 'hex'))
+}
+
+/**
+ * @param {Buffer} s
+ * @return {string}
+ */
+function encode (s) {
+  return Array.prototype.reverse.call(new Buffer(s)).toString('hex')
+}
+
+/**
+ * @param {string[]} txids
+ * @param {string} txid
+ * @return {string[]}
+ */
+function calcMerkle (txids, txid) {
+  var hashes = txids.map(decode)
+  var targetHash = decode(txid)
+
+  var merkle = []
+  while (hashes.length !== 1) {
+    if (hashes.length % 2 === 1) {
+      hashes.push(_.last(hashes))
+    }
+
+    var nHashes = []
+    for (var cnt = hashes.length, idx = 0; idx < cnt; idx += 2) {
+      var nHashSrc = Buffer.concat([hashes[idx], hashes[idx + 1]])
+      var nHash = bitcore.crypto.Hash.sha256sha256(nHashSrc)
+      nHashes.push(nHash)
+
+      if (bufferEqual(hashes[idx], targetHash)) {
+        merkle.push(encode(hashes[idx + 1]))
+        targetHash = nHash
+      } else if (bufferEqual(hashes[idx + 1], targetHash)) {
+        merkle.push(encode(hashes[idx]))
+        targetHash = nHash
+      }
+    }
+    hashes = nHashes
+  }
+
+  return merkle
 }
 
 /**
@@ -107,7 +181,7 @@ Master.prototype._getHeightForPoint = function (client, point) {
 
   return client.queryAsync.apply(client, args)
     .then(function (result) {
-      if (result.rows.length === 0) {
+      if (result.rowCount === 0) {
         return null
       }
 
@@ -276,18 +350,60 @@ Master.prototype.getRawTransaction = function (txid) {
   return storage.execute(function (client) {
     return client.queryAsync(SQL.selectBlocksRawTxByTxId, [txid])
       .then(function (result) {
-        if (result.rows.length > 0) {
+        if (result.rowCount > 0) {
           return result
         }
 
         return client.queryAsync(SQL.selectMempoolRawTxByTxId, [txid])
       })
       .then(function (result) {
-        if (result.rows.length > 0) {
-          return result.rows[0].tx.toString('hex')
+        if (result.rowCount > 0) {
+          return {hex: result.rows[0].tx.toString('hex')}
         }
 
         throw new errors.Slave.TxNotFound()
+      })
+  })
+}
+
+/**
+ * @param {string} txid
+ * @return {Promise<string>}
+ */
+Master.prototype.getMerkle = function (txid) {
+  return storage.executeTransaction(function (client) {
+    return client.queryAsync(SQL.mempoolHasTx, ['\\x' + txid])
+      .then(function (result) {
+        if (result.rows[0].count !== '0') {
+          return {source: 'mempool'}
+        }
+
+        return client.queryAsync(SQL.blocksGetHeightByTxId, ['\\x' + txid])
+          .then(function (result) {
+            if (result.rowCount === 0) {
+              throw new errors.Slave.TxNotFound()
+            }
+
+            var height = result.rows[0].height
+            return client.queryAsync(SQL.selectTxIdsByHeight, [height])
+          })
+          .then(function (result) {
+            var stxids = result.rows[0].txids.toString('hex')
+            var txids = []
+            for (var cnt = stxids.length / 64, idx = 0; idx < cnt; idx += 1) {
+              txids.push(stxids.slice(idx * 64, (idx + 1) * 64))
+            }
+
+            return {
+              source: 'blocks',
+              data: {
+                height: result.rows[0].height,
+                blockid: result.rows[0].blockid.toString('hex'),
+                merkle: calcMerkle(txids, txid),
+                index: txids.indexOf(txid)
+              }
+            }
+          })
       })
   })
 }

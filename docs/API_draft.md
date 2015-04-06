@@ -127,7 +127,7 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) as transpo
       "status": "confirmed",
       "data": {
         "height": 103548,
-        "blockid": "d04888787b942ae2d81a878048d29640e5bcd109ebfe7dd2abdcd8e9ce8b5453",
+        "blockid": "0000000048f98df71a9d3973c55ac5543735f8ef801603caea2bdf22d77e8354",
         "merkle": [
           "8894f3284e9fa1121b0b8935a211c4988db4fc2e44640f4da7a85eb6ea4652c7",
           "5f9829e099080e3b22933972b9428e6650163ef0b5a9498696d4599c6e30985f",

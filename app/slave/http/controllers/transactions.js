@@ -15,7 +15,12 @@ module.exports.raw = function (req, res) {
 }
 
 module.exports.merkle = function (req, res) {
-  res.jerror('todo')
+  var result = Promise.try(function () {
+    var txid = qutil.transformTxId(req.query.txid)
+    return master.getMerkle(txid)
+  })
+
+  res.promise(result)
 }
 
 module.exports.send = function (req, res) {

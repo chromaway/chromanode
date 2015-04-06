@@ -126,7 +126,6 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) for notifi
 |:------|:---------------|
 | txid  | transaction id |
 
-    // get raw transaction
     /v1/transactions/raw?txid=f9f12dafc3d4ca3fd9cdf293873ad1c6b0bddac35dcd2bd34a57320772def350
 
   **result**
@@ -139,6 +138,44 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) for notifi
     {"type": "TxNotFound"}
 
 #### Merkle
+
+  **url**
+
+    /v1/transactions/merkle
+
+  **query**
+
+| param | description    |
+|:------|:---------------|
+| txid  | transaction id |
+
+    /v1/transactions/merkle?txid=d04888787b942ae2d81a878048d29640e5bcd109ebfe7dd2abdcd8e9ce8b5453
+
+  **result**
+
+    // for unconfirmed transactions
+    {"source": "mempool"}
+
+    // for confirmed transactions
+    {
+      "source": "blocks",
+      "data": {
+        "height": 103548,
+        "blockid": "0000000048f98df71a9d3973c55ac5543735f8ef801603caea2bdf22d77e8354",
+        "merkle": [
+          "8894f3284e9fa1121b0b8935a211c4988db4fc2e44640f4da7a85eb6ea4652c7",
+          "5f9829e099080e3b22933972b9428e6650163ef0b5a9498696d4599c6e30985f",
+          "dd3f8d347786991cdf39abae6252474291711031247a1c1d5e2d27aa0964c6c8",
+          "3d20e80d705bbf73b3dea3c08c970a756ea1d79b0f2500282be76fbbff303a49"
+        ],
+        "index": 2
+      }
+    }
+
+  **errors**
+
+    {"type": "InvalidTxId"}
+    {"type": "TxNotFound"}
 
 #### Send
 
