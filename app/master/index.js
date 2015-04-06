@@ -87,7 +87,7 @@ Master.prototype.storeTransactions = function (client, transactions, height) {
     'SELECT address FROM history_mempool WHERE txid = $1 AND index = $2'
   ]
 
-  var network = this.network
+  var network = bitcore.Networks.get(config.get('chromanode.network'))
   var indexedTransactions = _.indexBy(transactions, 'id')
   var isMempool = height === undefined
   queries = isMempool ? queries.mempool : queries.blockchain
@@ -220,9 +220,9 @@ Master.prototype.catchUp = function () {
     logger.warn('Reorg to height: %d', height)
     return storage.executeTransaction(function (client) {
       return Promise.all([
-        client.queryAsync('DELETE FROM blocks WHERE height >= $1', [height]),
-        client.queryAsync('DELETE FROM transactions WHERE height >= $1', [height]),
-        client.queryAsync('DELETE FROM history WHERE height >= $1', [height]),
+        client.queryAsync('DELETE FROM blocks WHERE height > $1', [height]),
+        client.queryAsync('DELETE FROM transactions WHERE height > $1', [height]),
+        client.queryAsync('DELETE FROM history WHERE height > $1', [height]),
         tryTruncateMempool(client)
       ])
     })
@@ -240,11 +240,11 @@ Master.prototype.catchUp = function () {
         return Promise.all([latest, bitcoind.getBlock(latest.height + 1)])
       })
       .spread(function (latest, block) {
-        // run reorg
+        // reorg check
         var prevHash = new Buffer(block.header.prevHash)
         var prevBlockid = Array.prototype.reverse.call(prevHash).toString('hex')
         if (latest.blockid !== prevBlockid) {
-          return runReorg(latest.height)
+          return runReorg(latest.height - 1)
         }
 
         var height = latest.height + 1
