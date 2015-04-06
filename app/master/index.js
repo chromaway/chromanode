@@ -111,6 +111,7 @@ Master.prototype.storeTransactions = function (client, transactions, height) {
       return Promise.resolve(_.invoke(addresses, 'toString'))
     }
 
+    /* @todo If sync is finished check mempool first! */
     // load from storage
     var params = ['\\x' + txid, outindex]
     return client.queryAsync(selectAddresses[0], params)

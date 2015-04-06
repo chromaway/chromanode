@@ -56,7 +56,17 @@ var SQL = {
                         '  prevtxid as prevtxid, ' +
                         '  outputindex as outputindex ' +
                         'FROM history_mempool ' +
-                        '  WHERE address = ANY($1)'
+                        '  WHERE address = ANY($1)',
+
+  selectBlocksRawTxByTxId: 'SELECT ' +
+                           '  tx as tx ' +
+                           'FROM transactions ' +
+                           '  WHERE txid = $1',
+
+  selectMempoolRawTxByTxId: 'SELECT ' +
+                            '  tx as tx ' +
+                            'FROM transactions_mempool ' +
+                            '  WHERE txid = $1'
 }
 
 function convertToAnyParam (arr) {
@@ -170,7 +180,7 @@ Master.prototype.headersQuery = function (query) {
  * @param {(string|number)} [query.from]
  * @param {(string|number)} [query.to]
  * @param {string} [query.status]
- * @return {Promise<Master~AddressesQueryResult}
+ * @return {Promise<Master~AddressesQueryResult>}
  */
 Master.prototype.addressesQuery = function (query) {
   var self = this
@@ -252,6 +262,32 @@ Master.prototype.addressesQuery = function (query) {
             blockid: latest.blockid.toString('hex')
           }
         }
+      })
+  })
+}
+
+/**
+ * @param {string} txid
+ * @return {Promise<string>}
+ */
+Master.prototype.getRawTransaction = function (txid) {
+  txid = '\\x' + txid
+
+  return storage.execute(function (client) {
+    return client.queryAsync(SQL.selectBlocksRawTxByTxId, [txid])
+      .then(function (result) {
+        if (result.rows.length > 0) {
+          return result
+        }
+
+        return client.queryAsync(SQL.selectMempoolRawTxByTxId, [txid])
+      })
+      .then(function (result) {
+        if (result.rows.length > 0) {
+          return result.rows[0].tx.toString('hex')
+        }
+
+        throw new errors.Slave.TxNotFound()
       })
   })
 }

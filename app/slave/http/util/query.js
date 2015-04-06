@@ -75,7 +75,7 @@ module.exports.transformCount = function (val) {
  */
 module.exports.transformAddresses = function (val) {
   if (val === undefined) {
-    throw new errors.Slave.AddressesRequired()
+    throw new errors.Slave.InvalidAddresses()
   }
 
   var network = bitcore.Networks.get(config.get('chromanode.network'))
@@ -117,4 +117,16 @@ module.exports.transformStatus = function (val) {
   }
 
   return val
+}
+
+/**
+ * @param {string} val
+ * @return {string}
+ */
+module.exports.transformTxId = function (val) {
+  if (!!val && val.length === 64 && isHexa(val)) {
+    return val
+  }
+
+  throw new errors.Slave.InvalidTxId()
 }

@@ -4,6 +4,7 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) for notifi
 
   * [methods](#methods)
   * [notifications](#notifications)
+  * [errors](#errors)
 
 ## Methods:
 
@@ -105,16 +106,37 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) for notifi
 
   **errors**
 
-    {"type": "InvalidHeight"}
-    {"type": "InvalidHash"}
     {"type": "FromNotFound"}
-    {"type": "ToNotFound"}
-    {"type": "InvalidRequestedCount"}
     {"type": "InvalidCount"}
+    {"type": "InvalidHash"}
+    {"type": "InvalidHeight"}
+    {"type": "ToNotFound"}
 
 ### Transactions
 
 #### Raw
+
+  **url**
+
+    /v1/transactions/raw
+
+  **query**
+
+| param | description    |
+|:------|:---------------|
+| txid  | transaction id |
+
+    // get raw transaction
+    /v1/transactions/raw?txid=f9f12dafc3d4ca3fd9cdf293873ad1c6b0bddac35dcd2bd34a57320772def350
+
+  **result**
+
+    {"hex": "010000000161ad9192...277c850ef12def7248188ac00000000"}
+
+  **errors**
+
+    {"type": "InvalidTxId"}
+    {"type": "TxNotFound"}
 
 #### Merkle
 
@@ -174,14 +196,13 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) for notifi
 
   **errors**
 
-    {"type": "AddressesRequired"}
-    {"type": "InvalidAddresses"}
-    {"type": "InvalidSource"}
-    {"type": "InvalidHeight"}
-    {"type": "InvalidHash"}
     {"type": "FromNotFound"}
-    {"type": "ToNotFound"}
+    {"type": "InvalidAddresses"}
+    {"type": "InvalidHash"}
+    {"type": "InvalidHeight"}
+    {"type": "InvalidSource"}
     {"type": "InvalidStatus"}
+    {"type": "ToNotFound"}
 
 ## Notifications:
 
@@ -191,3 +212,17 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) for notifi
 ### New-blocks
 
 ### Address-txid
+
+## Errors
+
+  * FromNotFound
+  * InvalidAddresses
+  * InvalidCount
+  * InvalidHash
+  * InvalidHeight
+  * InvalidRequestedCount
+  * InvalidTxId
+  * InvalidSource
+  * InvalidStatus
+  * ToNotFound
+  * TxNotFound
