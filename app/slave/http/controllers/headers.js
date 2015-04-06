@@ -2,11 +2,11 @@
 
 var Promise = require('bluebird')
 
-var master = require('../../master').default()
+var db = require('../../db').default()
 var qutil = require('../util/query')
 
 module.exports.latest = function (req, res) {
-  res.promise(master.getLatestHeader())
+  res.promise(db.getLatestHeader())
 }
 
 module.exports.query = function (req, res) {
@@ -17,7 +17,7 @@ module.exports.query = function (req, res) {
       count: qutil.transformCount(req.query.count) || 2016
     }
 
-    return master.headersQuery(query)
+    return db.headersQuery(query)
   })
 
   res.promise(result)

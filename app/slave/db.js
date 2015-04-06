@@ -7,6 +7,7 @@ var Promise = require('bluebird')
 
 var errors = require('../../lib/errors')
 var storage = require('../../lib/storage').default()
+var util = require('../../lib/util')
 
 var SQL = {
   selectLatest: 'SELECT ' +
@@ -70,7 +71,7 @@ var SQL = {
                             'FROM transactions_mempool ' +
                             '  WHERE txid = $1',
 
-  blocksGetHeightByTxId: 'SELECT ' +
+  selectHeightByTxId: 'SELECT ' +
                          '  height as height ' +
                          'FROM transactions ' +
                          '  WHERE txid = $1',
@@ -97,65 +98,14 @@ function convertToAnyParam (arr) {
 }
 
 /**
- * @param {string} s
- * @return {Buffer}
+ * @class DB
  */
-function decode (s) {
-  return Array.prototype.reverse.call(new Buffer(s, 'hex'))
-}
-
-/**
- * @param {Buffer} s
- * @return {string}
- */
-function encode (s) {
-  return Array.prototype.reverse.call(new Buffer(s)).toString('hex')
-}
-
-/**
- * @param {string[]} txids
- * @param {string} txid
- * @return {string[]}
- */
-function calcMerkle (txids, txid) {
-  var hashes = txids.map(decode)
-  var targetHash = decode(txid)
-
-  var merkle = []
-  while (hashes.length !== 1) {
-    if (hashes.length % 2 === 1) {
-      hashes.push(_.last(hashes))
-    }
-
-    var nHashes = []
-    for (var cnt = hashes.length, idx = 0; idx < cnt; idx += 2) {
-      var nHashSrc = Buffer.concat([hashes[idx], hashes[idx + 1]])
-      var nHash = bitcore.crypto.Hash.sha256sha256(nHashSrc)
-      nHashes.push(nHash)
-
-      if (bufferEqual(hashes[idx], targetHash)) {
-        merkle.push(encode(hashes[idx + 1]))
-        targetHash = nHash
-      } else if (bufferEqual(hashes[idx + 1], targetHash)) {
-        merkle.push(encode(hashes[idx]))
-        targetHash = nHash
-      }
-    }
-    hashes = nHashes
-  }
-
-  return merkle
-}
-
-/**
- * @class Master
- */
-function Master () {}
+function DB () {}
 
 /**
  * @return {Promise<{height: number, blockid: string, header: string}>}
  */
-Master.prototype.getLatestHeader = function () {
+DB.prototype.getLatestHeader = function () {
   return storage.execute(function (client) {
     return client.queryAsync(SQL.selectLatestHeader)
   })
@@ -174,7 +124,7 @@ Master.prototype.getLatestHeader = function () {
  * @param {(string|number)} point height or blockid
  * @return {Promise<?number>}
  */
-Master.prototype._getHeightForPoint = function (client, point) {
+DB.prototype._getHeightForPoint = function (client, point) {
   var args = _.isNumber(point)
                ? [SQL.selectHeightByHeight, [point]]
                : [SQL.selectHeightByBlockId, ['\\x' + point]]
@@ -196,7 +146,7 @@ Master.prototype._getHeightForPoint = function (client, point) {
  * @param {string} [headersQuery.count]
  * @return {Promise<{from: number, count: number, headers: string}>}
  */
-Master.prototype.headersQuery = function (query) {
+DB.prototype.headersQuery = function (query) {
   var self = this
   return storage.executeTransaction(function (client) {
     return self._getHeightForPoint(client, query.from)
@@ -242,7 +192,7 @@ Master.prototype.headersQuery = function (query) {
 }
 
 /**
- * @typedef Master~AddressesQueryResult
+ * @typedef DB~AddressesQueryResult
  * @property {Array.<{txid: string, height: ?number}>} transactions
  * @property {{height: number, blockid: string}} latest
  */
@@ -254,9 +204,9 @@ Master.prototype.headersQuery = function (query) {
  * @param {(string|number)} [query.from]
  * @param {(string|number)} [query.to]
  * @param {string} [query.status]
- * @return {Promise<Master~AddressesQueryResult>}
+ * @return {Promise<DB~AddressesQueryResult>}
  */
-Master.prototype.addressesQuery = function (query) {
+DB.prototype.addressesQuery = function (query) {
   var self = this
   return storage.executeTransaction(function (client) {
     return client.queryAsync(SQL.selectLatest)
@@ -344,7 +294,7 @@ Master.prototype.addressesQuery = function (query) {
  * @param {string} txid
  * @return {Promise<string>}
  */
-Master.prototype.getRawTransaction = function (txid) {
+DB.prototype.getRawTransaction = function (txid) {
   txid = '\\x' + txid
 
   return storage.execute(function (client) {
@@ -370,7 +320,7 @@ Master.prototype.getRawTransaction = function (txid) {
  * @param {string} txid
  * @return {Promise<string>}
  */
-Master.prototype.getMerkle = function (txid) {
+DB.prototype.getMerkle = function (txid) {
   return storage.executeTransaction(function (client) {
     return client.queryAsync(SQL.mempoolHasTx, ['\\x' + txid])
       .then(function (result) {
@@ -378,7 +328,7 @@ Master.prototype.getMerkle = function (txid) {
           return {source: 'mempool'}
         }
 
-        return client.queryAsync(SQL.blocksGetHeightByTxId, ['\\x' + txid])
+        return client.queryAsync(SQL.selectHeightByTxId, ['\\x' + txid])
           .then(function (result) {
             if (result.rowCount === 0) {
               throw new errors.Slave.TxNotFound()
@@ -394,12 +344,37 @@ Master.prototype.getMerkle = function (txid) {
               txids.push(stxids.slice(idx * 64, (idx + 1) * 64))
             }
 
+            var merkle = []
+            var hashes = txids.map(util.decode)
+            var targetHash = util.decode(txid)
+            while (hashes.length !== 1) {
+              if (hashes.length % 2 === 1) {
+                hashes.push(_.last(hashes))
+              }
+
+              var nHashes = []
+              for (cnt = hashes.length, idx = 0; idx < cnt; idx += 2) {
+                var nHashSrc = Buffer.concat([hashes[idx], hashes[idx + 1]])
+                var nHash = bitcore.crypto.Hash.sha256sha256(nHashSrc)
+                nHashes.push(nHash)
+
+                if (bufferEqual(hashes[idx], targetHash)) {
+                  merkle.push(util.encode(hashes[idx + 1]))
+                  targetHash = nHash
+                } else if (bufferEqual(hashes[idx + 1], targetHash)) {
+                  merkle.push(util.encode(hashes[idx]))
+                  targetHash = nHash
+                }
+              }
+              hashes = nHashes
+            }
+
             return {
               source: 'blocks',
               data: {
                 height: result.rows[0].height,
                 blockid: result.rows[0].blockid.toString('hex'),
-                merkle: calcMerkle(txids, txid),
+                merkle: merkle,
                 index: txids.indexOf(txid)
               }
             }
@@ -408,4 +383,4 @@ Master.prototype.getMerkle = function (txid) {
   })
 }
 
-module.exports = require('soop')(Master)
+module.exports = require('soop')(DB)

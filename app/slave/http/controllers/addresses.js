@@ -2,7 +2,7 @@
 
 var Promise = require('bluebird')
 
-var master = require('../../master').default()
+var db = require('../../db').default()
 var qutil = require('../util/query')
 
 module.exports.query = function (req, res) {
@@ -15,7 +15,7 @@ module.exports.query = function (req, res) {
       status: qutil.transformStatus(req.query.status)
     }
 
-    return master.addressesQuery(query)
+    return db.addressesQuery(query)
   })
 
   res.promise(result)

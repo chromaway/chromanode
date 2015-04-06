@@ -2,13 +2,13 @@
 
 var Promise = require('bluebird')
 
-var master = require('../../master').default()
+var db = require('../../db').default()
 var util = require('../../../../lib/util')
 
 module.exports.status = function (req, res) {
   /* @todo */
   var result = Promise.all([
-    master.getLatestHeader()
+    db.getLatestHeader()
   ])
   .spread(function (header) {
     return {

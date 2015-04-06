@@ -2,13 +2,13 @@
 
 var Promise = require('bluebird')
 
-var master = require('../../master').default()
+var db = require('../../db').default()
 var qutil = require('../util/query')
 
 module.exports.raw = function (req, res) {
   var result = Promise.try(function () {
     var txid = qutil.transformTxId(req.query.txid)
-    return master.getRawTransaction(txid)
+    return db.getRawTransaction(txid)
   })
 
   res.promise(result)
@@ -17,7 +17,7 @@ module.exports.raw = function (req, res) {
 module.exports.merkle = function (req, res) {
   var result = Promise.try(function () {
     var txid = qutil.transformTxId(req.query.txid)
-    return master.getMerkle(txid)
+    return db.getMerkle(txid)
   })
 
   res.promise(result)

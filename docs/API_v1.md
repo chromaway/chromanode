@@ -21,6 +21,8 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) for notifi
 
 ### Status
 
+@todo
+
   **url**
 
     /v1/status
@@ -179,6 +181,8 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) for notifi
 
 #### Send
 
+@todo
+
 ### Addresses
 
 #### Query
@@ -248,7 +252,11 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) for notifi
 
 ### New-blocks
 
+@todo
+
 ### Address-txid
+
+@todo
 
 ## Errors
 
