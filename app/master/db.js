@@ -1,7 +1,3 @@
-/* globals Promise:true */
-
-var Promise = require('bluebird')
-
 var storage = require('../../lib/storage').default()
 var util = require('../../lib/util')
 

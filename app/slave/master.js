@@ -214,22 +214,36 @@ Master.prototype.addressesQuery = function (query) {
       .spread(function (latest, bHistory, mHistory) {
         var history = bHistory.rows.concat(mHistory.rows).map(function (row) {
           row.txid = row.txid.toString('hex')
+          row.prevtxid = row.prevtxid && row.prevtxid.toString('hex')
           row.height = _.isNumber(row.height) ? row.height : null
           return row
         })
 
         if (query.status === 'unspent') {
-          /* @todo */
+          var inputs = _.chain(history)
+            .filter(function (item) {
+              return item.prevtxid !== null
+            })
+            .map(function (item) {
+              return [item.prevtxid + item.outputindex, true]
+            })
+            .zipObject()
+            .value()
+
+          history = history.filter(function (item) {
+            // skip inputs
+            if (item.prevtxid !== null) {
+              return false
+            }
+
+            // check unspent
+            return inputs[item.txid + item.index] === undefined
+          })
         }
 
-        var transactions = _.chain(history)
-          .map(function (item) {
-            return {txid: item.txid, height: item.height}
-          })
-          .uniq(function (item) {
-            return item.txid + item.height
-          })
-          .value()
+        var transactions = _.uniq(history.map(function (item) {
+          return {txid: item.txid, height: item.height}
+        }), 'txid')
 
         return {
           transactions: transactions,
