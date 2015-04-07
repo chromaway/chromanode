@@ -11,15 +11,18 @@ var Hash = bitcore.crypto.Hash
 
 var config = require('../../lib/config')
 var logger = require('../../lib/logger').logger
+var messages = require('../../lib/messages').default()
 var storage = require('../../lib/storage').default()
 var bitcoind = require('./bitcoind').default()
 var db = require('./db').default()
+var slaves = require('./slaves').default()
 
 /**
  * @class Master
  */
 function Master () {
   /* @todo save to db */
+  /* @todo not notify if syncing */
   this.isSyncing = true
 }
 
@@ -46,7 +49,9 @@ Master.prototype.init = function () {
       })
   }
 
-  return Promise.all([bitcoind.init(), storage.init()])
+  return bitcoind.init()
+    .then(function () { return storage.init() })
+    .then(function () { return messages.init() })
     .then(function () { return db.getLatest() })
     .then(function (latest) {
       logger.info('Start from %d (blockId: %s)', latest.height, latest.blockid)
@@ -142,8 +147,10 @@ Master.prototype.storeTransactions = function (client, transactions, height) {
       return getInScriptAddresses(input.script, prevTxId, input.outputIndex)
         .then(function (addresses) {
           return Promise.all(addresses.map(function (address) {
-            var lparams = [address].concat(params)
-            return client.queryAsync(queries.storeIn, lparams)
+            return [
+              slaves.addressTouched(client, address, txid),
+              client.queryAsync(queries.storeIn, [address].concat(params))
+            ]
           }))
         })
     })
@@ -183,8 +190,11 @@ Master.prototype.storeTransactions = function (client, transactions, height) {
       if (!isMempool) { params.push(height) }
 
       return getOutScriptAddresses(output.script).map(function (address) {
-        var lparams = [address.toString()].concat(params)
-        return client.queryAsync(queries.storeOut, lparams)
+        address = address.toString()
+        return [
+          slaves.addressTouched(client, address, txid),
+          client.queryAsync(queries.storeOut, [address].concat(params))
+        ]
       })
     })
   }
@@ -251,20 +261,19 @@ Master.prototype.catchUp = function () {
         var height = latest.height + 1
         return storage.executeTransaction(function (client) {
           var blockQuery = 'INSERT INTO blocks (height, blockid, header, txids) VALUES ($1, $2, $3, $4)'
+          var blockValues = [
+            height,
+            '\\x' + block.id,
+            '\\x' + block.header.toString(),
+            '\\x' + _.pluck(block.transactions, 'id').join('')
+          ]
 
-          return tryTruncateMempool(client)
-            .then(function () {
-              var blockValues = [
-                height,
-                '\\x' + block.id,
-                '\\x' + block.header.toString(),
-                '\\x' + _.pluck(block.transactions, 'id').join('')
-              ]
-              return client.queryAsync(blockQuery, blockValues)
-            })
-            .then(function () {
-              return self.storeTransactions(client, block.transactions, height)
-            })
+          return Promise.all([
+            tryTruncateMempool(client),
+            client.queryAsync(blockQuery, blockValues),
+            slaves.newBlock(client, block.id, height),
+            self.storeTransactions(client, block.transactions, height)
+          ])
         })
         .then(function () {
           /* @todo show progress when syncing and this message when finished */

@@ -47,3 +47,11 @@
 ## License
 
 Code released under [the MIT license](https://github.com/chromaway/chromanode/blob/master/LICENSE).
+
+## Todo
+
+  * implement status method
+  * update config (using default value)
+  * romove `soop` package?
+  * code refactoring!
+  * add tests (regtest mode?)
