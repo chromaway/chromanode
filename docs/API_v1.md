@@ -1,6 +1,6 @@
 # API v1
 
-Chromanode using [socket.io](https://github.com/Automattic/socket.io) for notification and HTTP for request.
+Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notification and HTTP for request.
 
   * [methods](#methods)
   * [notifications](#notifications)
