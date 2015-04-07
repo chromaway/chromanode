@@ -94,4 +94,12 @@ Bitcoind.prototype.getTransactions = function (txids) {
     })
 }
 
+/**
+ * @param {string} rawtx
+ * @return {Promise}
+ */
+Bitcoind.prototype.sendTx = function (rawtx) {
+  return this.bitcoind.sendRawTransactionAsync(rawtx)
+}
+
 module.exports = require('soop')(Bitcoind)

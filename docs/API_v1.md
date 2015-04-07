@@ -181,7 +181,25 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) for notifi
 
 #### Send
 
-@todo
+  **url**
+
+    /v1/transactions/send
+
+  **query**
+
+| param | description     |
+|:------|:----------------|
+| rawtx | raw transaction |
+
+    curl http://localhost:3001/v1/transactions/send --header "Content-Type:application/json" -d '{"rawtx": "..."}'
+
+  **result**
+
+    empty response if success
+
+  **errors**
+
+    {"type": "SendTxError", "data": {"code": -8, "message": "parameter must be hexadeci..."}}
 
 ### Addresses
 
@@ -286,5 +304,6 @@ Chromanode using [socket.io](https://github.com/Automattic/socket.io) for notifi
   * InvalidTxId
   * InvalidSource
   * InvalidStatus
+  * SendTxError
   * ToNotFound
   * TxNotFound

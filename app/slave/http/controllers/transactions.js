@@ -3,6 +3,7 @@
 var Promise = require('bluebird')
 
 var db = require('../../db').default()
+var master = require('../../master').default()
 var qutil = require('../util/query')
 
 module.exports.raw = function (req, res) {
@@ -24,5 +25,5 @@ module.exports.merkle = function (req, res) {
 }
 
 module.exports.send = function (req, res) {
-  res.jerror('todo')
+  res.promise(master.sendTx(req.body.rawtx))
 }

@@ -32,6 +32,23 @@ function Master () {
 Master.prototype.init = function () {
   var self = this
 
+  slaves.on('sendTx', function (id, rawtx) {
+    bitcoind.sendTx(rawtx)
+      .then(function () { return })
+      .catch(function (err) {
+        if (err instanceof Error) {
+          return {code: null, message: err.message}
+        }
+
+        return err
+      })
+      .then(function (ret) {
+        return storage.execute(function (client) {
+          return slaves.sendTxResponse(client, id, ret)
+        })
+      })
+  })
+
   function once () {
     var st = Date.now()
     return Promise.all([db.getLatest(), bitcoind.getLatest()])
@@ -52,6 +69,7 @@ Master.prototype.init = function () {
   return bitcoind.init()
     .then(function () { return storage.init() })
     .then(function () { return messages.init() })
+    .then(function () { return slaves.init() })
     .then(function () { return db.getLatest() })
     .then(function (latest) {
       logger.info('Start from %d (blockId: %s)', latest.height, latest.blockid)

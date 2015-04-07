@@ -18,7 +18,7 @@ module.exports.createRouter = function () {
   // transaction routes
   router.get('/transactions/raw', transactions.raw)
   router.get('/transactions/merkle', transactions.merkle)
-  router.get('/transactions/send', transactions.send)
+  router.post('/transactions/send', transactions.send)
 
   // address routes
   router.get('/addresses/query', addresses.query)

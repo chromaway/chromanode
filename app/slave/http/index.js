@@ -31,6 +31,10 @@ express.response.promise = function (promise) {
   var self = this
   promise
     .then(self.jsend.bind(self))
+    .catch(errors.Slave.SendTxError, function (err) {
+      // special case
+      self.jfail({type: err.name.slice(20), data: err.data})
+    })
     .catch(errors.Slave, function (err) {
       // logger.info('Invalid query: %s', err.name)
       // cut ErrorChromanodeSlave
