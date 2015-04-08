@@ -51,6 +51,7 @@ Code released under [the MIT license](https://github.com/chromaway/chromanode/bl
 ## Todo
 
   * implement status method
+  * return coins (txid, outputindex, value, script) in addressesQuery?
   * update config (using default value)
   * romove `soop` package?
   * code refactoring!

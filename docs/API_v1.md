@@ -205,6 +205,8 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
 #### Query
 
+@todo add extra fields for coins
+
   \* *half-close interval for (from-to]*
 
   **url**
