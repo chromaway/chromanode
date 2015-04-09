@@ -112,6 +112,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
     {"type": "InvalidCount"}
     {"type": "InvalidHash"}
     {"type": "InvalidHeight"}
+    {"type": "InvalidRequestedCount"}
     {"type": "ToNotFound"}
 
 ### Transactions

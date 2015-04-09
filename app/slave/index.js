@@ -13,7 +13,6 @@ var storage = require('../../lib/storage').default()
  */
 module.exports.run = function () {
   var port = config.get('chromanode.port')
-  var host = config.get('chromanode.host')
 
   return storage.init()
     .then(function () { return messages.init() })
@@ -33,9 +32,9 @@ module.exports.run = function () {
         socket.broadcastBlockId(blockid, height)
       })
 
-      return server.listen(port, host)
+      return server.listen(port)
     })
     .then(function () {
-      logger.info('Slave server listening %s:%s', host, port)
+      logger.info('Slave server listening port %s', port)
     })
 }
