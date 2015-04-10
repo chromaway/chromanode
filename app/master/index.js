@@ -227,7 +227,7 @@ Master.prototype.storeTransactions = function (client, transactions, height) {
   }
 
   return Promise.all(transactions.map(function (tx) {
-    return saveTx(tx),then(function () {
+    return saveTx(tx).then(function () {
       return saveInputs(tx)
     }).then(function () {
       return saveOutputs(tx)
