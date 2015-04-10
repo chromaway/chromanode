@@ -152,26 +152,30 @@ Master.prototype.storeTransactions = function (client, transactions, height) {
 
   function saveInputs (tx) {
     var txid = tx.id
-    return tx.inputs.map(function (input, index) {
+    var promise = Promise.resolve()
+    tx.inputs.forEach(function (input, index) {
       var prevTxId = input.prevTxId.toString('hex')
       if (prevTxId === '0000000000000000000000000000000000000000000000000000000000000000' &&
           input.outputIndex === 0xffffffff) {
-        return Promise.resolve()
+        return
       }
 
       var params = ['\\x' + txid, index, '\\x' + prevTxId, input.outputIndex]
       if (!isMempool) { params.push(height) }
 
-      return getInScriptAddresses(input.script, prevTxId, input.outputIndex)
-        .then(function (addresses) {
-          return Promise.all(addresses.map(function (address) {
-            return [
-              slaves.addressTouched(client, address, txid),
-              client.queryAsync(queries.storeIn, [address].concat(params))
-            ]
-          }))
+      promise = promise.then(function () {
+        return getInScriptAddresses(input.script, prevTxId, input.outputIndex)
+          .then(function (addresses) {
+            return Promise.all(addresses.map(function (address) {
+                return [
+                  slaves.addressTouched(client, address, txid),
+                  client.queryAsync(queries.storeIn, [address].concat(params))
+                ]
+            }))
+          })
         })
     })
+    return promise
   }
 
   function getOutScriptAddresses (script) {
@@ -200,26 +204,35 @@ Master.prototype.storeTransactions = function (client, transactions, height) {
 
   function saveOutputs (tx) {
     var txid = tx.id
-    return tx.outputs.map(function (output, index) {
+    var promise = Promise.resolve()
+    tx.outputs.forEach(function (output, index) {
       // script validation
       try { output.script } catch (e) { return }
 
       var params = ['\\x' + txid, index, output.satoshis]
       if (!isMempool) { params.push(height) }
 
-      return getOutScriptAddresses(output.script).map(function (address) {
-        address = address.toString()
-        return [
-          slaves.addressTouched(client, address, txid),
-          client.queryAsync(queries.storeOut, [address].concat(params))
-        ]
-      })
+      promise = promise.then(function () {
+        return Promise.all(_.flattenDeep(
+          getOutScriptAddresses(output.script).map(function (address) {
+            address = address.toString()
+            return [
+              slaves.addressTouched(client, address, txid),
+              client.queryAsync(queries.storeOut, [address].concat(params))
+            ]
+          })))
+        })
     })
+    return promise
   }
 
-  return Promise.all(_.flattenDeep(transactions.map(function (tx) {
-    return [saveTx(tx), saveInputs(tx), saveOutputs(tx)]
-  })))
+  return Promise.all(transactions.map(function (tx) {
+    return saveTx(tx),then(function () {
+      return saveInputs(tx)
+    }).then(function () {
+      return saveOutputs(tx)
+    })
+  }))
 }
 
 function SyncComplete () {}
