@@ -50,6 +50,7 @@ Code released under [the MIT license](https://github.com/chromaway/chromanode/bl
 
 ## Todo
 
+  * switch to electrumjs table structure
   * implement status method
   * return coins (txid, outputindex, value, script) in addressesQuery?
   * update config (using default value)

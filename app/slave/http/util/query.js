@@ -20,7 +20,7 @@ function createTransformFromTo (name) {
     }
 
     var num = parseInt(val, 10)
-    if (!_.isNaN(num)) {
+    if (!_.isNaN(num) && val.length < 7) {
       if (num >= 0 && num < 1000000) {
         return num
       }

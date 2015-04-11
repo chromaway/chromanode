@@ -134,6 +134,7 @@ Master.prototype.storeTransactions = function (client, transactions, height) {
       return Promise.resolve(_.invoke(addresses, 'toString'))
     }
 
+    /* @todo what if output not in db yet ? */
     /* @todo If sync is finished check mempool first! */
     // load from storage
     var params = ['\\x' + txid, outindex]
