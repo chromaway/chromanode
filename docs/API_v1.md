@@ -44,7 +44,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
         "status": "starting|syncing|finished",
         "latest": {
           "height": 329736,
-          "blockid": "000000002eb3d5d9cac7d04b56f6d0afba66b46bd3715f0c56a240ef7b491937",
+          "hash": "000000002eb3d5d9cac7d04b56f6d0afba66b46bd3715f0c56a240ef7b491937",
         },
         "version": "a.b.c"
       }
@@ -62,7 +62,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
     {
       "height": 329741,
-      "blockid": "00000000f872dcf2242fdf93ecfe8da1ba02304ea6c05b56cb828d3c561e9012",
+      "hash": "00000000f872dcf2242fdf93ecfe8da1ba02304ea6c05b56cb828d3c561e9012",
       "header": "02000000f71f5d49b11756cbf9c2b9b53d...1d0047ed74" // 80 bytes
     }
 
@@ -80,11 +80,11 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
   **query**
 
-| param | description                                              |
-|:------|:---------------------------------------------------------|
-| from  | blockid or height                                        |
-| to    | blockid or height, may be omitted (preferred than count) |
-| count | number, may be omitted                                   |
+| param | description                                           |
+|:------|:------------------------------------------------------|
+| from  | hash or height                                        |
+| to    | hash or height, may be omitted (preferred than count) |
+| count | number, may be omitted                                |
 
     // get 1 header by height
     /v1/headers/query?from=150232&count=1
@@ -92,7 +92,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
     // alternative request, also get 1 header
     /v1/headers/query?from=150232&to=150233
 
-    // get header by blockid
+    // get header by hash
     /v1/headers/query?from=00000000f872dcf...cb828d3c561e9012&count=1
 
     // get first chunk (count omitted, because query return maximum 2016 headers)
@@ -162,9 +162,9 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
     // for confirmed transactions
     {
       "source": "blocks",
-      "data": {
+      "block": {
         "height": 103548,
-        "blockid": "0000000048f98df71a9d3973c55ac5543735f8ef801603caea2bdf22d77e8354",
+        "hash": "0000000048f98df71a9d3973c55ac5543735f8ef801603caea2bdf22d77e8354",
         "merkle": [
           "8894f3284e9fa1121b0b8935a211c4988db4fc2e44640f4da7a85eb6ea4652c7",
           "5f9829e099080e3b22933972b9428e6650163ef0b5a9498696d4599c6e30985f",
@@ -200,7 +200,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
   **errors**
 
-    {"type": "SendTxError", "data": {"code": -8, "message": "parameter must be hexadeci..."}}
+    {"type": "SendTxError", "code": -8, "message": "parameter must be hexadeci..."}
 
 ### Addresses
 
@@ -220,8 +220,8 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 |:----------|:------------------------------------------------------|
 | addresses | array of addresses                                    |
 | source    | blocks or mempool, may be omitted (both will be used) |
-| from      | blockid or height, may be omitted                     |
-| to        | blockid or height, may be omitted                     |
+| from      | hash or height, may be omitted                     |
+| to        | hash or height, may be omitted                     |
 | status    | now only unspent available, may be omitted            |
 
     // get all affected transactions for addresses (from blocks and mempool)
@@ -233,7 +233,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
     // all affected transactions from mempool
     /v1/addresses/query?addresses=mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2&source=mempool
 
-    // all affected transactions for half-closed interval (fromBlockId, toBlockId]
+    // all affected transactions for half-closed interval (fromHash, toHash]
     /v1/addresses/query?addresses=mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2&from=0000000048f98df71a9d3973c55ac5543735f8ef801603caea2bdf22d77e8354&to=0000000011ab0934769901d4acde41e48a98a7cdaf9d7626d094e66368443560
 
   **result**
@@ -252,7 +252,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
       }],
       latest: {
         "height": 329750,
-        "blockid": "0000000045dd9bad2000dd00b31762c3da32ac46f40cdf4ddd350bcc3571a253"
+        "hash": "0000000045dd9bad2000dd00b31762c3da32ac46f40cdf4ddd350bcc3571a253"
       }
     }
 
@@ -279,8 +279,8 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
     socket.on('connect', function () {
       socket.emit('subscribe', 'new-block')
     })
-    socket.on('new-block', function (blockid, height) {
-      console.log('New block ' + height + '! (blockid: ' + blockid + ')')
+    socket.on('new-block', function (hash, height) {
+      console.log('New block ' + height + '! (hash: ' + hash + ')')
     })
 ```
 ### addressTouched

@@ -283,7 +283,7 @@ DB.prototype.addressesQuery = function (query) {
           transactions: transactions,
           latest: {
             height: latest.height,
-            blockid: latest.blockid.toString('hex')
+            hash: latest.blockid.toString('hex')
           }
         }
       })
@@ -371,9 +371,9 @@ DB.prototype.getMerkle = function (txid) {
 
             return {
               source: 'blocks',
-              data: {
+              block: {
                 height: result.rows[0].height,
-                blockid: result.rows[0].blockid.toString('hex'),
+                hash: result.rows[0].blockid.toString('hex'),
                 merkle: merkle,
                 index: txids.indexOf(txid)
               }
