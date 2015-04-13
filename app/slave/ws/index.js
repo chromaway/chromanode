@@ -31,15 +31,22 @@ SocketIO.prototype.attach = function (server) {
  * @param {string} blockid
  * @param {number} height
  */
-SocketIO.prototype.broadcastBlockId = function (blockid, height) {
+SocketIO.prototype.broadcastNewBlock = function (blockid, height) {
   this.ios.sockets.in('new-block').emit('new-block', blockid, height)
+}
+
+/**
+ * @param {string} txid
+ */
+SocketIO.prototype.broadcastNewTx = function (txid) {
+  this.ios.sockets.in('new-tx').emit('new-tx', txid)
 }
 
 /**
  * @param {string} address
  * @param {string} txid
  */
-SocketIO.prototype.broadcastAddressTxId = function (address, txid) {
+SocketIO.prototype.broadcastAddressTouched = function (address, txid) {
   this.ios.sockets.in(address).emit(address, txid)
 }
 

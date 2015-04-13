@@ -118,7 +118,10 @@ Master.prototype.storeTransactions = function (client, transactions, height) {
   function saveTx (tx) {
     var params = ['\\x' + tx.id, '\\x' + tx.toString()]
     if (!isMempool) { params.push(height) }
-    return client.queryAsync(queries.storeTx, params)
+    return Promise.all([
+      client.queryAsync(queries.storeTx, params),
+      slaves.newTx(client, tx.id)
+    ])
   }
 
   function getInScriptAddresses (script, txid, outindex) {

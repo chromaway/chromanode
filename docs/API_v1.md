@@ -269,6 +269,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 ## Notifications:
 
   * [newBlock](#newBlock)
+  * [newTx](#newtx)
   * [addressTouched](#addressTouched)
 
 ### newBlock
@@ -280,9 +281,23 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
       socket.emit('subscribe', 'new-block')
     })
     socket.on('new-block', function (hash, height) {
-      console.log('New block ' + height + '! (hash: ' + hash + ')')
+      console.log('New block ' + hash + '! (height: ' + height + ')')
     })
 ```
+
+### newTx
+
+```js
+    var io = require('socket.io-client')
+    var socket = io('http://localhost:3001')
+    socket.on('connect', function () {
+      socket.emit('subscribe', 'new-tx')
+    })
+    socket.on('new-tx', function (txid) {
+      console.log('New tx: ' + txid)
+    })
+```
+
 ### addressTouched
 
 ```js

@@ -65,6 +65,16 @@ Slaves.prototype.newBlock = function (client, blockid, height) {
 
 /**
  * @param {pg.Client} client
+ * @param {string} txid
+ * @return {Promise}
+ */
+Slaves.prototype.newTx = function (client, txid) {
+  var payload = JSON.stringify({txid: txid})
+  return messages.notify(client, 'newtx', payload)
+}
+
+/**
+ * @param {pg.Client} client
  * @param {string} address
  * @param {string} txid
  * @return {Promise}

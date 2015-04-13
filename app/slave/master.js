@@ -17,6 +17,11 @@ var storage = require('../../lib/storage').default()
  */
 
 /**
+ * @event Master#newTx
+ * @param {string} txid
+ */
+
+/**
  * @event Master#addressTouched
  * @param {string} address
  * @param {string} txid
@@ -43,6 +48,11 @@ Master.prototype.init = function () {
     self.emit('newBlock', payload.blockid, payload.height)
   }
 
+  function onNewTx (payload) {
+    payload = JSON.parse(payload)
+    self.emit('newTx', payload.txid)
+  }
+
   function onAddressTouched (payload) {
     payload = JSON.parse(payload)
     self.emit('addressTouched', payload.address, payload.txid)
@@ -67,6 +77,7 @@ Master.prototype.init = function () {
 
   return Promise.all([
     messages.listen('newblock', onNewBlock),
+    messages.listen('newtx', onNewTx),
     messages.listen('addresstouched', onAddressTouched),
     messages.listen('sendtxresponse', onSendTxResponse)
   ])

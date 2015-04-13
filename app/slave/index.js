@@ -24,12 +24,16 @@ module.exports.run = function () {
       var server = http.createServer(expressApp)
       socket.attach(server)
 
-      master.on('addressTouched', function (address, txid) {
-        socket.broadcastAddressTxId(address, txid)
+      master.on('newBlock', function (blockid, height) {
+        socket.broadcastNewBlock(blockid, height)
       })
 
-      master.on('newBlock', function (blockid, height) {
-        socket.broadcastBlockId(blockid, height)
+      master.on('newTx', function (txid) {
+        socket.broadcastNewTx(txid)
+      })
+
+      master.on('addressTouched', function (address, txid) {
+        socket.broadcastAddressTouched(address, txid)
       })
 
       return server.listen(port)
