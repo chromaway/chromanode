@@ -8,7 +8,7 @@ var qutil = require('../util/query')
 module.exports.query = function (req, res) {
   var result = Promise.try(function () {
     var query = {
-      addresses: unescape(qutil.transformAddresses(req.query.addresses)),
+      addresses: qutil.transformAddresses(unescape(req.query.addresses)),
       source: qutil.transformSource(req.query.source),
       from: qutil.transformFrom(req.query.from),
       to: qutil.transformTo(req.query.to),
