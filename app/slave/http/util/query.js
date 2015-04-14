@@ -80,7 +80,7 @@ module.exports.transformAddresses = function (val) {
 
   var network = bitcore.Networks.get(config.get('chromanode.network'))
 
-  var addresses = val.indexOf(',') === -1 ? val.split(',') : [val]
+  var addresses = val.indexOf(',') !== -1 ? val.split(',') : [val]
   addresses.forEach(function (address) {
     try {
       assert.equal(Address.fromString(address).network.name, network.name)
