@@ -52,11 +52,8 @@ Code released under [the MIT license](https://github.com/chromaway/chromanode/bl
 
 ## Todo
 
-  * store scriptPubKey? scriptSig?
-  * switch to electrumjs table structure
   * implement status method
   * return coins (txid, outputindex, value, script, confirmations|height) in addressesQuery?
-  * update config (using default value)
   * romove `soop` package?
   * code refactoring!
   * add tests (regtest mode?)
