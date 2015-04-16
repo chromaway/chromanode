@@ -1,4 +1,4 @@
-# API v1
+# API v2
 
 Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notification and HTTP for request.
 
@@ -8,6 +8,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
 ## Methods:
 
+  * [status](#status)
   * [headers](#headers)
     * [latest](#latest)
     * [query](#query)
@@ -18,13 +19,44 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
   * [addresses](#addresses)
     * [query](#query)
 
+### Status
+
+@todo
+
+  **url**
+
+    /v2/status
+
+  **result**
+
+    {
+      "bitcoind": {
+        "version": 99900,
+        "protocolversion": 70002,
+        "blocks": 329741,
+        "connections": 8,
+        "difficulty": 1,
+        "testnet": true,
+        "errors": "This is a pre-release test build - use at your own risk - do not use for mining or merchant applications",
+        ...
+      },
+      "chromanode": {
+        "status": "starting|syncing|finished",
+        "latest": {
+          "height": 329736,
+          "hash": "000000002eb3d5d9cac7d04b56f6d0afba66b46bd3715f0c56a240ef7b491937",
+        },
+        "version": "a.b.c"
+      }
+    }
+
 ### Headers
 
 #### Latest
 
   **url**
 
-    /v1/headers/latest
+    /v2/headers/latest
 
   **result**
 
@@ -44,7 +76,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
   **url**
 
-    /v1/headers/query
+    /v2/headers/query
 
   **query**
 
@@ -55,16 +87,16 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 | count | number, may be omitted                                |
 
     // get 1 header by height
-    /v1/headers/query?from=150232&count=1
+    /v2/headers/query?from=150232&count=1
 
     // alternative request, also get 1 header
-    /v1/headers/query?from=150232&to=150233
+    /v2/headers/query?from=150232&to=150233
 
     // get header by hash
-    /v1/headers/query?from=00000000f872dcf...cb828d3c561e9012&count=1
+    /v2/headers/query?from=00000000f872dcf...cb828d3c561e9012&count=1
 
     // get first chunk (count omitted, because query return maximum 2016 headers)
-    /v1/headers/query?from=0
+    /v2/headers/query?from=0
 
   **result**
 
@@ -89,7 +121,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
   **url**
 
-    /v1/transactions/raw
+    /v2/transactions/raw
 
   **query**
 
@@ -97,7 +129,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 |:------|:---------------|
 | txid  | transaction id |
 
-    /v1/transactions/raw?txid=f9f12dafc3d4ca3fd9cdf293873ad1c6b0bddac35dcd2bd34a57320772def350
+    /v2/transactions/raw?txid=f9f12dafc3d4ca3fd9cdf293873ad1c6b0bddac35dcd2bd34a57320772def350
 
   **result**
 
@@ -112,7 +144,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
   **url**
 
-    /v1/transactions/merkle
+    /v2/transactions/merkle
 
   **query**
 
@@ -120,7 +152,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 |:------|:---------------|
 | txid  | transaction id |
 
-    /v1/transactions/merkle?txid=d04888787b942ae2d81a878048d29640e5bcd109ebfe7dd2abdcd8e9ce8b5453
+    /v2/transactions/merkle?txid=d04888787b942ae2d81a878048d29640e5bcd109ebfe7dd2abdcd8e9ce8b5453
 
   **result**
 
@@ -152,7 +184,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
   **url**
 
-    /v1/transactions/send
+    /v2/transactions/send
 
   **query**
 
@@ -160,7 +192,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 |:------|:----------------|
 | rawtx | raw transaction |
 
-    curl http://localhost:3001/v1/transactions/send --header "Content-Type:application/json" -d '{"rawtx": "..."}'
+    curl http://localhost:3001/v2/transactions/send --header "Content-Type:application/json" -d '{"rawtx": "..."}'
 
   **result**
 
@@ -174,11 +206,13 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
 #### Query
 
+@todo add extra fields for coins
+
   \* *half-close interval for (from-to]*
 
   **url**
 
-    /v1/addresses/query
+    /v2/addresses/query
 
   **query**
 
@@ -191,16 +225,16 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 | status    | now only unspent available, may be omitted            |
 
     // get all affected transactions for addresses (from blocks and mempool)
-    /v1/addresses/query?addresses=mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2,msGccLNBLYWBg9U1J2RVribprvsEF3uYGK
+    /v2/addresses/query?addresses=mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2,msGccLNBLYWBg9U1J2RVribprvsEF3uYGK
 
     // all affected transactions from blocks that have at least one unspent output from height #103548
-    /v1/addresses/query?addresses=mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2&source=blocks&from=103548&status=unspent
+    /v2/addresses/query?addresses=mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2&source=blocks&from=103548&status=unspent
 
     // all affected transactions from mempool
-    /v1/addresses/query?addresses=mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2&source=mempool
+    /v2/addresses/query?addresses=mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2&source=mempool
 
     // all affected transactions for half-closed interval (fromHash, toHash]
-    /v1/addresses/query?addresses=mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2&from=0000000048f98df71a9d3973c55ac5543735f8ef801603caea2bdf22d77e8354&to=0000000011ab0934769901d4acde41e48a98a7cdaf9d7626d094e66368443560
+    /v2/addresses/query?addresses=mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2&from=0000000048f98df71a9d3973c55ac5543735f8ef801603caea2bdf22d77e8354&to=0000000011ab0934769901d4acde41e48a98a7cdaf9d7626d094e66368443560
 
   **result**
 
