@@ -4,8 +4,6 @@ var EventEmitter = require('events').EventEmitter
 var inherits = require('util').inherits
 var Promise = require('bluebird')
 
-var messages = require('../../lib/messages').default()
-
 /**
  * @event Slaves#sendTx
  * @param {string} rawTx

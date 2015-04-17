@@ -11,9 +11,8 @@ var Hash = bitcore.crypto.Hash
 
 var config = require('../../lib/config')
 var logger = require('../../lib/logger').logger
-var messages = require('../../lib/messages').default()
 var storage = require('../../lib/storage').default()
-var bitcoind = require('./bitcoind').default()
+var network = require('./network').default()
 var db = require('./db').default()
 var slaves = require('./slaves').default()
 
@@ -65,6 +64,8 @@ Master.prototype.init = function () {
         setTimeout(once, Math.max(0, delay))
       })
   }
+
+  return network.init()
 
   return bitcoind.init()
     .then(function () { return storage.init() })
