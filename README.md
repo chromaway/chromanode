@@ -54,9 +54,6 @@ Code released under [the MIT license](https://github.com/chromaway/chromanode/bl
 
 ## Todo
 
-  * implement status method
-  * add validation to subscription and change to something like {type: 'new-block'}
-  * return coins (txid, outputindex, value, script, confirmations|height) in addressesQuery?
   * romove `soop` package?
   * code refactoring!
   * add tests (regtest mode?)

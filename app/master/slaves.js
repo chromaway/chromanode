@@ -46,14 +46,14 @@ Slaves.prototype.sendTxResponse = function (id, err, opts) {
 }
 
 /**
- * @param {string} blockid
+ * @param {string} hash
  * @param {number} height
  * @param {Object} [opts]
  * @param {pg.Client} [opts.client]
  * @return {Promise}
  */
-Slaves.prototype.broadcastBlock = function (blockid, height, opts) {
-  var payload = JSON.stringify({blockid: blockid, height: height})
+Slaves.prototype.broadcastBlock = function (hash, height, opts) {
+  var payload = JSON.stringify({hash: hash, height: height})
   return storage.notify('broadcastblock', payload, opts)
 }
 
@@ -87,14 +87,14 @@ Slaves.prototype.broadcastAddressTx = function (address, txid, opts) {
 }
 
 /**
- * @param {Object} info
+ * @param {Object} status
  * @param {Object} [opts]
  * @param {pg.Client} [opts.client]
  * @return {Promise}
  */
-Slaves.prototype.broadcastSyncInfo = function (info, opts) {
-  var payload = JSON.stringify(info)
-  return storage.notify('broadcastsyncinfo', payload, opts)
+Slaves.prototype.broadcastStatus = function (status, opts) {
+  var payload = JSON.stringify(status)
+  return storage.notify('broadcaststatus', payload, opts)
 }
 
 module.exports = require('soop')(Slaves)

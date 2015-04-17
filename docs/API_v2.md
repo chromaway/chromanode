@@ -21,8 +21,6 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
 ### Status
 
-@todo
-
   **url**
 
     /v2/status
@@ -30,23 +28,17 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
   **result**
 
     {
+      "version": "a.b.c",
+      "status": "starting|syncing|finished",
+      "progress": "1.000000",
+      "latest": {
+        "height": 329736,
+        "hash": "000000002eb3d5d9cac7d04b56f6d0afba66b46bd3715f0c56a240ef7b491937",
+      },
+      "connections": 8,
       "bitcoind": {
         "version": 99900,
-        "protocolversion": 70002,
-        "blocks": 329741,
-        "connections": 8,
-        "difficulty": 1,
-        "testnet": true,
-        "errors": "This is a pre-release test build - use at your own risk - do not use for mining or merchant applications",
-        ...
-      },
-      "chromanode": {
-        "status": "starting|syncing|finished",
-        "latest": {
-          "height": 329736,
-          "hash": "000000002eb3d5d9cac7d04b56f6d0afba66b46bd3715f0c56a240ef7b491937",
-        },
-        "version": "a.b.c"
+        "protocolversion": 70002
       }
     }
 
@@ -206,8 +198,6 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
 #### Query
 
-@todo add extra fields for coins
-
   \* *half-close interval for (from-to]*
 
   **url**
@@ -220,8 +210,8 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 |:----------|:------------------------------------------------------|
 | addresses | array of addresses                                    |
 | source    | blocks or mempool, may be omitted (both will be used) |
-| from      | hash or height, may be omitted                     |
-| to        | hash or height, may be omitted                     |
+| from      | hash or height, may be omitted                        |
+| to        | hash or height, may be omitted                        |
 | status    | now only unspent available, may be omitted            |
 
     // get all affected transactions for addresses (from blocks and mempool)
@@ -238,7 +228,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
   **result**
 
-    // for mempool height is null
+    // empty status, for mempool transactions height is null
     {
       "transactions": [{
         "txid": "5f450e47d9ae60f156d366418442f7c454fd4a343523edde7776af7a7d335ac6",
@@ -250,7 +240,28 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
         "txid": "ab139c6e7054d086ca65f1b7173ee31ef39a1d0ad1797b4addd82f4028dfa0d1",
         "height": null
       }],
-      latest: {
+      "latest": {
+        "height": 329750,
+        "hash": "0000000045dd9bad2000dd00b31762c3da32ac46f40cdf4ddd350bcc3571a253"
+      }
+    }
+
+    // status is unspent
+    {
+      "transactions": [{
+        "txid", "a9566f182b27355b4a7470d7fd77809ba0a5a3d19831e271516fe38584c33dee",
+        "vout": 0,
+        "value": 5000000000,
+        "script": "76a914c3d093c756dc4f8dd817b503c64ecb802776213488ac",
+        "height": 130241
+      }, ... {
+        "txid": "ddd1b0bfefcac0163d1b9298a520d4b90b0bffe8947caf0989ffa6da0f536a99",
+        "vout": 0,
+        "value": 330000,
+        "script": "76a9143ee467c487c69df0828614f27bdb55eb7c4d679d88ac",
+        "height": null
+      }],
+      "latest": {
         "height": 329750,
         "hash": "0000000045dd9bad2000dd00b31762c3da32ac46f40cdf4ddd350bcc3571a253"
       }
@@ -268,46 +279,63 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
 ## Notifications:
 
-  * [newBlock](#newBlock)
-  * [newTx](#newtx)
-  * [addressTouched](#addressTouched)
+  * [new-block](#new-block)
+  * [new-transaction](#new-transaction)
+  * [address](#address)
+  * [status](#status)
 
-### newBlock
+### new-block
 
 ```js
     var io = require('socket.io-client')
     var socket = io('http://localhost:3001')
     socket.on('connect', function () {
-      socket.emit('subscribe', 'new-block')
+      socket.emit('subscribe', {type: 'new-block'})
     })
     socket.on('new-block', function (hash, height) {
       console.log('New block ' + hash + '! (height: ' + height + ')')
     })
 ```
 
-### newTx
+### new-transaction
 
 ```js
     var io = require('socket.io-client')
     var socket = io('http://localhost:3001')
     socket.on('connect', function () {
-      socket.emit('subscribe', 'new-tx')
+      socket.emit('subscribe', {type: 'new-transaction'})
     })
-    socket.on('new-tx', function (txid) {
-      console.log('New tx: ' + txid)
+    socket.on('new-transaction', function (txid) {
+      console.log('New tx:', txid)
     })
 ```
 
-### addressTouched
+### address
 
 ```js
     var io = require('socket.io-client')
     var socket = io('http://localhost:3001')
     socket.on('connect', function () {
-      socket.emit('subscribe', 'mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2')
+      socket.emit('subscribe', {
+        type: 'address',
+        address: 'mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2'
+      })
     })
-    socket.on('mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2', function (txid) {
-      console.log('New affected tx: ' + txid)
+    socket.on('address', function (address, txid) {
+      console.log('New affected tx:', txid)
+    })
+```
+
+### status
+
+```js
+    var io = require('socket.io-client')
+    var socket = io('http://localhost:3001')
+    socket.on('connect', function () {
+      socket.emit('subscribe', {type: 'status'})
+    })
+    socket.on('status', function (status) {
+      console.log('New status:', status)
     })
 ```
 
