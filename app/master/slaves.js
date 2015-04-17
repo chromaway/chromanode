@@ -1,12 +1,11 @@
-/* globals Promise:true */
-
 var EventEmitter = require('events').EventEmitter
 var inherits = require('util').inherits
-var Promise = require('bluebird')
+
+var storage = require('../../lib/storage').default()
 
 /**
  * @event Slaves#sendTx
- * @param {string} rawTx
+ * @param {string} rawtx
  */
 
 /**
@@ -23,63 +22,79 @@ inherits(Slaves, EventEmitter)
  */
 Slaves.prototype.init = function () {
   var self = this
-
-  function onSendTx (payload) {
+  return storage.listen('sendTx', function (payload) {
     payload = JSON.parse(payload)
     self.emit('sendTx', payload.id, payload.rawtx)
-  }
-
-  return Promise.all([
-    messages.listen('sendtx', onSendTx)
-  ])
+  })
 }
 
 /**
- * @param {pg.Client} client
  * @param {string} id
- * @param {(Object|undefined)} err
+ * @param {?Object} err
+ * @param {Object} [opts]
+ * @param {pg.Client} [opts.client]
  * @return {Promise}
  */
-Slaves.prototype.sendTxResponse = function (client, id, err) {
+Slaves.prototype.sendTxResponse = function (id, err, opts) {
   var payload = JSON.stringify({
-    status: err === undefined ? 'success' : 'fail',
+    status: err === null ? 'success' : 'fail',
     id: id,
     code: (err || {}).code,
     message: escape((err || {}).message)
   })
-  return messages.notify(client, 'sendtxresponse', payload)
+  return storage.notify('sendtxresponse', payload, opts)
 }
 
 /**
- * @param {pg.Client} client
  * @param {string} blockid
  * @param {number} height
+ * @param {Object} [opts]
+ * @param {pg.Client} [opts.client]
  * @return {Promise}
  */
-Slaves.prototype.newBlock = function (client, blockid, height) {
+Slaves.prototype.broadcastBlock = function (blockid, height, opts) {
   var payload = JSON.stringify({blockid: blockid, height: height})
-  return messages.notify(client, 'newblock', payload)
+  return storage.notify('broadcastblock', payload, opts)
 }
 
 /**
- * @param {pg.Client} client
  * @param {string} txid
+ * @param {?string} blockHash
+ * @param {?number} blockHeight
+ * @param {Object} [opts]
+ * @param {pg.Client} [opts.client]
  * @return {Promise}
  */
-Slaves.prototype.newTx = function (client, txid) {
-  var payload = JSON.stringify({txid: txid})
-  return messages.notify(client, 'newtx', payload)
+Slaves.prototype.broadcastTx = function (txid, blockHash, blockHeight, opts) {
+  var payload = JSON.stringify({
+    txid: txid,
+    blockHash: blockHash,
+    blockHeight: blockHeight
+  })
+  return storage.notify('broadcasttx', payload, opts)
 }
 
 /**
- * @param {pg.Client} client
  * @param {string} address
  * @param {string} txid
+ * @param {Object} [opts]
+ * @param {pg.Client} [opts.client]
  * @return {Promise}
  */
-Slaves.prototype.addressTouched = function (client, address, txid) {
+Slaves.prototype.broadcastAddressTx = function (address, txid, opts) {
   var payload = JSON.stringify({address: address, txid: txid})
-  return messages.notify(client, 'addresstouched', payload)
+  return storage.notify('broadcastaddresstx', payload, opts)
+}
+
+/**
+ * @param {Object} info
+ * @param {Object} [opts]
+ * @param {pg.Client} [opts.client]
+ * @return {Promise}
+ */
+Slaves.prototype.broadcastSyncInfo = function (info, opts) {
+  var payload = JSON.stringify(info)
+  return storage.notify('broadcastsyncinfo', payload, opts)
 }
 
 module.exports = require('soop')(Slaves)
