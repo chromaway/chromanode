@@ -1,6 +1,5 @@
 /* globals Promise:true */
 
-var _ = require('lodash')
 var EventEmitter = require('events').EventEmitter
 var inherits = require('util').inherits
 var timers = require('timers')
@@ -23,6 +22,11 @@ var util = require('../../lib/util')
  */
 
 /**
+ * @event Network#newBitcoindError
+ * @param {string} error
+ */
+
+/**
  * @event Network#block
  * @param {string} hash
  */
@@ -40,6 +44,13 @@ function Network () {
 }
 
 inherits(Network, EventEmitter)
+
+/**
+ * @return {Promise}
+ */
+Network.prototype.init = function () {
+  return Promise.all([this._initBitcoind(), this._initTrustedPeer()])
+}
 
 /**
  * @return {Promise}
@@ -65,9 +76,10 @@ Network.prototype._initBitcoind = function () {
         throw new errors.InvalidBitcoindNetwork()
       }
 
-      // simulate real network
+      // simulate real network & bitcoind error monitor
       self.bitcoindConnectedCount = ret.result.connections
-      function updateConnectedCount () {
+      var lastBitcoindError = ''
+      function checkBitcoindInfo () {
         self.bitcoind.getInfoAsync()
           .then(function (ret) {
             while (self.bitcoindConnectedCount !== ret.result.connections) {
@@ -79,12 +91,17 @@ Network.prototype._initBitcoind = function () {
                 self.emit('peerdisconnect')
               }
             }
+
+            if (lastBitcoindError !== ret.result.errors) {
+              lastBitcoindError = ret.result.errors
+              self.emit('newBitcoindError', lastBitcoindError)
+            }
           })
           .finally(function () {
-            setTimeout(updateConnectedCount, 2500)
+            setTimeout(checkBitcoindInfo, 2500)
           })
       }
-      timers.setImmediate(updateConnectedCount, 0)
+      timers.setImmediate(checkBitcoindInfo, 0)
 
       // show info
       logger.info(
@@ -171,10 +188,16 @@ Network.prototype._initTrustedPeer = function () {
 }
 
 /**
- * @return {Promise}
+ * @return {Promise<{version: number, protocolversion: number}>}
  */
-Network.prototype.init = function () {
-  return Promise.all([this._initBitcoind(), this._initTrustedPeer()])
+Network.prototype.getBitcoindVersion = function () {
+  return this.bitcoind.getInfoAsync()
+    .then(function (ret) {
+      return {
+        version: ret.result.version,
+        protocolversion: ret.result.protocolversion
+      }
+    })
 }
 
 /**
@@ -182,6 +205,14 @@ Network.prototype.init = function () {
  */
 Network.prototype.getConnectedNumber = function () {
   return Promise.resolve(this.bitcoindConnectedCount)
+}
+
+/**
+ * @return {Promise<number>}
+ */
+Network.prototype.getBlockCount = function () {
+  return this.bitcoind.getBlockCountAsync()
+    .then(function (ret) { return ret.result })
 }
 
 /**
@@ -194,33 +225,30 @@ Network.prototype.getBlockHash = function (height) {
 }
 
 /**
- * @param {(string|number)} id hash or height
+ * @param {string} hash
  * @return {Promise<bitcore.Block>}
  */
-Network.prototype.getBlock = function (id) {
-  var self = this
-  return Promise.try(function () {
-    if (_.isString(id)) {
-      return id
-    }
-
-    return self.getBlockHash(id)
-  })
-  .then(function (hash) {
-    return self.bitcoind.getBlockAsync(hash, false)
-  })
-  .then(function (ret) {
-    var rawBlock = new Buffer(ret.result, 'hex')
-    return new bitcore.Block(rawBlock)
-  })
+Network.prototype.getBlock = function (hash) {
+  return this.bitcoind.getBlockAsync(hash, false)
+    .then(function (ret) {
+      var rawBlock = new Buffer(ret.result, 'hex')
+      return new bitcore.Block(rawBlock)
+    })
 }
 
 /**
- * @return {Promise<number>}
+ * @return {Promise<{hash: string, height: number}>}
  */
-Network.prototype.getBlockCount = function () {
-  return this.bitcoind.getBlockCountAsync()
-    .then(function (ret) { return ret.result })
+Network.prototype.getLatest = function () {
+  var self = this
+  return self.bitcoind.getBlockCountAsync()
+    .then(function (ret) {
+      var height = ret.result
+      return Promise.all([height, self.bitcoind.getBlockHashAsync(height)])
+    })
+    .spread(function (height, hash) {
+      return {hash: hash, height: height}
+    })
 }
 
 /**
@@ -231,4 +259,4 @@ Network.prototype.sendTx = function (rawtx) {
   return this.bitcoind.sendRawTransactionAsync(rawtx)
 }
 
-module.exports = require('soop')(Network)
+module.exports = Network

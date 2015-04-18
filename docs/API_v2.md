@@ -29,16 +29,22 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
     {
       "version": "a.b.c",
+      "network": "livenet|testnet",
       "status": "starting|syncing|finished",
-      "progress": "1.000000",
+      "progress": "0.943264",
       "latest": {
-        "height": 329736,
         "hash": "000000002eb3d5d9cac7d04b56f6d0afba66b46bd3715f0c56a240ef7b491937",
+        "height": 329736
+      },
+      "blockchainLatest": {
+        "hash": "0000000037859e0b71704e4a24093ca809d4058923af42844d0a3990b191e1fa",
+        "height": 349569
       },
       "connections": 8,
       "bitcoind": {
         "version": 99900,
-        "protocolversion": 70002
+        "protocolversion": 70002,
+        "errors": "Warning: This version is obsolete, upgrade required!"
       }
     }
 

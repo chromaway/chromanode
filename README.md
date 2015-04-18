@@ -51,9 +51,3 @@ To get current version of chromanode make request to `/version`
 ## License
 
 Code released under [the MIT license](https://github.com/chromaway/chromanode/blob/master/LICENSE).
-
-## Todo
-
-  * romove `soop` package?
-  * code refactoring!
-  * add tests (regtest mode?)
