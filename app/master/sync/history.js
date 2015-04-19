@@ -48,15 +48,13 @@ inherits(HistorySync, EventEmitter)
  */
 HistorySync.prototype.init = function () {
   var self = this
-  return self.storage.executeTransaction(function (client) {
-    // remove unconfirmed data
-    return Promise.all([
-      client.queryAsync(SQL.delete.transactions.unconfirmed),
-      client.queryAsync(SQL.update.history.deleteUnconfirmedInputs),
-      client.queryAsync(SQL.update.history.deleteUnconfirmedOutputs),
-      client.queryAsync(SQL.delete.history.unconfirmed)
-    ])
-  })
+  // remove unconfirmed data
+  return self.storage.executeQueries([
+    [SQL.delete.transactions.unconfirmed],
+    [SQL.delete.history.unconfirmed],
+    [SQL.update.history.deleteUnconfirmedInputs],
+    [SQL.update.history.deleteUnconfirmedOutputs]
+  ], {concurrency: 1})
   .then(function () {
     // extract latest from network and from database
     return Promise.all([
@@ -108,7 +106,8 @@ HistorySync.prototype._updatePercentage = function () {
   var value = this.latest.height / this.blockchainLatest.height
   this.progress.value = value.toFixed(6)
 
-  if (this.progress.latest + this.progress.step <= this.latest.height) {
+  if (this.progress.latest + this.progress.step <= this.latest.height ||
+      this.progress.value === '1.000000') {
     this.progress.latest = this.latest.height
 
     logger.info('HistorySync progress: %s', this.progress.value)
@@ -129,10 +128,48 @@ HistorySync.prototype.getInfo = function () {
 
 /**
  */
-HistorySync.prototype.run = function () {
+HistorySync.prototype._loop = function () {
   var self = this
-  self.emit('start')
-  // @todo
+  if (self.latest.hash === self.blockchainLatest.hash) {
+    return
+  }
+
+  var height = self.latest.height + 1
+  return self.storage.executeTransaction(function (client) {
+    return Promise.try(function () {
+      if (height < self.blockchainLatest.height) {
+        return
+      }
+
+      // reorg found, new height, delete blocks, transactions, history
+      logger.warning('Reorg found: from %d to %d',
+                     self.latest.height, self.blockchainLatest.height)
+
+      height = self.blockchainLatest.height - 1
+      return self.storage.executeQueries([
+        [SQL.delete.blocks.fromHeight, [height]],
+        [SQL.delete.transactions.fromHeight, [height]],
+        [SQL.delete.history.fromHeight, [height]],
+        [SQL.update.history.deleteInputsFromHeight, [height]],
+        [SQL.update.history.deleteOutputsFromHeight, [height]]
+      ], {client: client, concurrency: 1})
+    })
+    .then(function () {
+      // download block
+    })
+  })
+  .catch(function (err) {
+    // new attempt after 15s
+    setTimeout(self._loop.bind(self), 15 * 1000)
+    throw err
+  })
+}
+
+/**
+ */
+HistorySync.prototype.run = function () {
+  this.emit('start')
+  this._loop()
 }
 
 module.exports = HistorySync

@@ -123,6 +123,7 @@ Master.prototype.init = function () {
     }
     self.historySync.on('progress', historySyncOnProgress)
 
+    // remove historySync handlers on finish
     self.historySync.on('finish', function () {
       self.historySync.removeListener('start', historySyncOnStart)
       self.historySync.removeListener('progress', historySyncOnProgress)
