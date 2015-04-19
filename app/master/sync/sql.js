@@ -1,4 +1,24 @@
 module.exports = {
+  insert: {
+    blocks: {
+      row: 'INSERT INTO blocks ' +
+           '    (height, hash, header, txids) ' +
+           '  VALUES ' +
+           '    ($1, $2, $3, $4)'
+    },
+    transactions: {
+      confirmed: 'INSERT INTO transactions ' +
+                 '    (txid, height, tx) ' +
+                 '  VALUES ' +
+                 '    ($1, $2, $3)'
+    },
+    history: {
+      confirmedOutput: 'INSERT INTO history ' +
+                       '    (address, otxid, oindex, ovalue, oscript, oheight) ' +
+                       '  VALUES ' +
+                       '    ($1, $2, $3, $4, $5, $6)'
+    }
+  },
   select: {
     blocks: {
       latest: 'SELECT ' +
@@ -12,6 +32,15 @@ module.exports = {
   },
   update: {
     history: {
+      confirmedInput: 'UPDATE history ' +
+                      '  SET ' +
+                      '    itxid = $1, ' +
+                      '    iindex = $2, ' +
+                      '    iheight = $3 ' +
+                      '  WHERE ' +
+                      '    otxid = $4 AND ' +
+                      '    oindex = $5',
+
       deleteInputsFromHeight: 'UPDATE history ' +
                               '  SET ' +
                               '    itxid = NULL, ' +

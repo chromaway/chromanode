@@ -1,5 +1,6 @@
 /* globals Promise:true */
 
+var _ = require('lodash')
 var EventEmitter = require('events').EventEmitter
 var inherits = require('util').inherits
 var timers = require('timers')
@@ -225,15 +226,25 @@ Network.prototype.getBlockHash = function (height) {
 }
 
 /**
- * @param {string} hash
+ * @param {(number|string)} id
  * @return {Promise<bitcore.Block>}
  */
-Network.prototype.getBlock = function (hash) {
-  return this.bitcoind.getBlockAsync(hash, false)
-    .then(function (ret) {
-      var rawBlock = new Buffer(ret.result, 'hex')
-      return new bitcore.Block(rawBlock)
-    })
+Network.prototype.getBlock = function (id) {
+  var self = this
+  return Promise.try(function () {
+    if (_.isNumber(id)) {
+      return self.getBlockHash(id)
+    }
+
+    return id
+  })
+  .then(function (hash) {
+    return self.bitcoind.getBlockAsync(hash, false)
+  })
+  .then(function (ret) {
+    var rawBlock = new Buffer(ret.result, 'hex')
+    return new bitcore.Block(rawBlock)
+  })
 }
 
 /**
@@ -241,10 +252,9 @@ Network.prototype.getBlock = function (hash) {
  */
 Network.prototype.getLatest = function () {
   var self = this
-  return self.bitcoind.getBlockCountAsync()
-    .then(function (ret) {
-      var height = ret.result
-      return Promise.all([height, self.bitcoind.getBlockHashAsync(height)])
+  return self.getBlockCount()
+    .then(function (height) {
+      return Promise.all([height, self.getBlockHash(height)])
     })
     .spread(function (height, hash) {
       return {hash: hash, height: height}

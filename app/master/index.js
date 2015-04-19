@@ -129,6 +129,7 @@ Master.prototype.init = function () {
       self.historySync.removeListener('progress', historySyncOnProgress)
 
       self.status.status = 'finished'
+      self.status.progress = self.historySync.getInfo().progress
       self.slaves.broadcastStatus(self.status)
 
       // also add peerSync listeners, move to function?

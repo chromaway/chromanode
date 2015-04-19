@@ -1,12 +1,14 @@
 /* globals Promise:true */
 
 var _ = require('lodash')
-var EventEmitter = require('events').EventEmitter
 var inherits = require('util').inherits
+var timers = require('timers')
 var Promise = require('bluebird')
 
+var errors = require('../../../lib/errors')
 var logger = require('../../../lib/logger').logger
 var util = require('../../../lib/util')
+var Sync = require('./sync')
 var SQL = require('./sql')
 
 /**
@@ -23,11 +25,12 @@ var SQL = require('./sql')
 
 /**
  * @class HistorySync
+ * @extends Sync
  * @param {Storage} storage
  * @param {Network} network
  */
 function HistorySync (storage, network) {
-  EventEmitter.call(this)
+  Sync.call(this)
 
   this.storage = storage
   this.network = network
@@ -41,7 +44,7 @@ function HistorySync (storage, network) {
   this.blockchainLatest = null
 }
 
-inherits(HistorySync, EventEmitter)
+inherits(HistorySync, Sync)
 
 /**
  * @return {Promise}
@@ -59,21 +62,16 @@ HistorySync.prototype.init = function () {
     // extract latest from network and from database
     return Promise.all([
       self.network.getLatest(),
-      self.storage.executeQuery(SQL.select.blocks.latest)
+      self.updateLatest()
     ])
   })
-  .spread(function (blockchainLatest, latest) {
-    // process latest to {hash: string, height: number}
-    latest = latest.rowCount === 1
-               ? {hash: latest.rows[0].hash, height: latest.rows[0].height}
-               : {hash: util.zfill('', 64), height: -1}
-
+  .spread(function (blockchainLatest) {
     // update self.blockchainLatest on new blocks before sync finished
     function onNewBlock () {
       self.network.getLatest()
-        .then(function (latest) {
-          self.blockchainLatest = latest
-          self._updatePercentage()
+        .then(function (blockchainLatest) {
+          self.blockchainLatest = blockchainLatest
+          self._updateProgress()
         })
     }
 
@@ -83,26 +81,26 @@ HistorySync.prototype.init = function () {
     })
 
     // calculate progress.step
-    var step = parseInt((blockchainLatest.height - latest.height) / 1000, 10)
+    var fstep = (blockchainLatest.height - self.latest.height) / 1000
+    var step = parseInt(fstep, 10)
     self.progress.step = Math.max(step, 10)
 
     // set progress.latest, network and database latest block
-    self.progress.latest = latest.height
+    self.progress.latest = self.latest.height
     self.blockchainLatest = blockchainLatest
-    self.latest = latest
 
     // update self.progress.value
-    self._updatePercentage()
+    self._updateProgress()
 
     // show info message
     logger.info('Got %d blocks in current db, out of %d block at bitcoind',
-                self.latest.height, self.blockchainLatest.height)
+                self.latest.height + 1, self.blockchainLatest.height)
   })
 }
 
 /**
  */
-HistorySync.prototype._updatePercentage = function () {
+HistorySync.prototype._updateProgress = function () {
   var value = this.latest.height / this.blockchainLatest.height
   this.progress.value = value.toFixed(6)
 
@@ -141,22 +139,54 @@ HistorySync.prototype._loop = function () {
         return
       }
 
-      // reorg found, new height, delete blocks, transactions, history
-      logger.warning('Reorg found: from %d to %d',
-                     self.latest.height, self.blockchainLatest.height)
-
-      height = self.blockchainLatest.height - 1
+      // reorg found
+      //   delete blocks, transactions, history
+      //   update self.latest and height
+      var to = self.blockchainLatest.height - 1
+      logger.warning('Reorg found: from %d to %d', self.latest.height, to)
       return self.storage.executeQueries([
-        [SQL.delete.blocks.fromHeight, [height]],
-        [SQL.delete.transactions.fromHeight, [height]],
-        [SQL.delete.history.fromHeight, [height]],
-        [SQL.update.history.deleteInputsFromHeight, [height]],
-        [SQL.update.history.deleteOutputsFromHeight, [height]]
+        [SQL.delete.blocks.fromHeight, [to]],
+        [SQL.delete.transactions.fromHeight, [to]],
+        [SQL.delete.history.fromHeight, [to]],
+        [SQL.update.history.deleteInputsFromHeight, [to]],
+        [SQL.update.history.deleteOutputsFromHeight, [to]]
       ], {client: client, concurrency: 1})
+      .then(function () {
+        return self.updateLatest()
+      })
+      .then(function () {
+        height = self.latest.height + 1
+      })
     })
     .then(function () {
       // download block
+      return self.network.getBlock(height)
     })
+    .then(function (block) {
+      // check hashPrevBlock
+      if (self.latest.hash !== util.encode(block.header.prevHash)) {
+        throw new errors.Master.InvalidHashPrevBlock(
+          self.latest.hash, block.hash)
+      }
+
+      // create queries and execute
+      var queries = self._getImportBlockQueries(height, block)
+      return self.storage.executeQueries(queries, {client: client})
+    })
+    .then(function () {
+      return self.updateLatest({client: client})
+    })
+  })
+  .then(function () {
+    // verbose logging
+    logger.verbose('Import block #%d - %s',
+                   self.latest.height, self.latest.hash)
+
+    // update self.progress and emit progress if need
+    self._updateProgress()
+
+    // run _loop again
+    timers.setImmediate(self._loop.bind(self))
   })
   .catch(function (err) {
     // new attempt after 15s
