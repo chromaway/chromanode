@@ -161,7 +161,7 @@ DB.prototype.headersQuery = function (query) {
 
         return self._getHeightForPoint(client, query.to)
           .then(function (to) {
-            if (to === 0) {
+            if (to === null) {
               throw new errors.Slave.ToNotFound()
             }
 
