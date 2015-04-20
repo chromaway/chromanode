@@ -68,9 +68,9 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
   Return raw headers for custom query.
 
-  \* *maximum 2016 headers (one chunk)*
+  \* *half-open interval for (from-to]*
 
-  \* *half-open interval for [from-to)*
+  \* *maximum 2016 headers (one chunk)*
 
   **url**
 
@@ -78,11 +78,11 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
   **query**
 
-| param | description                                           |
-|:------|:------------------------------------------------------|
-| from  | hash or height                                        |
-| to    | hash or height, may be omitted (preferred than count) |
-| count | number, may be omitted                                |
+| param | description                                                       |
+|:------|:------------------------------------------------------------------|
+| from  | hash or height, may be ommited (include zero header in this case) |
+| to    | hash or height, may be omitted (preferred than count)             |
+| count | number, may be omitted                                            |
 
     // get 1 header by height
     /v2/headers/query?from=150232&count=1
