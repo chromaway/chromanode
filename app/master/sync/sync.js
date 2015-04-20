@@ -89,6 +89,8 @@ Sync.prototype._getAddresses = function (script) {
 Sync.prototype._importBlock = function (height, block, client) {
   var self = this
 
+  var txids = _.pluck(block.transactions, 'hash')
+
   return Promise.try(function () {
     // import header
     return client.queryAsync(SQL.insert.blocks.row, [
@@ -100,9 +102,9 @@ Sync.prototype._importBlock = function (height, block, client) {
   })
   .then(function () {
     // import transactions
-    return Promise.map(block.transactions, function (tx) {
+    return Promise.map(block.transactions, function (tx, txIndex) {
       return client.queryAsync(SQL.insert.transactions.confirmed, [
-        '\\x' + tx.hash,
+        '\\x' + txids[txIndex],
         height,
         '\\x' + tx.toString()
       ])
@@ -110,13 +112,13 @@ Sync.prototype._importBlock = function (height, block, client) {
   })
   .then(function () {
     // import outputs
-    return Promise.map(block.transactions, function (tx) {
+    return Promise.map(block.transactions, function (tx, txIndex) {
       return Promise.map(tx.outputs, function (output, index) {
         var addresses = self._getAddresses(output.script)
         return Promise.map(addresses, function (address) {
           return client.queryAsync(SQL.insert.history.confirmedOutput, [
             address,
-            '\\x' + tx.hash,
+            '\\x' + txids[txIndex],
             index,
             output.satoshis,
             '\\x' + output.script.toHex(),
@@ -128,7 +130,7 @@ Sync.prototype._importBlock = function (height, block, client) {
   })
   .then(function () {
     // import inputs
-    return Promise.map(block.transactions, function (tx) {
+    return Promise.map(block.transactions, function (tx, txIndex) {
       return Promise.map(tx.inputs, function (input, index) {
         // skip coinbase
         var prevTxId = input.prevTxId.toString('hex')
@@ -139,7 +141,7 @@ Sync.prototype._importBlock = function (height, block, client) {
         }
 
         return client.queryAsync(SQL.update.history.confirmedInput, [
-          '\\x' + tx.hash,
+          '\\x' + txids[txIndex],
           index,
           height,
           '\\x' + prevTxId,
