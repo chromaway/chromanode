@@ -1,7 +1,10 @@
+/* globals Promise:true */
+
 var _ = require('lodash')
 var EventEmitter = require('events').EventEmitter
 var inherits = require('util').inherits
 var bitcore = require('bitcore')
+var Promise = require('bluebird')
 
 var config = require('../../../lib/config')
 var logger = require('../../../lib/logger').logger
@@ -80,71 +83,71 @@ Sync.prototype._getAddresses = function (script) {
 /**
  * @param {number} height
  * @param {bitcore.Block} block
- * @return {Array.<>}
+ * @param {pg.Client} client
+ * @return {Promise}
  */
-Sync.prototype._getImportBlockQueries = function (height, block) {
+Sync.prototype._importBlock = function (height, block, client) {
   var self = this
-  var queries = []
-  var stopwatch = util.stopwatch.start()
 
-  // import header
-  queries.push([SQL.insert.blocks.row, [
-    height,
-    '\\x' + block.hash,
-    '\\x' + block.header.toString(),
-    '\\x' + _.pluck(block.transactions, 'hash').join('')
-  ]])
-
-  // import transactions
-  block.transactions.forEach(function (tx) {
-    queries.push([SQL.insert.transactions.confirmed, [
-      '\\x' + tx.hash,
+  return Promise.try(function () {
+    // import header
+    return client.queryAsync(SQL.insert.blocks.row, [
       height,
-      '\\x' + tx.toString()
-    ]])
+      '\\x' + block.hash,
+      '\\x' + block.header.toString(),
+      '\\x' + _.pluck(block.transactions, 'hash').join('')
+    ])
   })
+  .then(function () {
+    // import transactions
+    return Promise.map(block.transactions, function (tx) {
+      return client.queryAsync(SQL.insert.transactions.confirmed, [
+        '\\x' + tx.hash,
+        height,
+        '\\x' + tx.toString()
+      ])
+    }, {concurrency: 1})
+  })
+  .then(function () {
+    // import outputs
+    return Promise.map(block.transactions, function (tx) {
+      return Promise.map(tx.outputs, function (output, index) {
+        var addresses = self._getAddresses(output.script)
+        return Promise.map(addresses, function (address) {
+          return client.queryAsync(SQL.insert.history.confirmedOutput, [
+            address,
+            '\\x' + tx.hash,
+            index,
+            output.satoshis,
+            '\\x' + output.script.toHex(),
+            height
+          ])
+        }, {concurrency: 1})
+      }, {concurrency: 1})
+    }, {concurrency: 1})
+  })
+  .then(function () {
+    // import inputs
+    return Promise.map(block.transactions, function (tx) {
+      return Promise.map(tx.inputs, function (input, index) {
+        // skip coinbase
+        var prevTxId = input.prevTxId.toString('hex')
+        if (index === 0 &&
+            input.outputIndex === 0xffffffff &&
+            prevTxId === ZERO_HASH) {
+          return
+        }
 
-  // import outputs
-  block.transactions.forEach(function (tx) {
-    tx.outputs.forEach(function (output, index) {
-      self._getAddresses(output.script).forEach(function (address) {
-        queries.push([SQL.insert.history.confirmedOutput, [
-          address,
+        return client.queryAsync(SQL.update.history.confirmedInput, [
           '\\x' + tx.hash,
           index,
-          output.satoshis,
-          '\\x' + output.script.toHex(),
-          height
-        ]])
-      })
-    })
+          height,
+          '\\x' + prevTxId,
+          input.outputIndex
+        ])
+      }, {concurrency: 1})
+    }, {concurrency: 1})
   })
-
-  // import inputs
-  block.transactions.forEach(function (tx) {
-    tx.inputs.forEach(function (input, index) {
-      // skip coinbase
-      var prevTxId = input.prevTxId.toString('hex')
-      if (index === 0 &&
-          input.outputIndex === 0xffffffff &&
-          prevTxId === ZERO_HASH) {
-        return
-      }
-
-      queries.push([SQL.update.history.confirmedInput, [
-        '\\x' + tx.hash,
-        index,
-        height,
-        '\\x' + prevTxId,
-        input.outputIndex
-      ]])
-    })
-  })
-
-  logger.verbose('Generage queries for importing block %d, elapsed time: %s',
-                 height, stopwatch.format(stopwatch.value()))
-
-  return queries
 }
 
 /**

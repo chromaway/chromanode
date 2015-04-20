@@ -32,11 +32,11 @@ var SQL = require('./sql')
 function HistorySync () {
   Sync.apply(this, arguments)
 
-  this._maxBlockDataCache = Math.max(
-    config.get('chromanode.sync.maxBlockDataCache') || 0, 0)
+  this._maxCachedBlocks = Math.max(
+    config.get('chromanode.sync.maxCachedBlocks') || 0, 0)
 
-  this._blockDataCache = LRU({
-    max: this._maxBlockDataCache
+  this._blockCache = LRU({
+    max: this._maxCachedBlocks
   })
 
   this._progress = {
@@ -135,29 +135,26 @@ HistorySync.prototype.getInfo = function () {
 
 /**
  * @param {number} height
- * @return {Promise<{block: bitcore.block, queries: Array.<>}>}
+ * @return {Promise<bitcore.block>}
  */
-HistorySync.prototype._getBlockData = function (height) {
+HistorySync.prototype._getBlock = function (height) {
   var self = this
-  var promise = self._blockDataCache.get(height)
+  var block = self._blockCache.get(height)
 
-  if (promise === undefined || promise.isRejected()) {
+  if (block === undefined || block.isRejected()) {
     // download block and create queries
     var stopwatch = util.stopwatch.start()
-    promise = self._network.getBlock(height)
+    block = self._network.getBlock(height)
       .then(function (block) {
         logger.verbose('Downloading block %d, elapsed time: %s',
                        height, stopwatch.format(stopwatch.value()))
-        return {
-          block: block,
-          queries: self._getImportBlockQueries(height, block)
-        }
+        return block
       })
 
-    self._blockDataCache.set(height, promise)
+    self._blockCache.set(height, block)
   }
 
-  return promise
+  return block
 }
 
 /**
@@ -187,17 +184,16 @@ HistorySync.prototype._loop = function () {
         })
     })
     .then(function () {
-      return self._getBlockData(latest.height + 1)
+      return self._getBlock(latest.height + 1)
     })
-    .then(function (data) {
+    .then(function (block) {
       // check hashPrevBlock
-      if (latest.hash !== util.encode(data.block.header.prevHash)) {
-        throw new errors.Master.InvalidHashPrevBlock(
-          latest.hash, data.block.hash)
+      if (latest.hash !== util.encode(block.header.prevHash)) {
+        throw new errors.Master.InvalidHashPrevBlock(latest.hash, block.hash)
       }
 
       stopwatch = util.stopwatch.start()
-      return self._storage.executeQueries(data.queries, {client: client})
+      return self._importBlock(latest.height + 1, block, client)
     })
     .then(function () {
       stopwatch = stopwatch.value()
@@ -219,10 +215,10 @@ HistorySync.prototype._loop = function () {
 
     // fill block cache
     if (self._latest.height + 500 < self._blockchainLatest.height) {
-      var start = self._latest.height + 1
-      var stop = self._latest.height + 1 + self._maxBlockDataCache
-      _.range(start, stop).forEach(function (height) {
-        timers.setImmediate(function () { self._getBlockData(height) })
+      var start = self._latest.height
+      var stop = self._latest.height + self._maxCachedBlocks
+      _.range(stop, start, -1).forEach(function (height) {
+        timers.setImmediate(function () { self._getBlock(height) })
       })
     }
 
