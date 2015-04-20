@@ -16,12 +16,17 @@ var ZERO_HASH = util.zfill('', 64)
 /**
  * @class Sync
  * @extends events.EventEmitter
+ * @param {Storage} storage
+ * @param {Network} network
  */
-function Sync () {
+function Sync (storage, network) {
   EventEmitter.call(this)
 
+  this._storage = storage
+  this._network = network
+
   var networkName = config.get('chromanode.network')
-  this.bitcoinNetwork = bitcore.Networks.get(networkName)
+  this._bitcoinNetwork = bitcore.Networks.get(networkName)
 }
 
 inherits(Sync, EventEmitter)
@@ -32,7 +37,7 @@ inherits(Sync, EventEmitter)
  * @return {string}
  */
 Sync.prototype._createAddress = function (buf, type) {
-  var address = new Address(buf, this.bitcoinNetwork, type)
+  var address = new Address(buf, this._bitcoinNetwork, type)
   return address.toString()
 }
 
@@ -75,6 +80,7 @@ Sync.prototype._getAddresses = function (script) {
 /**
  * @param {number} height
  * @param {bitcore.Block} block
+ * @return {Array.<>}
  */
 Sync.prototype._getImportBlockQueries = function (height, block) {
   var self = this
@@ -145,7 +151,7 @@ Sync.prototype._getImportBlockQueries = function (height, block) {
  */
 Sync.prototype._reorgTo = function (to, opts) {
   logger.warning('Reorg found: from %d to %d', this.latest.height, to)
-  return this.storage.executeQueries([
+  return this._storage.executeQueries([
     [SQL.delete.blocks.fromHeight, [to]],
     [SQL.delete.transactions.fromHeight, [to]],
     [SQL.delete.history.fromHeight, [to]],
@@ -160,7 +166,7 @@ Sync.prototype._reorgTo = function (to, opts) {
  */
 Sync.prototype._getMyLatest = function (opts) {
   var self = this
-  return self.storage.executeQueries([[SQL.select.blocks.latest]], opts)
+  return self._storage.executeQueries([[SQL.select.blocks.latest]], opts)
     .spread(function (result) {
       if (result.rowCount === 0) {
         return {hash: util.zfill('', 64), height: -1}

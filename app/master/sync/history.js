@@ -4,12 +4,15 @@ var _ = require('lodash')
 var inherits = require('util').inherits
 var timers = require('timers')
 var Promise = require('bluebird')
+var LRU = require('lru-cache')
 
 var errors = require('../../../lib/errors')
 var logger = require('../../../lib/logger').logger
 var util = require('../../../lib/util')
 var Sync = require('./sync')
 var SQL = require('./sql')
+
+var MAX_BLOCK_DATA_CACHE = 3
 
 /**
  * @event HistorySync#start
@@ -26,22 +29,21 @@ var SQL = require('./sql')
 /**
  * @class HistorySync
  * @extends Sync
- * @param {Storage} storage
- * @param {Network} network
  */
-function HistorySync (storage, network) {
-  Sync.call(this)
+function HistorySync () {
+  Sync.apply(this, arguments)
 
-  this.storage = storage
-  this.network = network
+  this._blockDataCache = LRU({
+    max: MAX_BLOCK_DATA_CACHE
+  })
 
-  this.progress = {
+  this._progress = {
     value: null,
     step: null,
     latest: null
   }
-  this.latest = null
-  this.blockchainLatest = null
+  this._latest = null
+  this._blockchainLatest = null
 }
 
 inherits(HistorySync, Sync)
@@ -52,7 +54,7 @@ inherits(HistorySync, Sync)
 HistorySync.prototype.init = function () {
   var self = this
   // remove unconfirmed data
-  return self.storage.executeQueries([
+  return self._storage.executeQueries([
     [SQL.delete.transactions.unconfirmed],
     [SQL.delete.history.unconfirmed],
     [SQL.update.history.deleteUnconfirmedInputs],
@@ -61,55 +63,55 @@ HistorySync.prototype.init = function () {
   .then(function () {
     // extract latest from network and from database
     return Promise.all([
-      self.network.getLatest(),
+      self._network.getLatest(),
       self._getMyLatest()
     ])
   })
   .spread(function (blockchainLatest, latest) {
-    // update self.blockchainLatest on new blocks before sync finished
+    // update self._blockchainLatest on new blocks before sync finished
     function onNewBlock () {
-      self.network.getLatest()
+      self._network.getLatest()
         .then(function (blockchainLatest) {
-          self.blockchainLatest = blockchainLatest
+          self._blockchainLatest = blockchainLatest
           self._updateProgress()
         })
     }
 
-    self.network.on('block', onNewBlock)
+    self._network.on('block', onNewBlock)
     self.on('finish', function () {
-      self.network.removeListener('block', onNewBlock)
+      self._network.removeListener('block', onNewBlock)
     })
 
     // calculate progress.step
     var fstep = (blockchainLatest.height - latest.height) / 1000
     var step = parseInt(fstep, 10)
-    self.progress.step = Math.max(step, 10)
+    self._progress.step = Math.max(step, 10)
 
-    // set progress.latest, network and database latest block
-    self.progress.latest = latest.height
-    self.latest = latest
-    self.blockchainLatest = blockchainLatest
+    // set self.progress.latest, network and database latest block
+    self._progress.latest = latest.height
+    self._latest = latest
+    self._blockchainLatest = blockchainLatest
 
-    // update self.progress.value
+    // update self._progress.value
     self._updateProgress()
 
     // show info message
     logger.info('Got %d blocks in current db, out of %d block at bitcoind',
-                self.latest.height + 1, self.blockchainLatest.height)
+                self._latest.height + 1, self._blockchainLatest.height)
   })
 }
 
 /**
  */
 HistorySync.prototype._updateProgress = function () {
-  var value = this.latest.height / this.blockchainLatest.height
-  this.progress.value = value.toFixed(6)
+  var value = this._latest.height / this._blockchainLatest.height
+  this._progress.value = value.toFixed(6)
 
-  if (this.progress.latest + this.progress.step <= this.latest.height ||
-      this.progress.value === '1.000000') {
-    this.progress.latest = this.latest.height
+  if (this._progress.latest + this._progress.step <= this._latest.height ||
+      this._progress.value === '1.000000') {
+    this._progress.latest = this._latest.height
 
-    logger.info('HistorySync progress: %s', this.progress.value)
+    logger.info('HistorySync progress: %s', this._progress.value)
     this.emit('progress')
   }
 }
@@ -119,29 +121,53 @@ HistorySync.prototype._updateProgress = function () {
  */
 HistorySync.prototype.getInfo = function () {
   return {
-    progress: this.progress.value,
-    latest: _.clone(this.latest),
-    blockchainLatest: _.clone(this.blockchainLatest)
+    progress: this._progress.value,
+    latest: _.clone(this._latest),
+    blockchainLatest: _.clone(this._blockchainLatest)
   }
+}
+
+/**
+ * @param {number} height
+ * @return {Promise<{block: bitcore.block, queries: Array.<>}>}
+ */
+HistorySync.prototype._getBlockData = function (height) {
+  var self = this
+  var promise = self._blockDataCache.get(height)
+
+  if (promise === undefined || promise.isRejected()) {
+    // download block and create queries
+    promise = self._network.getBlock(height)
+      .then(function (block) {
+        return {
+          block: block,
+          queries: self._getImportBlockQueries(height, block)
+        }
+      })
+
+    self._blockDataCache.set(height, promise)
+  }
+
+  return promise
 }
 
 /**
  */
 HistorySync.prototype._loop = function () {
   var self = this
-  if (self.latest.hash === self.blockchainLatest.hash) {
+  if (self._latest.hash === self._blockchainLatest.hash) {
     return
   }
 
-  var latest = _.clone(self.latest)
-  return self.storage.executeTransaction(function (client) {
+  var latest = _.clone(self._latest)
+  return self._storage.executeTransaction(function (client) {
     return Promise.try(function () {
-      if (latest.height + 1 < self.blockchainLatest.height) {
+      if (latest.height + 1 < self._blockchainLatest.height) {
         return
       }
 
       // reorg found
-      var to = self.blockchainLatest.height - 1
+      var to = self._blockchainLatest.height - 1
       return self._reorgTo(to, {client: client})
         .then(function () {
           return self._getMyLatest({client: client})
@@ -151,18 +177,16 @@ HistorySync.prototype._loop = function () {
         })
     })
     .then(function () {
-      // download block
-      return self.network.getBlock(latest.height + 1)
+      return self._getBlockData(latest.height + 1)
     })
-    .then(function (block) {
+    .then(function (data) {
       // check hashPrevBlock
-      if (latest.hash !== util.encode(block.header.prevHash)) {
-        throw new errors.Master.InvalidHashPrevBlock(latest.hash, block.hash)
+      if (latest.hash !== util.encode(data.block.header.prevHash)) {
+        throw new errors.Master.InvalidHashPrevBlock(
+          latest.hash, data.block.hash)
       }
 
-      // create queries and execute
-      var queries = self._getImportBlockQueries(latest.height + 1, block)
-      return self.storage.executeQueries(queries, {client: client})
+      return self._storage.executeQueries(data.queries, {client: client})
     })
     .then(function () {
       return self._getMyLatest({client: client})
@@ -170,14 +194,21 @@ HistorySync.prototype._loop = function () {
   })
   .then(function (newLatest) {
     // new latest
-    self.latest = newLatest
+    self._latest = newLatest
 
     // verbose logging
     logger.verbose('Import block #%d - %s',
-                   self.latest.height, self.latest.hash)
+                   self._latest.height, self._latest.hash)
 
-    // update self.progress and emit progress if need
+    // update self._progress and emit progress if need
     self._updateProgress()
+
+    // fill block cache
+    if (self._latest.height + 500 < self._blockchainLatest.height) {
+      for (var i = 0; i < MAX_BLOCK_DATA_CACHE; i += 1) {
+        self._getBlockData(self._latest.height + i + 1)
+      }
+    }
 
     // run _loop again
     timers.setImmediate(self._loop.bind(self))

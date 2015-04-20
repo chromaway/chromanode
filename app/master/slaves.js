@@ -13,7 +13,7 @@ var inherits = require('util').inherits
  */
 function Slaves (storage) {
   EventEmitter.call(this)
-  this.storage = storage
+  this._storage = storage
 }
 
 inherits(Slaves, EventEmitter)
@@ -23,7 +23,7 @@ inherits(Slaves, EventEmitter)
  */
 Slaves.prototype.init = function () {
   var self = this
-  return self.storage.listen('sendTx', function (payload) {
+  return self._storage.listen('sendTx', function (payload) {
     payload = JSON.parse(payload)
     self.emit('sendTx', payload.id, payload.rawtx)
   })
@@ -43,7 +43,7 @@ Slaves.prototype.sendTxResponse = function (id, err, opts) {
     code: (err || {}).code,
     message: escape((err || {}).message)
   })
-  return this.storage.notify('sendtxresponse', payload, opts)
+  return this._storage.notify('sendtxresponse', payload, opts)
 }
 
 /**
@@ -55,7 +55,7 @@ Slaves.prototype.sendTxResponse = function (id, err, opts) {
  */
 Slaves.prototype.broadcastBlock = function (hash, height, opts) {
   var payload = JSON.stringify({hash: hash, height: height})
-  return this.storage.notify('broadcastblock', payload, opts)
+  return this._storage.notify('broadcastblock', payload, opts)
 }
 
 /**
@@ -72,7 +72,7 @@ Slaves.prototype.broadcastTx = function (txid, blockHash, blockHeight, opts) {
     blockHash: blockHash,
     blockHeight: blockHeight
   })
-  return this.storage.notify('broadcasttx', payload, opts)
+  return this._storage.notify('broadcasttx', payload, opts)
 }
 
 /**
@@ -84,7 +84,7 @@ Slaves.prototype.broadcastTx = function (txid, blockHash, blockHeight, opts) {
  */
 Slaves.prototype.broadcastAddressTx = function (address, txid, opts) {
   var payload = JSON.stringify({address: address, txid: txid})
-  return this.storage.notify('broadcastaddresstx', payload, opts)
+  return this._storage.notify('broadcastaddresstx', payload, opts)
 }
 
 /**
@@ -95,7 +95,7 @@ Slaves.prototype.broadcastAddressTx = function (address, txid, opts) {
  */
 Slaves.prototype.broadcastStatus = function (status, opts) {
   var payload = JSON.stringify(status)
-  return this.storage.notify('broadcaststatus', payload, opts)
+  return this._storage.notify('broadcaststatus', payload, opts)
 }
 
 module.exports = Slaves
