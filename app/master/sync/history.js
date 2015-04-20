@@ -6,13 +6,12 @@ var timers = require('timers')
 var Promise = require('bluebird')
 var LRU = require('lru-cache')
 
+var config = require('../../../lib/config')
 var errors = require('../../../lib/errors')
 var logger = require('../../../lib/logger').logger
 var util = require('../../../lib/util')
 var Sync = require('./sync')
 var SQL = require('./sql')
-
-var MAX_BLOCK_DATA_CACHE = 3
 
 /**
  * @event HistorySync#start
@@ -33,8 +32,11 @@ var MAX_BLOCK_DATA_CACHE = 3
 function HistorySync () {
   Sync.apply(this, arguments)
 
+  this._maxBlockDataCache = Math.max(
+    config.get('chromanode.sync.maxBlockDataCache') || 0, 0)
+
   this._blockDataCache = LRU({
-    max: MAX_BLOCK_DATA_CACHE
+    max: this._maxBlockDataCache
   })
 
   this._progress = {
@@ -54,6 +56,7 @@ inherits(HistorySync, Sync)
 HistorySync.prototype.init = function () {
   var self = this
   // remove unconfirmed data
+  var stopwatch = util.stopwatch.start()
   return self._storage.executeQueries([
     [SQL.delete.transactions.unconfirmed],
     [SQL.delete.history.unconfirmed],
@@ -61,6 +64,9 @@ HistorySync.prototype.init = function () {
     [SQL.update.history.deleteUnconfirmedOutputs]
   ], {concurrency: 1})
   .then(function () {
+    logger.verbose('Delete unconfirmed data, elapsed time: %s',
+                   stopwatch.format(stopwatch.value()))
+
     // extract latest from network and from database
     return Promise.all([
       self._network.getLatest(),
@@ -137,8 +143,11 @@ HistorySync.prototype._getBlockData = function (height) {
 
   if (promise === undefined || promise.isRejected()) {
     // download block and create queries
+    var stopwatch = util.stopwatch.start()
     promise = self._network.getBlock(height)
       .then(function (block) {
+        logger.verbose('Downloading block %d, elapsed time: %s',
+                       height, stopwatch.format(stopwatch.value()))
         return {
           block: block,
           queries: self._getImportBlockQueries(height, block)
@@ -159,6 +168,7 @@ HistorySync.prototype._loop = function () {
     return
   }
 
+  var stopwatch
   var latest = _.clone(self._latest)
   return self._storage.executeTransaction(function (client) {
     return Promise.try(function () {
@@ -186,9 +196,11 @@ HistorySync.prototype._loop = function () {
           latest.hash, data.block.hash)
       }
 
+      stopwatch = util.stopwatch.start()
       return self._storage.executeQueries(data.queries, {client: client})
     })
     .then(function () {
+      stopwatch = stopwatch.value()
       return self._getMyLatest({client: client})
     })
   })
@@ -197,17 +209,21 @@ HistorySync.prototype._loop = function () {
     self._latest = newLatest
 
     // verbose logging
-    logger.verbose('Import block #%d - %s',
-                   self._latest.height, self._latest.hash)
+    logger.verbose('Import block #%d, elapsed time: %s (hash: %s)',
+                   self._latest.height,
+                   util.stopwatch.format(stopwatch),
+                   self._latest.hash)
 
     // update self._progress and emit progress if need
     self._updateProgress()
 
     // fill block cache
     if (self._latest.height + 500 < self._blockchainLatest.height) {
-      for (var i = 0; i < MAX_BLOCK_DATA_CACHE; i += 1) {
-        self._getBlockData(self._latest.height + i + 1)
-      }
+      var start = self._latest.height + 1
+      var stop = self._latest.height + 1 + self._maxBlockDataCache
+      _.range(start, stop).forEach(function (height, index) {
+        setTimeout(function () { self._getBlockData(height) }, index * 50)
+      })
     }
 
     // run _loop again

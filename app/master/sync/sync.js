@@ -85,6 +85,7 @@ Sync.prototype._getAddresses = function (script) {
 Sync.prototype._getImportBlockQueries = function (height, block) {
   var self = this
   var queries = []
+  var stopwatch = util.stopwatch.start()
 
   // import header
   queries.push([SQL.insert.blocks.row, [
@@ -140,6 +141,9 @@ Sync.prototype._getImportBlockQueries = function (height, block) {
     })
   })
 
+  logger.verbose('Generage queries for importing block %d, elapsed time: %s',
+                 height, stopwatch.format(stopwatch.value()))
+
   return queries
 }
 
@@ -151,6 +155,7 @@ Sync.prototype._getImportBlockQueries = function (height, block) {
  */
 Sync.prototype._reorgTo = function (to, opts) {
   logger.warning('Reorg found: from %d to %d', this.latest.height, to)
+  var stopwatch = util.stopwatch.start()
   return this._storage.executeQueries([
     [SQL.delete.blocks.fromHeight, [to]],
     [SQL.delete.transactions.fromHeight, [to]],
@@ -158,6 +163,11 @@ Sync.prototype._reorgTo = function (to, opts) {
     [SQL.update.history.deleteInputsFromHeight, [to]],
     [SQL.update.history.deleteOutputsFromHeight, [to]]
   ], _.defaults({concurrency: 1}, opts))
+  .then(function (result) {
+    logger.verbose('Reorg execution, elapsed time: %s',
+                    stopwatch.format(stopwatch.value()))
+    return result
+  })
 }
 
 /**
