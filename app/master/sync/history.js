@@ -165,7 +165,7 @@ HistorySync.prototype._getBlockData = function (height) {
 HistorySync.prototype._loop = function () {
   var self = this
   if (self._latest.hash === self._blockchainLatest.hash) {
-    return
+    return self.emit('finish')
   }
 
   var stopwatch
