@@ -221,8 +221,8 @@ HistorySync.prototype._loop = function () {
     if (self._latest.height + 500 < self._blockchainLatest.height) {
       var start = self._latest.height + 1
       var stop = self._latest.height + 1 + self._maxBlockDataCache
-      _.range(start, stop).forEach(function (height, index) {
-        setTimeout(function () { self._getBlockData(height) }, index * 50)
+      _.range(start, stop).forEach(function (height) {
+        timers.setImmediate(function () { self._getBlockData(height) })
       })
     }
 
