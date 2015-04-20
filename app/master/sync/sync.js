@@ -4,6 +4,7 @@ var inherits = require('util').inherits
 var bitcore = require('bitcore')
 
 var config = require('../../../lib/config')
+var logger = require('../../../lib/logger').logger
 var util = require('../../../lib/util')
 var SQL = require('./sql')
 
@@ -137,17 +138,36 @@ Sync.prototype._getImportBlockQueries = function (height, block) {
 }
 
 /**
+ * @param {number} to
+ * @param {Object} [opts]
+ * @param {pg.Client} [opts.client]
+ * @return {Promise}
+ */
+Sync.prototype._reorgTo = function (to, opts) {
+  logger.warning('Reorg found: from %d to %d', this.latest.height, to)
+  return this.storage.executeQueries([
+    [SQL.delete.blocks.fromHeight, [to]],
+    [SQL.delete.transactions.fromHeight, [to]],
+    [SQL.delete.history.fromHeight, [to]],
+    [SQL.update.history.deleteInputsFromHeight, [to]],
+    [SQL.update.history.deleteOutputsFromHeight, [to]]
+  ], _.defaults({concurrency: 1}, opts))
+}
+
+/**
  * @param {Objects} [opts]
  * @param {pg.Client} [opts.client]
  */
-Sync.prototype.updateLatest = function (opts) {
+Sync.prototype._getMyLatest = function (opts) {
   var self = this
   return self.storage.executeQueries([[SQL.select.blocks.latest]], opts)
-    .then(function (results) {
-      var row = results[0].rows[0]
-      self.latest = row === undefined
-                      ? {hash: util.zfill('', 64), height: -1}
-                      : {hash: row.hash.toString('hex'), height: row.height}
+    .spread(function (result) {
+      if (result.rowCount === 0) {
+        return {hash: util.zfill('', 64), height: -1}
+      }
+
+      var row = result.rows[0]
+      return {hash: row.hash.toString('hex'), height: row.height}
     })
 }
 

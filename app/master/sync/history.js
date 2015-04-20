@@ -62,10 +62,10 @@ HistorySync.prototype.init = function () {
     // extract latest from network and from database
     return Promise.all([
       self.network.getLatest(),
-      self.updateLatest()
+      self._getMyLatest()
     ])
   })
-  .spread(function (blockchainLatest) {
+  .spread(function (blockchainLatest, latest) {
     // update self.blockchainLatest on new blocks before sync finished
     function onNewBlock () {
       self.network.getLatest()
@@ -81,12 +81,13 @@ HistorySync.prototype.init = function () {
     })
 
     // calculate progress.step
-    var fstep = (blockchainLatest.height - self.latest.height) / 1000
+    var fstep = (blockchainLatest.height - latest.height) / 1000
     var step = parseInt(fstep, 10)
     self.progress.step = Math.max(step, 10)
 
     // set progress.latest, network and database latest block
-    self.progress.latest = self.latest.height
+    self.progress.latest = latest.height
+    self.latest = latest
     self.blockchainLatest = blockchainLatest
 
     // update self.progress.value
@@ -132,52 +133,45 @@ HistorySync.prototype._loop = function () {
     return
   }
 
-  var height = self.latest.height + 1
+  var latest = _.clone(self.latest)
   return self.storage.executeTransaction(function (client) {
     return Promise.try(function () {
-      if (height < self.blockchainLatest.height) {
+      if (latest.height + 1 < self.blockchainLatest.height) {
         return
       }
 
       // reorg found
-      //   delete blocks, transactions, history
-      //   update self.latest and height
       var to = self.blockchainLatest.height - 1
-      logger.warning('Reorg found: from %d to %d', self.latest.height, to)
-      return self.storage.executeQueries([
-        [SQL.delete.blocks.fromHeight, [to]],
-        [SQL.delete.transactions.fromHeight, [to]],
-        [SQL.delete.history.fromHeight, [to]],
-        [SQL.update.history.deleteInputsFromHeight, [to]],
-        [SQL.update.history.deleteOutputsFromHeight, [to]]
-      ], {client: client, concurrency: 1})
-      .then(function () {
-        return self.updateLatest()
-      })
-      .then(function () {
-        height = self.latest.height + 1
-      })
+      return self._reorgTo(to, {client: client})
+        .then(function () {
+          return self._getMyLatest({client: client})
+        })
+        .then(function (newLatest) {
+          latest = newLatest
+        })
     })
     .then(function () {
       // download block
-      return self.network.getBlock(height)
+      return self.network.getBlock(latest.height + 1)
     })
     .then(function (block) {
       // check hashPrevBlock
-      if (self.latest.hash !== util.encode(block.header.prevHash)) {
-        throw new errors.Master.InvalidHashPrevBlock(
-          self.latest.hash, block.hash)
+      if (latest.hash !== util.encode(block.header.prevHash)) {
+        throw new errors.Master.InvalidHashPrevBlock(latest.hash, block.hash)
       }
 
       // create queries and execute
-      var queries = self._getImportBlockQueries(height, block)
+      var queries = self._getImportBlockQueries(latest.height + 1, block)
       return self.storage.executeQueries(queries, {client: client})
     })
     .then(function () {
-      return self.updateLatest({client: client})
+      return self._getMyLatest({client: client})
     })
   })
-  .then(function () {
+  .then(function (newLatest) {
+    // new latest
+    self.latest = newLatest
+
     // verbose logging
     logger.verbose('Import block #%d - %s',
                    self.latest.height, self.latest.hash)
