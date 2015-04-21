@@ -82,7 +82,7 @@ Sync.prototype._getAddresses = function (script) {
  * @return {Promise}
  */
 Sync.prototype._reorgTo = function (to, opts) {
-  logger.warning('Reorg found: from %d to %d', this.latest.height, to)
+  logger.warn('Reorg to %d', to)
   var stopwatch = util.stopwatch.start()
   return this._storage.executeQueries([
     [SQL.delete.blocks.fromHeight, [to]],
@@ -91,7 +91,7 @@ Sync.prototype._reorgTo = function (to, opts) {
     [SQL.update.history.deleteInputsFromHeight, [to]]
   ], _.defaults({concurrency: 1}, opts))
   .then(function (result) {
-    logger.verbose('Reorg execution, elapsed time: %s',
+    logger.verbose('Reorg finished, elapsed time: %s',
                     stopwatch.format(stopwatch.value()))
     return result
   })
