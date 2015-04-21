@@ -35,27 +35,24 @@ module.exports = {
       confirmedInput: 'UPDATE history ' +
                       '  SET ' +
                       '    itxid = $1, ' +
-                      '    iindex = $2, ' +
-                      '    iheight = $3 ' +
+                      '    iheight = $2 ' +
                       '  WHERE ' +
-                      '    otxid = $4 AND ' +
-                      '    oindex = $5',
+                      '    otxid = $3 AND ' +
+                      '    oindex = $4',
 
       deleteInputsFromHeight: 'UPDATE history ' +
                               '  SET ' +
                               '    itxid = NULL, ' +
-                              '    iindex = NULL ' +
+                              '    iheight = NULL ' +
                               '  WHERE ' +
                               '    iheight > $1',
 
       deleteUnconfirmedInputs: 'UPDATE history ' +
                                '  SET ' +
-                               '    itxid = NULL, ' +
-                               '    iindex = NULL ' +
+                               '    itxid = NULL ' +
                                '  WHERE ' +
                                '    iheight IS NULL AND ' +
-                               '    itxid IS NOT NULL AND ' +
-                               '    iindex IS NOT NULL'
+                               '    itxid IS NOT NULL'
     }
   },
   delete: {

@@ -222,7 +222,6 @@ HistorySync.prototype._importBlock = function (height, block, client) {
 
         return client.queryAsync(SQL.update.history.confirmedInput, [
           '\\x' + txids[txIndex],
-          index,
           height,
           '\\x' + prevTxId,
           input.outputIndex
