@@ -1,10 +1,7 @@
-/* globals Promise:true */
-
 var _ = require('lodash')
 var EventEmitter = require('events').EventEmitter
 var inherits = require('util').inherits
 var bitcore = require('bitcore')
-var Promise = require('bluebird')
 
 var config = require('../../../lib/config')
 var logger = require('../../../lib/logger').logger
@@ -13,8 +10,6 @@ var SQL = require('./sql')
 
 var Address = bitcore.Address
 var Hash = bitcore.crypto.Hash
-
-var ZERO_HASH = util.zfill('', 64)
 
 /**
  * @class Sync
@@ -81,78 +76,6 @@ Sync.prototype._getAddresses = function (script) {
 }
 
 /**
- * @param {number} height
- * @param {bitcore.Block} block
- * @param {pg.Client} client
- * @return {Promise}
- */
-Sync.prototype._importBlock = function (height, block, client) {
-  var self = this
-
-  var txids = _.pluck(block.transactions, 'hash')
-
-  return Promise.try(function () {
-    // import header
-    return client.queryAsync(SQL.insert.blocks.row, [
-      height,
-      '\\x' + block.hash,
-      '\\x' + block.header.toString(),
-      '\\x' + _.pluck(block.transactions, 'hash').join('')
-    ])
-  })
-  .then(function () {
-    // import transactions
-    return Promise.map(block.transactions, function (tx, txIndex) {
-      return client.queryAsync(SQL.insert.transactions.confirmed, [
-        '\\x' + txids[txIndex],
-        height,
-        '\\x' + tx.toString()
-      ])
-    }, {concurrency: 1})
-  })
-  .then(function () {
-    // import outputs
-    return Promise.map(block.transactions, function (tx, txIndex) {
-      return Promise.map(tx.outputs, function (output, index) {
-        var addresses = self._getAddresses(output.script)
-        return Promise.map(addresses, function (address) {
-          return client.queryAsync(SQL.insert.history.confirmedOutput, [
-            address,
-            '\\x' + txids[txIndex],
-            index,
-            output.satoshis,
-            '\\x' + output.script.toHex(),
-            height
-          ])
-        }, {concurrency: 1})
-      }, {concurrency: 1})
-    }, {concurrency: 1})
-  })
-  .then(function () {
-    // import inputs
-    return Promise.map(block.transactions, function (tx, txIndex) {
-      return Promise.map(tx.inputs, function (input, index) {
-        // skip coinbase
-        var prevTxId = input.prevTxId.toString('hex')
-        if (index === 0 &&
-            input.outputIndex === 0xffffffff &&
-            prevTxId === ZERO_HASH) {
-          return
-        }
-
-        return client.queryAsync(SQL.update.history.confirmedInput, [
-          '\\x' + txids[txIndex],
-          index,
-          height,
-          '\\x' + prevTxId,
-          input.outputIndex
-        ])
-      }, {concurrency: 1})
-    }, {concurrency: 1})
-  })
-}
-
-/**
  * @param {number} to
  * @param {Object} [opts]
  * @param {pg.Client} [opts.client]
@@ -165,8 +88,7 @@ Sync.prototype._reorgTo = function (to, opts) {
     [SQL.delete.blocks.fromHeight, [to]],
     [SQL.delete.transactions.fromHeight, [to]],
     [SQL.delete.history.fromHeight, [to]],
-    [SQL.update.history.deleteInputsFromHeight, [to]],
-    [SQL.update.history.deleteOutputsFromHeight, [to]]
+    [SQL.update.history.deleteInputsFromHeight, [to]]
   ], _.defaults({concurrency: 1}, opts))
   .then(function (result) {
     logger.verbose('Reorg execution, elapsed time: %s',

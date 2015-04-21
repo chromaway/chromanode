@@ -13,6 +13,8 @@ var util = require('../../../lib/util')
 var Sync = require('./sync')
 var SQL = require('./sql')
 
+var ZERO_HASH = util.zfill('', 64)
+
 /**
  * @event HistorySync#start
  */
@@ -30,22 +32,24 @@ var SQL = require('./sql')
  * @extends Sync
  */
 function HistorySync () {
-  Sync.apply(this, arguments)
+  var self = this
+  Sync.apply(self, arguments)
 
-  this._maxCachedBlocks = Math.max(
+  self._maxCachedBlocks = Math.max(
     config.get('chromanode.sync.maxCachedBlocks') || 0, 0)
 
-  this._blockCache = LRU({
-    max: this._maxCachedBlocks
+  self._blockCache = LRU({
+    max: self._maxCachedBlocks
   })
+  self.on('finish', function () { self._blockCache.reset() })
 
-  this._progress = {
+  self._progress = {
     value: null,
     step: null,
     latest: null
   }
-  this._latest = null
-  this._blockchainLatest = null
+  self._latest = null
+  self._blockchainLatest = null
 }
 
 inherits(HistorySync, Sync)
@@ -60,8 +64,7 @@ HistorySync.prototype.init = function () {
   return self._storage.executeQueries([
     [SQL.delete.transactions.unconfirmed],
     [SQL.delete.history.unconfirmed],
-    [SQL.update.history.deleteUnconfirmedInputs],
-    [SQL.update.history.deleteUnconfirmedOutputs]
+    [SQL.update.history.deleteUnconfirmedInputs]
   ], {concurrency: 1})
   .then(function () {
     logger.verbose('Delete unconfirmed data, elapsed time: %s',
@@ -158,6 +161,78 @@ HistorySync.prototype._getBlock = function (height) {
 }
 
 /**
+ * @param {number} height
+ * @param {bitcore.Block} block
+ * @param {pg.Client} client
+ * @return {Promise}
+ */
+HistorySync.prototype._importBlock = function (height, block, client) {
+  var self = this
+
+  var txids = _.pluck(block.transactions, 'hash')
+
+  return Promise.try(function () {
+    // import header
+    return client.queryAsync(SQL.insert.blocks.row, [
+      height,
+      '\\x' + block.hash,
+      '\\x' + block.header.toString(),
+      '\\x' + _.pluck(block.transactions, 'hash').join('')
+    ])
+  })
+  .then(function () {
+    // import transactions
+    return Promise.map(block.transactions, function (tx, txIndex) {
+      return client.queryAsync(SQL.insert.transactions.confirmed, [
+        '\\x' + txids[txIndex],
+        height,
+        '\\x' + tx.toString()
+      ])
+    }, {concurrency: 1})
+  })
+  .then(function () {
+    // import outputs
+    return Promise.map(block.transactions, function (tx, txIndex) {
+      return Promise.map(tx.outputs, function (output, index) {
+        var addresses = self._getAddresses(output.script)
+        return Promise.map(addresses, function (address) {
+          return client.queryAsync(SQL.insert.history.confirmedOutput, [
+            address,
+            '\\x' + txids[txIndex],
+            index,
+            output.satoshis,
+            '\\x' + output.script.toHex(),
+            height
+          ])
+        }, {concurrency: 1})
+      }, {concurrency: 1})
+    }, {concurrency: 1})
+  })
+  .then(function () {
+    // import inputs
+    return Promise.map(block.transactions, function (tx, txIndex) {
+      return Promise.map(tx.inputs, function (input, index) {
+        // skip coinbase
+        var prevTxId = input.prevTxId.toString('hex')
+        if (index === 0 &&
+            input.outputIndex === 0xffffffff &&
+            prevTxId === ZERO_HASH) {
+          return
+        }
+
+        return client.queryAsync(SQL.update.history.confirmedInput, [
+          '\\x' + txids[txIndex],
+          index,
+          height,
+          '\\x' + prevTxId,
+          input.outputIndex
+        ])
+      }, {concurrency: 1})
+    }, {concurrency: 1})
+  })
+}
+
+/**
  */
 HistorySync.prototype._loop = function () {
   var self = this
@@ -181,6 +256,7 @@ HistorySync.prototype._loop = function () {
         })
         .then(function (newLatest) {
           latest = newLatest
+          // reset block cache
         })
     })
     .then(function () {

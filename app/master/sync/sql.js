@@ -48,30 +48,14 @@ module.exports = {
                               '  WHERE ' +
                               '    iheight > $1',
 
-      deleteOutputsFromHeight: 'UPDATE history ' +
-                               '  SET ' +
-                               '    otxid = NULL, ' +
-                               '    oindex = NULL, ' +
-                               '    ovalue = NULL, ' +
-                               '    oscript = NULL ' +
-                               '  WHERE ' +
-                               '    oheight > $1',
-
       deleteUnconfirmedInputs: 'UPDATE history ' +
                                '  SET ' +
                                '    itxid = NULL, ' +
                                '    iindex = NULL ' +
                                '  WHERE ' +
-                               '    iheight is NULL',
-
-      deleteUnconfirmedOutputs: 'UPDATE history ' +
-                                '  SET ' +
-                                '    otxid = NULL, ' +
-                                '    oindex = NULL, ' +
-                                '    ovalue = NULL, ' +
-                                '    oscript = NULL ' +
-                                '  WHERE ' +
-                                '    oheight is NULL'
+                               '    iheight IS NULL AND ' +
+                               '    itxid IS NOT NULL AND ' +
+                               '    iindex IS NOT NULL'
     }
   },
   delete: {
@@ -92,14 +76,10 @@ module.exports = {
     history: {
       fromHeight: 'DELETE FROM history ' +
                   '  WHERE ' +
-                  '    iheight > $1 AND ' +
                   '    oheight > $1',
 
       unconfirmed: 'DELETE FROM history ' +
                    '  WHERE ' +
-                   '    itxid IS NOT NULL AND ' +
-                   '    otxid IS NOT NULL AND ' +
-                   '    iheight IS NULL AND ' +
                    '    oheight IS NULL'
     }
   }
