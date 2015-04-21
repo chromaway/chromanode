@@ -194,7 +194,13 @@ HistorySync.prototype._importBlock = function (height, block, client) {
     // import outputs
     return Promise.map(block.transactions, function (tx, txIndex) {
       return Promise.map(tx.outputs, function (output, index) {
-        var addresses = self._getAddresses(output.script)
+        try {
+          var addresses = self._getAddresses(output.script)
+        } catch (err) {
+          return logger.error('On get addresses for output %s:%s %s',
+                              txids[txIndex], index, err.stack)
+        }
+
         return Promise.map(addresses, function (address) {
           return client.queryAsync(SQL.insert.history.confirmedOutput, [
             address,

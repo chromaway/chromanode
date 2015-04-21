@@ -51,8 +51,8 @@ module.exports = {
                                '  SET ' +
                                '    itxid = NULL ' +
                                '  WHERE ' +
-                               '    iheight IS NULL AND ' +
-                               '    itxid IS NOT NULL'
+                               '    itxid IS NOT NULL AND' +
+                               '    iheight IS NULL'
     }
   },
   delete: {
