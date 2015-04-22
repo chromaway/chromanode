@@ -12,16 +12,23 @@ var Address = bitcore.Address
 var Hash = bitcore.crypto.Hash
 
 /**
+ * @event Sync#latest
+ * @param {{hash: string, height: number}} latest
+ */
+
+/**
  * @class Sync
  * @extends events.EventEmitter
  * @param {Storage} storage
  * @param {Network} network
+ * @param {Slaves} slaves
  */
-function Sync (storage, network) {
+function Sync (storage, network, slaves) {
   EventEmitter.call(this)
 
   this._storage = storage
   this._network = network
+  this._slaves = slaves
 
   var networkName = config.get('chromanode.network')
   this._bitcoinNetwork = bitcore.Networks.get(networkName)
@@ -79,6 +86,22 @@ Sync.prototype._getAddresses = function (script) {
 }
 
 /**
+ * @param {bitcore.Transaction.Output} output
+ * @param {string} txid
+ * @param {number} index
+ * @return {?string[]}
+ */
+Sync.prototype._safeGetAddresses = function (output, txid, index) {
+  try {
+    return this._getAddresses(output.script)
+  } catch (err) {
+    logger.error('On get addresses for output %s:%s %s',
+                 txid, index, err.stack)
+    return null
+  }
+}
+
+/**
  * @param {number} to
  * @param {Object} [opts]
  * @param {pg.Client} [opts.client]
@@ -95,7 +118,7 @@ Sync.prototype._reorgTo = function (to, opts) {
   ], _.defaults({concurrency: 1}, opts))
   .then(function (result) {
     logger.verbose('Reorg finished, elapsed time: %s',
-                    stopwatch.format(stopwatch.value()))
+                   stopwatch.formattedValue())
     return result
   })
 }
@@ -109,7 +132,7 @@ Sync.prototype._getMyLatest = function (opts) {
   return self._storage.executeQueries([[SQL.select.blocks.latest]], opts)
     .spread(function (result) {
       if (result.rowCount === 0) {
-        return {hash: util.zfill('', 64), height: -1}
+        return {hash: util.ZERO_HASH, height: -1}
       }
 
       var row = result.rows[0]

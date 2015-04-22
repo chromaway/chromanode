@@ -9,23 +9,11 @@ var errors = require('../../../lib/errors')
 var logger = require('../../../lib/logger').logger
 var util = require('../../../lib/util')
 var Sync = require('./sync')
+var SQL = require('./sql')
 
-/**
- * @event PeerSync#newBlock
- * @param {string} hash
- * @param {number} height
- */
-
-/**
- * @event PeerSync#newTx
- * @param {string} txid
- */
-
-/**
- * @event PeerSync#address
- * @param {string} address
- * @param {string} txid
- */
+// fake error
+function TransactionsAlreadyExists () {}
+inherits(TransactionsAlreadyExists, Error)
 
 /**
  * @class PeerSync
@@ -33,9 +21,6 @@ var Sync = require('./sync')
  */
 function PeerSync () {
   Sync.apply(this, arguments)
-
-  this._latest = null
-  this._blockchainLatest = null
 }
 
 inherits(PeerSync, Sync)
@@ -43,22 +28,9 @@ inherits(PeerSync, Sync)
 /**
  * @return {Promise}
  */
-PeerSync.prototype.init = function () {
-  return Promise.resolve()
-}
+PeerSync.prototype._updateChain = function () {
+  return
 
-/**
- * @param {function} fn
- * @return {Promise}
- */
-PeerSync.prototype._executeTransaction = util.makeCuncurrent(function (fn) {
-  return this._storage._executeTransaction(fn)
-}, {concurrency: 1})
-
-/**
- * @return {Promise}
- */
-PeerSync.prototype._updateChain = util.makeCuncurrent(function () {
   var self = this
   if (self._latest.hash === self._blockchainLatest.hash) {
     return
@@ -71,7 +43,7 @@ PeerSync.prototype._updateChain = util.makeCuncurrent(function () {
   // add bitcoind_mempool - block - postgres_mempool as unconfirmed
   var stopwatch
   var latest = _.clone(self._latest)
-  return self._executeTransaction(function (client) {
+  return self._storage.executeTransaction(function (client) {
     return Promise.try(function () {
       if (latest.height + 1 < self._blockchainLatest.height) {
         return
@@ -134,36 +106,115 @@ PeerSync.prototype._updateChain = util.makeCuncurrent(function () {
     setTimeout(self._loop.bind(self), 15 * 1000)
     throw err
   })
-}, {concurrency: 1})
+}
 
 /**
  * @param {bitcore.Transaction} tx
  * @return {Promise}
  */
-PeerSync.prototype._importUnconfirmedTx = util.makeCuncurrent(function (tx) {
-})
+PeerSync.prototype._importUnconfirmedTx = function (tx) {
+  var self = this
+  var stopwatch = util.stopwatch.start()
+  var txid = tx.hash
+
+  return self._storage.executeTransaction(function (client) {
+    return Promise.try(function () {
+      // transaction already in database?
+      return client.queryAsync(SQL.select.transactions.has, ['\\x' + txid])
+    })
+    .then(function (result) {
+      if (result.rows[0].count !== '0') {
+        throw new TransactionsAlreadyExists()
+      }
+
+      // import transaction
+      return client.queryAsync(SQL.insert.transactions.unconfirmed, [
+        '\\x' + txid,
+        '\\x' + tx.toString()
+      ])
+    })
+    .then(function () {
+      // import outputs
+      return Promise.map(tx.outputs, function (output, index) {
+        var addresses = self._safeGetAddresses(output, txid, index)
+        if (addresses === null) {
+          return
+        }
+
+        return Promise.map(addresses, function (address) {
+          return client.queryAsync(SQL.insert.history.unconfirmedOutput, [
+            address,
+            '\\x' + txid,
+            index,
+            output.satoshis,
+            '\\x' + output.script.toHex()
+          ])
+        }, {concurrency: 1})
+      }, {concurrency: 1})
+    })
+    .then(function () {
+      // import intputs
+      return Promise.map(tx.inputs, function (input, index) {
+        // skip coinbase
+        var prevTxId = input.prevTxId.toString('hex')
+        if (index === 0 &&
+            input.outputIndex === 0xffffffff &&
+            prevTxId === util.ZERO_HASH) {
+          return
+        }
+
+        return client.queryAsync(SQL.update.history.unconfirmedInput, [
+          '\\x' + txid,
+          '\\x' + prevTxId,
+          input.outputIndex
+        ])
+      }, {concurrency: 1})
+    })
+    .then(function () {
+      logger.verbose('Import tx %s, elapsed time: %s',
+                     txid, stopwatch.formattedValue())
+    })
+    .catch(TransactionsAlreadyExists, function () {})
+  })
+}
 
 /**
  */
 PeerSync.prototype.run = function () {
   var self = this
 
-  self._getMyLatest(function (latest) {
-    self._latest = latest
+  return self._getMyLatest()
+    .then(function (latest) {
+      self._latest = latest
 
-    var onNewBlock = util.makeCuncurrent(function () {
-      return self._network.getLatest()
-        .then(function (blockchainLatest) {
-          self._blockchainLatest = blockchainLatest
-          return self._updateChain()
+      // only one import process at one moment
+      //  @todo make parallel tx import ?
+      var executor = util.makeConcurrent(function (fn) {
+        return fn()
+      }, {concurrency: 1})
+
+      // block handler
+      var onBlock = util.makeConcurrent(function () {
+        return self._network.getLatest()
+          .then(function (newBlockchainLatest) {
+            self._blockchainLatest = newBlockchainLatest
+            return executor(function () {
+              return self._updateChain()
+            })
+          })
+      }, {concurrency: 1})
+
+      self._network.on('block', onBlock)
+      onBlock()
+
+      // tx handler
+      var onTx = function (tx) {
+        return executor(function () {
+          return self._importUnconfirmedTx(tx)
         })
-    }, {concurrency: 1})
-
-    self._network.on('block', onNewBlock)
-    onNewBlock()
-
-    // var onNewTx
-  })
+      }
+      self._network.on('tx', onTx)
+    })
 }
 
 module.exports = PeerSync

@@ -1,5 +1,6 @@
-config/master-local*.yml
-config/slave-local*.yml
+config
 node_modules
 
+!config/master.yml
+!config/slave.yml
 npm-debug.log

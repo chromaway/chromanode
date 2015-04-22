@@ -13,18 +13,6 @@ var util = require('../../../lib/util')
 var Sync = require('./sync')
 var SQL = require('./sql')
 
-var ZERO_HASH = util.zfill('', 64)
-
-/**
- * @event HistorySync#progress
- * @param {string} progress
- * @param {{hash: string, height: number}} latest
- */
-
-/**
- * @event HistorySync#finish
- */
-
 /**
  * @class HistorySync
  * @extends Sync
@@ -39,70 +27,11 @@ function HistorySync () {
   self._blockCache = LRU({
     max: self._maxCachedBlocks
   })
-  self.on('finish', function () { self._blockCache.reset() })
 
   self._progress = null
 }
 
 inherits(HistorySync, Sync)
-
-/**
- * @return {Promise}
- */
-HistorySync.prototype.init = function () {
-  var self = this
-  // remove unconfirmed data
-  var stopwatch = util.stopwatch.start()
-  return self._storage.executeQueries([
-    [SQL.delete.transactions.unconfirmed],
-    [SQL.delete.history.unconfirmed],
-    [SQL.update.history.deleteUnconfirmedInputs]
-  ], {concurrency: 1})
-  .then(function () {
-    logger.info('Delete unconfirmed data, elapsed time: %s',
-                stopwatch.format(stopwatch.value()))
-
-    // self._network `block` handler
-    var onNewBlock = util.makeCuncurrent(function () {
-      return self._network.getLatest()
-        .then(function (newBlockchainLatest) {
-          self._blockchainLatest = newBlockchainLatest
-          self._updateProgress()
-        })
-    }, {concurrency: 1})
-
-    self._network.on('block', onNewBlock)
-    self.on('finish', function () {
-      self._network.removeListener('block', onNewBlock)
-      self._progress = '1.0000'
-      self.emit('progress', this._progress, this._latest)
-    })
-
-    // extract from db
-    return self._getMyLatest()
-      .then(function (latest) {
-        self._latest = latest
-        // get from network, update self._progress and emit `progress`
-        return onNewBlock()
-      })
-  })
-  .then(function () {
-    // show info message
-    logger.info('Got %d blocks in current db, out of %d block at bitcoind',
-                self._latest.height + 1, self._blockchainLatest.height + 1)
-  })
-}
-
-/**
- */
-HistorySync.prototype._updateProgress = function () {
-  var value = (this._latest.height / this._blockchainLatest.height).toFixed(4)
-  if (this._progress !== value) {
-    logger.info('HistorySync progress: %s', value)
-    this._progress = value
-    this.emit('progress', this._progress, this._latest)
-  }
-}
 
 /**
  * @param {number} height
@@ -118,7 +47,7 @@ HistorySync.prototype._getBlock = function (height) {
     block = self._network.getBlock(height)
       .then(function (block) {
         logger.verbose('Downloading block %d, elapsed time: %s',
-                       height, stopwatch.format(stopwatch.value()))
+                       height, stopwatch.formattedValue())
         return block
       })
 
@@ -162,11 +91,9 @@ HistorySync.prototype._importBlock = function (height, block, client) {
     // import outputs
     return Promise.map(block.transactions, function (tx, txIndex) {
       return Promise.map(tx.outputs, function (output, index) {
-        try {
-          var addresses = self._getAddresses(output.script)
-        } catch (err) {
-          return logger.error('On get addresses for output %s:%s %s',
-                              txids[txIndex], index, err.stack)
+        var addresses = self._safeGetAddresses(output, txids[txIndex], index)
+        if (addresses === null) {
+          return
         }
 
         return Promise.map(addresses, function (address) {
@@ -190,7 +117,7 @@ HistorySync.prototype._importBlock = function (height, block, client) {
         var prevTxId = input.prevTxId.toString('hex')
         if (index === 0 &&
             input.outputIndex === 0xffffffff &&
-            prevTxId === ZERO_HASH) {
+            prevTxId === util.ZERO_HASH) {
           return
         }
 
@@ -210,7 +137,7 @@ HistorySync.prototype._importBlock = function (height, block, client) {
 HistorySync.prototype._loop = function () {
   var self = this
   if (self._latest.hash === self._blockchainLatest.hash) {
-    return self.emit('finish')
+    return self._finishResolver()
   }
 
   var stopwatch
@@ -259,8 +186,8 @@ HistorySync.prototype._loop = function () {
                    util.stopwatch.format(stopwatch),
                    self._latest.hash)
 
-    // update self._progress and emit progress if need
-    self._updateProgress()
+    // emit latest
+    self.emit('latest', self._latest)
 
     // fill block cache
     if (self._latest.height + 500 < self._blockchainLatest.height) {
@@ -284,8 +211,49 @@ HistorySync.prototype._loop = function () {
 /**
  */
 HistorySync.prototype.run = function () {
-  this.emit('start')
-  this._loop()
+  var self = this
+
+  var onBlockchainNewBlock = util.makeConcurrent(function () {
+    return self._network.getLatest()
+      .then(function (newBlockchainLatest) {
+        self._blockchainLatest = newBlockchainLatest
+      })
+  }, {concurrency: 1})
+
+  // remove unconfirmed data
+  var stopwatch = util.stopwatch.start()
+  return self._storage.executeQueries([
+    [SQL.delete.transactions.unconfirmed],
+    [SQL.delete.history.unconfirmed],
+    [SQL.update.history.deleteUnconfirmedInputs]
+  ], {concurrency: 1})
+  .then(function () {
+    logger.info('Delete unconfirmed data, elapsed time: %s',
+                stopwatch.formattedValue())
+
+    self._network.on('block', onBlockchainNewBlock)
+
+    // extract from db and network
+    return Promise.all([
+      self._getMyLatest().then(function (latest) { self._latest = latest }),
+      onBlockchainNewBlock()
+    ])
+  })
+  .then(function () {
+    // show info message
+    logger.info('Got %d blocks in current db, out of %d block at bitcoind',
+                self._latest.height + 1, self._blockchainLatest.height + 1)
+  })
+  .then(function () {
+    return new Promise(function (resolve) {
+      self._finishResolver = resolve
+      timers.setImmediate(self._loop.bind(self))
+    })
+  })
+  .finally(function () {
+    self._network.removeListener('block', onBlockchainNewBlock)
+    self._blockCache.reset()
+  })
 }
 
 module.exports = HistorySync

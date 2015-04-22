@@ -119,7 +119,7 @@ Network.prototype._initTrustedPeer = function () {
   self.peer.on('tx', function (message) {
     logger.verbose('Receive tx message from peer %s:%s',
                    self.peer.host, self.peer.port)
-    self.emit('tx', message.tx)
+    self.emit('tx', message.transaction)
   })
 
   // connect event

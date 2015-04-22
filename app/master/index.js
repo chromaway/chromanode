@@ -5,7 +5,7 @@ var timers = require('timers')
 var Promise = require('bluebird')
 
 var config = require('../../lib/config')
-// var logger = require('../../lib/logger').logger
+var logger = require('../../lib/logger').logger
 var Storage = require('../../lib/storage')
 var util = require('../../lib/util')
 var Network = require('./network')
@@ -51,8 +51,8 @@ Master.prototype.init = function () {
   self.storage = new Storage()
   self.network = new Network()
   self.slaves = new Slaves(self.storage)
-  self.historySync = new HistorySync(self.storage, self.network)
-  self.peerSync = new PeerSync(self.storage, self.network)
+  self.historySync = new HistorySync(self.storage, self.network, self.slaves)
+  self.peerSync = new PeerSync(self.storage, self.network, self.slaves)
 
   return Promise.all([
     self.storage.init(),
@@ -60,9 +60,7 @@ Master.prototype.init = function () {
   ])
   .then(function () {
     return Promise.all([
-      self.slaves.init(),
-      self.historySync.init(),
-      self.peerSync.init()
+      self.slaves.init()
     ])
   })
   .then(function () {
@@ -76,24 +74,8 @@ Master.prototype.init = function () {
       self.slaves.broadcastStatus(self.status)
     }, 500)
 
-    // historySync progress handler
-    var historySyncOnProgress = function (progress, latest) {
-      self.status.progress = progress
-      self.status.latest = latest
-      self.broadcastStatus()
-    }
-    self.historySync.on('progress', historySyncOnProgress)
-
-    // remove historySync handlers on finish
-    self.historySync.on('finish', function () {
-      self.historySync.removeListener('progress', historySyncOnProgress)
-
-      // also add peerSync listeners, move to function?
-      // self.peerSync.run()
-    })
-
     // run historySync
-    timers.setImmediate(function () { self.historySync.run() })
+    timers.setImmediate(function () { self._runHistorySync() })
   })
 }
 
@@ -145,7 +127,7 @@ Master.prototype._installBitcoindHandlers = function () {
       })
   }
 
-  var onNewBlock = util.makeCuncurrent(function () {
+  var onNewBlock = util.makeConcurrent(function () {
     return self.network.getLatest()
       .then(function (latest) {
         if (self.status.bitcoind.latest.hash !== latest.hash) {
@@ -160,6 +142,63 @@ Master.prototype._installBitcoindHandlers = function () {
     updateBitcoindInfo(),
     onNewBlock()
   ])
+}
+
+/**
+ */
+Master.prototype._runHistorySync = function () {
+  var self = this
+
+  logger.info('Run HistorySync...')
+
+  function onLatest (latest) {
+    self.status.latest = latest
+
+    var value = (latest.height / self.status.bitcoind.latest.height).toFixed(4)
+    if (self.status.progress !== value) {
+      logger.info('Sync progress: %s (%d of %d)',
+                  value, latest.height, self.status.bitcoind.latest.height)
+      self.status.progress = value
+      self.broadcastStatus()
+    }
+  }
+
+  Promise.try(function () {
+    self.historySync.on('latest', onLatest)
+    return self.historySync.run()
+  })
+  .finally(function () {
+    self.historySync.removeListener('latest', onLatest)
+  })
+  .catch(function (err) {
+    setTimeout(self._runHistorySync.bind(self), 30 * 1000)
+    throw err
+  })
+  .then(function () {
+    logger.info('HistorySync finished!')
+
+    // run PeerSync
+    timers.setImmediate(self._runPeerSync.bind(self))
+  })
+}
+
+/**
+ */
+Master.prototype._runPeerSync = function () {
+  var self = this
+
+  logger.info('Run PeerSync...')
+
+  self.peerSync.on('latest', function (latest) {
+    self.status.latest = latest
+    self.broadcastStatus()
+  })
+
+  self.peerSync.run()
+    .catch(function (err) {
+      logger.error('Error on calling PeerSync.run()! Please restart...')
+      throw err
+    })
 }
 
 /**

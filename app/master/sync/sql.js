@@ -10,13 +10,23 @@ module.exports = {
       confirmed: 'INSERT INTO transactions ' +
                  '    (txid, height, tx) ' +
                  '  VALUES ' +
-                 '    ($1, $2, $3)'
+                 '    ($1, $2, $3)',
+
+      unconfirmed: 'INSERT INTO transactions ' +
+                   '    (txid, tx) ' +
+                   '  VALUES ' +
+                   '    ($1, $2)'
     },
     history: {
       confirmedOutput: 'INSERT INTO history ' +
                        '    (address, otxid, oindex, ovalue, oscript, oheight) ' +
                        '  VALUES ' +
-                       '    ($1, $2, $3, $4, $5, $6)'
+                       '    ($1, $2, $3, $4, $5, $6)',
+
+      unconfirmedOutput: 'INSERT INTO history ' +
+                         '    (address, otxid, oindex, ovalue, oscript) ' +
+                         '  VALUES ' +
+                         '    ($1, $2, $3, $4, $5)'
     }
   },
   select: {
@@ -28,6 +38,13 @@ module.exports = {
               '  FROM blocks ' +
               '    ORDER BY height DESC ' +
               '    LIMIT 1'
+    },
+    transactions: {
+      has: 'SELECT ' +
+           '    COUNT(*) ' +
+           '  FROM transactions ' +
+           '    WHERE ' +
+           '      txid = $1'
     }
   },
   update: {
@@ -39,6 +56,13 @@ module.exports = {
                       '  WHERE ' +
                       '    otxid = $3 AND ' +
                       '    oindex = $4',
+
+      unconfirmedInput: 'UPDATE history ' +
+                        '  SET ' +
+                        '    itxid = $1 ' +
+                        '  WHERE ' +
+                        '    otxid = $2 AND ' +
+                        '    oindex = $3',
 
       deleteInputsFromHeight: 'UPDATE history ' +
                               '  SET ' +
