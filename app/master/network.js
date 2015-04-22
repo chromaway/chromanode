@@ -15,19 +15,6 @@ var logger = require('../../lib/logger').logger
 var util = require('../../lib/util')
 
 /**
- * @event Network#peerconnect
- */
-
-/**
- * @event Network#peerdisconnect
- */
-
-/**
- * @event Network#newBitcoindError
- * @param {string} error
- */
-
-/**
  * @event Network#block
  * @param {string} hash
  */
@@ -76,33 +63,6 @@ Network.prototype._initBitcoind = function () {
       if (bitcoindNetwork !== config.get('chromanode.network')) {
         throw new errors.InvalidBitcoindNetwork()
       }
-
-      // simulate real network & bitcoind error monitor
-      self.bitcoindConnectedCount = ret.result.connections
-      var lastBitcoindError = ''
-      function checkBitcoindInfo () {
-        self.bitcoind.getInfoAsync()
-          .then(function (ret) {
-            while (self.bitcoindConnectedCount !== ret.result.connections) {
-              if (self.bitcoindConnectedCount < ret.result.connections) {
-                self.bitcoindConnectedCount += 1
-                self.emit('peerconnect')
-              } else {
-                self.bitcoindConnectedCount -= 1
-                self.emit('peerdisconnect')
-              }
-            }
-
-            if (lastBitcoindError !== ret.result.errors) {
-              lastBitcoindError = ret.result.errors
-              self.emit('newBitcoindError', lastBitcoindError)
-            }
-          })
-          .finally(function () {
-            setTimeout(checkBitcoindInfo, 2500)
-          })
-      }
-      timers.setImmediate(checkBitcoindInfo, 0)
 
       // show info
       logger.info(
@@ -189,23 +149,11 @@ Network.prototype._initTrustedPeer = function () {
 }
 
 /**
- * @return {Promise<{version: number, protocolversion: number}>}
+ * @return {Promise<Object>}
  */
-Network.prototype.getBitcoindVersion = function () {
+Network.prototype.getBitcoindInfo = function () {
   return this.bitcoind.getInfoAsync()
-    .then(function (ret) {
-      return {
-        version: ret.result.version,
-        protocolversion: ret.result.protocolversion
-      }
-    })
-}
-
-/**
- * @return {Promise<number>}
- */
-Network.prototype.getConnectedNumber = function () {
-  return Promise.resolve(this.bitcoindConnectedCount)
+    .then(function (ret) { return ret.result })
 }
 
 /**

@@ -17,26 +17,29 @@ var PeerSync = require('./sync/peer')
  * @class Master
  */
 function Master () {
-  this.status = {
+  var self = this
+
+  self.status = {
     version: util.getVersion(),
     network: config.get('chromanode.network'),
-    status: 'starting',
     progress: null,
     latest: {
       hash: null,
       height: null
     },
-    blockchainLatest: {
-      hash: null,
-      height: null
-    },
-    connections: 0,
     bitcoind: {
       version: null,
       protocolversion: null,
-      errors: null
+      connections: 0,
+      errors: null,
+      latest: {
+        hash: null,
+        height: null
+      }
     }
   }
+
+  self.broadcastStatus = function () {}
 }
 
 /**
@@ -63,85 +66,100 @@ Master.prototype.init = function () {
     ])
   })
   .then(function () {
-    // sendtx handler
-    self.slaves.on('sendTx', function (id, rawtx) {
-      self.network.sendTx(rawtx)
-        .then(function () { return })
-        .catch(function (err) {
-          if (err instanceof Error) {
-            return {code: null, message: err.message}
-          }
-
-          return err
-        })
-        .then(function (ret) {
-          self.slaves.sendTxResponse(id, ret)
-        })
-    })
-
-    // get some info for status
-    return self.network.getBitcoindVersion()
+    return Promise.all([
+      self._installSendTxHandler(),
+      self._installBitcoindHandlers()
+    ])
   })
-  .then(function (bitcoindVersion) {
-    // fill status.bitcoind
-    self.status.bitcoind.version = bitcoindVersion.version
-    self.status.bitcoind.protocolversion = bitcoindVersion.protocolversion
-
-    // update status.connections and broadcast
-    var updateStatusConnections = _.debounce(function () {
-      self.network.getConnectedNumber()
-        .then(function (count) {
-          if (self.status.connections !== count) {
-            self.status.connections = count
-            self.slaves.broadcastStatus(self.status)
-          }
-        })
-    }, 1000)
-    self.network.on('peerconnect', updateStatusConnections)
-    self.network.on('peerdisconnect', updateStatusConnections)
-
-    // update status.bitcoind.errors and broadcast
-    self.network.on('newBitcoindError', function (err) {
-      self.status.bitcoind.errors = err
+  .then(function () {
+    self.broadcastStatus = _.debounce(function () {
       self.slaves.broadcastStatus(self.status)
-    })
-
-    // historySync start handler
-    var historySyncOnStart = function () {
-      self.status.status = 'syncing'
-      self.slaves.broadcastStatus(self.status)
-    }
-    self.historySync.on('start', historySyncOnStart)
+    }, 500)
 
     // historySync progress handler
-    var historySyncOnProgress = function () {
-      var info = self.historySync.getInfo()
-      self.status.progress = info.progress
-      self.status.latest = _.clone(info.latest)
-      self.status.blockchainLatest = _.clone(info.blockchainLatest)
-      self.slaves.broadcastStatus(self.status)
+    var historySyncOnProgress = function (progress, latest) {
+      self.status.progress = progress
+      self.status.latest = latest
+      self.broadcastStatus()
     }
     self.historySync.on('progress', historySyncOnProgress)
 
     // remove historySync handlers on finish
     self.historySync.on('finish', function () {
-      self.historySync.removeListener('start', historySyncOnStart)
       self.historySync.removeListener('progress', historySyncOnProgress)
-
-      self.status.status = 'finished'
-      self.status.progress = self.historySync.getInfo().progress
-      self.slaves.broadcastStatus(self.status)
 
       // also add peerSync listeners, move to function?
       // self.peerSync.run()
     })
 
-    // update progress, latest, blockchainLatest and broadcast status
-    historySyncOnProgress()
-
     // run historySync
     timers.setImmediate(function () { self.historySync.run() })
   })
+}
+
+/**
+ */
+Master.prototype._installSendTxHandler = function () {
+  var self = this
+  self.slaves.on('sendTx', function (id, rawtx) {
+    self.network.sendTx(rawtx)
+      .then(function () { return })
+      .catch(function (err) {
+        if (err instanceof Error) {
+          return {code: null, message: err.message}
+        }
+
+        return err
+      })
+      .then(function (ret) {
+        self.slaves.sendTxResponse(id, ret)
+      })
+  })
+}
+
+/**
+ * @return {Promise}
+ */
+Master.prototype._installBitcoindHandlers = function () {
+  var self = this
+
+  var updateBitcoindInfo = function (info) {
+    return self.network.getBitcoindInfo()
+      .then(function (info) {
+        var old = self.status.bitcoind
+        var shouldBroadcast = old.version !== info.version ||
+                              old.protocolversion !== info.protocolversion ||
+                              old.connections !== info.connections ||
+                              old.errors !== info.errors
+
+        if (shouldBroadcast) {
+          self.status.bitcoind.version = info.version
+          self.status.bitcoind.protocolversion = info.protocolversion
+          self.status.connections = info.connections
+          self.status.errors = info.errors
+          self.broadcastStatus()
+        }
+      })
+      .finally(function () {
+        setTimeout(updateBitcoindInfo, 5000)
+      })
+  }
+
+  var onNewBlock = util.makeCuncurrent(function () {
+    return self.network.getLatest()
+      .then(function (latest) {
+        if (self.status.bitcoind.latest.hash !== latest.hash) {
+          self.status.bitcoind.latest = latest
+          self.broadcastStatus()
+        }
+      })
+  }, {concurrency: 1})
+  self.network.on('block', onNewBlock)
+
+  return Promise.all([
+    updateBitcoindInfo(),
+    onNewBlock()
+  ])
 }
 
 /**

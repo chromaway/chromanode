@@ -2,6 +2,7 @@
 
 var _ = require('lodash')
 var inherits = require('util').inherits
+var timers = require('timers')
 var Promise = require('bluebird')
 
 var errors = require('../../../lib/errors')
@@ -47,10 +48,19 @@ PeerSync.prototype.init = function () {
 }
 
 /**
+ * @param {function} fn
+ * @return {Promise}
+ */
+PeerSync.prototype._executeTransaction = util.makeCuncurrent(function (fn) {
+  return this._storage._executeTransaction(fn)
+}, {concurrency: 1})
+
+/**
+ * @return {Promise}
  */
 PeerSync.prototype._updateChain = util.makeCuncurrent(function () {
   var self = this
-  if (self._latest.hash === self._blockchainLatest.hahs) {
+  if (self._latest.hash === self._blockchainLatest.hash) {
     return
   }
 
@@ -61,7 +71,7 @@ PeerSync.prototype._updateChain = util.makeCuncurrent(function () {
   // add bitcoind_mempool - block - postgres_mempool as unconfirmed
   var stopwatch
   var latest = _.clone(self._latest)
-  return self._storage.executeTransaction(function (client) {
+  return self._executeTransaction(function (client) {
     return Promise.try(function () {
       if (latest.height + 1 < self._blockchainLatest.height) {
         return
@@ -127,6 +137,13 @@ PeerSync.prototype._updateChain = util.makeCuncurrent(function () {
 }, {concurrency: 1})
 
 /**
+ * @param {bitcore.Transaction} tx
+ * @return {Promise}
+ */
+PeerSync.prototype._importUnconfirmedTx = util.makeCuncurrent(function (tx) {
+})
+
+/**
  */
 PeerSync.prototype.run = function () {
   var self = this
@@ -138,12 +155,14 @@ PeerSync.prototype.run = function () {
       return self._network.getLatest()
         .then(function (blockchainLatest) {
           self._blockchainLatest = blockchainLatest
-          self._updateChain()
+          return self._updateChain()
         })
     }, {concurrency: 1})
 
     self._network.on('block', onNewBlock)
     onNewBlock()
+
+    // var onNewTx
   })
 }
 

@@ -16,11 +16,9 @@ var SQL = require('./sql')
 var ZERO_HASH = util.zfill('', 64)
 
 /**
- * @event HistorySync#start
- */
-
-/**
  * @event HistorySync#progress
+ * @param {string} progress
+ * @param {{hash: string, height: number}} latest
  */
 
 /**
@@ -43,13 +41,7 @@ function HistorySync () {
   })
   self.on('finish', function () { self._blockCache.reset() })
 
-  self._progress = {
-    value: null,
-    step: null,
-    latest: null
-  }
-  self._latest = null
-  self._blockchainLatest = null
+  self._progress = null
 }
 
 inherits(HistorySync, Sync)
@@ -67,72 +59,48 @@ HistorySync.prototype.init = function () {
     [SQL.update.history.deleteUnconfirmedInputs]
   ], {concurrency: 1})
   .then(function () {
-    logger.verbose('Delete unconfirmed data, elapsed time: %s',
-                   stopwatch.format(stopwatch.value()))
+    logger.info('Delete unconfirmed data, elapsed time: %s',
+                stopwatch.format(stopwatch.value()))
 
-    // extract latest from network and from database
-    return Promise.all([
-      self._network.getLatest(),
-      self._getMyLatest()
-    ])
-  })
-  .spread(function (blockchainLatest, latest) {
-    // update self._blockchainLatest on new blocks before sync finished
-    function onNewBlock () {
-      self._network.getLatest()
-        .then(function (blockchainLatest) {
-          self._blockchainLatest = blockchainLatest
+    // self._network `block` handler
+    var onNewBlock = util.makeCuncurrent(function () {
+      return self._network.getLatest()
+        .then(function (newBlockchainLatest) {
+          self._blockchainLatest = newBlockchainLatest
           self._updateProgress()
         })
-    }
+    }, {concurrency: 1})
 
     self._network.on('block', onNewBlock)
     self.on('finish', function () {
       self._network.removeListener('block', onNewBlock)
+      self._progress = '1.0000'
+      self.emit('progress', this._progress, this._latest)
     })
 
-    // calculate progress.step
-    var fstep = (blockchainLatest.height - latest.height) / 1000
-    var step = parseInt(fstep, 10)
-    self._progress.step = Math.max(step, 10)
-
-    // set self.progress.latest, network and database latest block
-    self._progress.latest = latest.height
-    self._latest = latest
-    self._blockchainLatest = blockchainLatest
-
-    // update self._progress.value
-    self._updateProgress()
-
+    // extract from db
+    return self._getMyLatest()
+      .then(function (latest) {
+        self._latest = latest
+        // get from network, update self._progress and emit `progress`
+        return onNewBlock()
+      })
+  })
+  .then(function () {
     // show info message
     logger.info('Got %d blocks in current db, out of %d block at bitcoind',
-                self._latest.height + 1, self._blockchainLatest.height)
+                self._latest.height + 1, self._blockchainLatest.height + 1)
   })
 }
 
 /**
  */
 HistorySync.prototype._updateProgress = function () {
-  var value = this._latest.height / this._blockchainLatest.height
-  this._progress.value = value.toFixed(6)
-
-  if (this._progress.latest + this._progress.step <= this._latest.height ||
-      this._progress.value === '1.000000') {
-    this._progress.latest = this._latest.height
-
-    logger.info('HistorySync progress: %s', this._progress.value)
-    this.emit('progress')
-  }
-}
-
-/**
- * @return {Object}
- */
-HistorySync.prototype.getInfo = function () {
-  return {
-    progress: this._progress.value,
-    latest: _.clone(this._latest),
-    blockchainLatest: _.clone(this._blockchainLatest)
+  var value = (this._latest.height / this._blockchainLatest.height).toFixed(4)
+  if (this._progress !== value) {
+    logger.info('HistorySync progress: %s', value)
+    this._progress = value
+    this.emit('progress', this._progress, this._latest)
   }
 }
 
@@ -254,6 +222,7 @@ HistorySync.prototype._loop = function () {
       }
 
       // reorg found
+      self._blockCache.reset()
       var to = self._blockchainLatest.height - 1
       return self._reorgTo(to, {client: client})
         .then(function () {
@@ -261,7 +230,6 @@ HistorySync.prototype._loop = function () {
         })
         .then(function (newLatest) {
           latest = newLatest
-          // reset block cache
         })
     })
     .then(function () {

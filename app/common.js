@@ -32,7 +32,7 @@ module.exports.run = function (init) {
 
   // initialize
   init().catch(function (err) {
-    logger.error('Error on initialization: %s', err)
+    logger.error('Error on initialization: %s', err.stack)
     process.exit(1)
   })
 }

@@ -25,6 +25,9 @@ function Sync (storage, network) {
 
   var networkName = config.get('chromanode.network')
   this._bitcoinNetwork = bitcore.Networks.get(networkName)
+
+  this._latest = null
+  this._blockchainLatest = null
 }
 
 inherits(Sync, EventEmitter)
