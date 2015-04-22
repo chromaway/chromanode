@@ -20,6 +20,7 @@
     "bitcoin api"
   ],
   "scripts": {
+    "test": "echo 'No test specified'",
     "lint": "standard"
   },
   "engines": {
