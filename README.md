@@ -37,6 +37,8 @@
 
 [API v1](docs/API_v1.md)
 
+To get current version of chromanode make request to `/version`
+
 ## Other open source blockchain apis
 
   * [Insight-api](https://github.com/bitpay/insight-api)
