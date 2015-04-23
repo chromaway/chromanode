@@ -106,10 +106,13 @@ Sync.prototype._safeGetAddresses = function (output, txid, index) {
 }
 
 /**
- * @return {Promise}
+ * @return {Promise<boolean>}
  */
 Sync.prototype._updateChain = function () {
   var self = this
+  if (self._latest.hash === self._blockchainLatest.hash) {
+    return Promise.resolve(false)
+  }
 
   var stopwatch
   var latest = _.clone(self._latest)
@@ -167,6 +170,8 @@ Sync.prototype._updateChain = function () {
                    self._latest.height,
                    util.stopwatch.format(stopwatch),
                    self._latest.hash)
+
+    return true
   })
 }
 

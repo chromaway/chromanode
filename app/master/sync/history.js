@@ -166,12 +166,8 @@ HistorySync.prototype.run = function () {
   .then(function () {
     return new Promise(function (resolve) {
       function loop () {
-        if (self._latest.hash === self._blockchainLatest.hash) {
-          return resolve()
-        }
-
         self._updateChain()
-          .then(function () {
+          .then(function (updated) {
             // emit latest
             self.emit('latest', self._latest)
 
@@ -182,6 +178,11 @@ HistorySync.prototype.run = function () {
               _.range(start, stop).forEach(function (height, index) {
                 setTimeout(function () { self._getBlock(height) }, index)
               })
+            }
+
+            // updated is false mean that latest.hash === blockchainLatest.hash
+            if (updated === false) {
+              return resolve()
             }
 
             // run loop again...

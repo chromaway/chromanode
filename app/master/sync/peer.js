@@ -2,7 +2,6 @@
 
 var _ = require('lodash')
 var inherits = require('util').inherits
-var timers = require('timers')
 var Promise = require('bluebird')
 
 var logger = require('../../../lib/logger').logger
@@ -202,111 +201,32 @@ PeerSync.prototype._importUnconfirmedTx = function (tx) {
 PeerSync.prototype.run = function () {
   var self = this
 
-  var blockImportingNow = false
-  var stillNeedBlockImporting = false
-  var allowBlockImporting = Promise.defer()
+  // only one query at one momeny
+  var executor = util.makeConcurrent(function (fn) {
+    return fn()
+  }, {concurrency: 1})
 
-  var txQueue = []
-  var txImportedNow = {}
-
-  /**
-   */
-  function runBlockImport () {
-    // set still need and return if importing block now
-    if (blockImportingNow === true) {
-      stillNeedBlockImporting = true
-      return
-    }
-
-    // block all feature tx import operation and drop still need
-    blockImportingNow = true
-    stillNeedBlockImporting = false
-
-    // resolve allow if not one tx importing now
-    if (allowBlockImporting.promise.isPending() &&
-        _.keys(txImportedNow).length === 0) {
-      allowBlockImporting.resolve()
-    }
-
-    // get latest from network
+  var runBlockImport = util.makeConcurrent(function () {
+    // get latest from bitcoind
     return self._network.getLatest()
       .then(function (newBlockchainLatest) {
-        // save latest
+        // .. set ..
         self._blockchainLatest = newBlockchainLatest
-
-        // wait permission for start importing
-        //   (when all import processes of current tx's will be finished)
-        return allowBlockImporting.promisea
-      })
-      .then(function (newBlockchainLatest) {
-        // update chain
-        if (self._latest.hash === self._blockchainLatest.hash) {
-          return
-        }
-
-        return self._updateChain()
-      })
-      .catch(function (err) {
-        // drop block importing now and planning importing
-        blockImportingNow = false
-        stillNeedBlockImporting = true
-        // re-throw
-        throw err
-      })
-      .then(function () {
-        // drop block importing now and
-        blockImportingNow = false
-      })
-      .finally(function () {
-        // create new permission for block import
-        allowBlockImporting = Promise.defer()
-
-        // we still need import block...
-        if (stillNeedBlockImporting === true) {
-          return timers.setImmediate(runBlockImport)
-        }
-
-        /* @todo update mempool */
-        // run import for all tx what as planned and drop queue
-        var txids = _.uniq(txQueue).reverse()
-        txQueue = []
-        txids.forEach(function (txid) {
-          timers.setImmediate(_.partial(runTxImport, txid))
+        // ... and run import
+        return executor(function () {
+          return self._updateChain()
         })
       })
-  }
+  }, {concurrency: 1})
 
-  /**
-   * @param {string} txid
-   */
-  function runTxImport (txid) {
-    /* @todo make sequential and check for orphans */
-    // skip if importing block now or planned for importing
-    if (blockImportingNow === true || stillNeedBlockImporting === true) {
-      return txQueue.push(txid)
-    }
-
-    // skip if txid in txImportedNow or add and continue
-    if (txImportedNow[txid] !== undefined) {
-      return
-    }
-    txImportedNow[txid] = true
-
+  var runTxImport = function (txid) {
     // get tx from bitcoind
     self._network.getTx(txid)
       .then(function (tx) {
-        // import as unconfirmed tx
-        return self._importUnconfirmedTx(tx)
-      })
-      .finally(function () {
-        // drop from txImportedNow
-        delete txImportedNow[txid]
-
-        // allow import block if not one tx imported now
-        if (_.keys(txImportedNow).length === 0 &&
-            (blockImportingNow === true || stillNeedBlockImporting === true)) {
-          allowBlockImporting.resolve()
-        }
+        // ... and run import
+        return executor(function () {
+          return self._importUnconfirmedTx(tx)
+        })
       })
   }
 
