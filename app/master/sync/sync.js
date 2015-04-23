@@ -1,9 +1,13 @@
+/* globals Promise:true */
+
 var _ = require('lodash')
 var EventEmitter = require('events').EventEmitter
 var inherits = require('util').inherits
 var bitcore = require('bitcore')
+var Promise = require('bluebird')
 
 var config = require('../../../lib/config')
+var errors = require('../../../lib/errors')
 var logger = require('../../../lib/logger').logger
 var util = require('../../../lib/util')
 var SQL = require('./sql')
@@ -89,7 +93,7 @@ Sync.prototype._getAddresses = function (script) {
  * @param {bitcore.Transaction.Output} output
  * @param {string} txid
  * @param {number} index
- * @return {?string[]}
+ * @return {string[]}
  */
 Sync.prototype._safeGetAddresses = function (output, txid, index) {
   try {
@@ -97,29 +101,72 @@ Sync.prototype._safeGetAddresses = function (output, txid, index) {
   } catch (err) {
     logger.error('On get addresses for output %s:%s %s',
                  txid, index, err.stack)
-    return null
+    return []
   }
 }
 
 /**
- * @param {number} to
- * @param {Object} [opts]
- * @param {pg.Client} [opts.client]
  * @return {Promise}
  */
-Sync.prototype._reorgTo = function (to, opts) {
-  logger.warn('Reorg to %d', to)
-  var stopwatch = util.stopwatch.start()
-  return this._storage.executeQueries([
-    [SQL.delete.blocks.fromHeight, [to]],
-    [SQL.delete.transactions.fromHeight, [to]],
-    [SQL.delete.history.fromHeight, [to]],
-    [SQL.update.history.deleteInputsFromHeight, [to]]
-  ], _.defaults({concurrency: 1}, opts))
-  .then(function (result) {
-    logger.verbose('Reorg finished, elapsed time: %s',
-                   stopwatch.formattedValue())
-    return result
+Sync.prototype._updateChain = function () {
+  var self = this
+
+  var stopwatch
+  var latest = _.clone(self._latest)
+  return self._storage.executeTransaction(function (client) {
+    return Promise.try(function () {
+      if (latest.height < self._blockchainLatest.height) {
+        return
+      }
+
+      // reorg found
+      self._blockCache.reset()
+      var to = self._blockchainLatest.height - 1
+      var opts = {client: client, concurrency: 1}
+
+      stopwatch = util.stopwatch.start()
+      return self._storage.executeQueries([
+        [SQL.delete.blocks.fromHeight, [to]],
+        [SQL.delete.transactions.fromHeight, [to]],
+        [SQL.delete.history.fromHeight, [to]],
+        [SQL.update.history.deleteInputsFromHeight, [to]]
+      ], opts)
+      .then(function () {
+        logger.verbose('Reorg finished, elapsed time: %s',
+                       stopwatch.formattedValue())
+
+        return self._getMyLatest({client: client})
+      })
+      .then(function (newLatest) {
+        latest = newLatest
+      })
+    })
+    .then(function () {
+      return self._getBlock(latest.height + 1)
+    })
+    .then(function (block) {
+      // check hashPrevBlock
+      if (latest.hash !== util.encode(block.header.prevHash)) {
+        throw new errors.Master.InvalidHashPrevBlock(latest.hash, block.hash)
+      }
+
+      stopwatch = util.stopwatch.start()
+      return self._importBlock(block, latest.height + 1, client)
+    })
+    .then(function () {
+      stopwatch = stopwatch.value()
+      return self._getMyLatest({client: client})
+    })
+  })
+  .then(function (newLatest) {
+    // new latest
+    self._latest = newLatest
+
+    // verbose logging
+    logger.verbose('Import block #%d, elapsed time: %s (hash: %s)',
+                   self._latest.height,
+                   util.stopwatch.format(stopwatch),
+                   self._latest.hash)
   })
 }
 

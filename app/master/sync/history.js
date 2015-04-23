@@ -7,7 +7,6 @@ var Promise = require('bluebird')
 var LRU = require('lru-cache')
 
 var config = require('../../../lib/config')
-var errors = require('../../../lib/errors')
 var logger = require('../../../lib/logger').logger
 var util = require('../../../lib/util')
 var Sync = require('./sync')
@@ -58,12 +57,12 @@ HistorySync.prototype._getBlock = function (height) {
 }
 
 /**
- * @param {number} height
  * @param {bitcore.Block} block
+ * @param {number} height
  * @param {pg.Client} client
  * @return {Promise}
  */
-HistorySync.prototype._importBlock = function (height, block, client) {
+HistorySync.prototype._importBlock = function (block, height, client) {
   var self = this
 
   var txids = _.pluck(block.transactions, 'hash')
@@ -74,7 +73,7 @@ HistorySync.prototype._importBlock = function (height, block, client) {
       height,
       '\\x' + block.hash,
       '\\x' + block.header.toString(),
-      '\\x' + _.pluck(block.transactions, 'hash').join('')
+      '\\x' + txids.join('')
     ])
   })
   .then(function () {
@@ -92,10 +91,6 @@ HistorySync.prototype._importBlock = function (height, block, client) {
     return Promise.map(block.transactions, function (tx, txIndex) {
       return Promise.map(tx.outputs, function (output, index) {
         var addresses = self._safeGetAddresses(output, txids[txIndex], index)
-        if (addresses === null) {
-          return
-        }
-
         return Promise.map(addresses, function (address) {
           return client.queryAsync(SQL.insert.history.confirmedOutput, [
             address,
@@ -129,82 +124,6 @@ HistorySync.prototype._importBlock = function (height, block, client) {
         ])
       }, {concurrency: 1})
     }, {concurrency: 1})
-  })
-}
-
-/**
- */
-HistorySync.prototype._loop = function () {
-  var self = this
-  if (self._latest.hash === self._blockchainLatest.hash) {
-    return self._finishResolver()
-  }
-
-  var stopwatch
-  var latest = _.clone(self._latest)
-  return self._storage.executeTransaction(function (client) {
-    return Promise.try(function () {
-      if (latest.height + 1 < self._blockchainLatest.height) {
-        return
-      }
-
-      // reorg found
-      self._blockCache.reset()
-      var to = self._blockchainLatest.height - 1
-      return self._reorgTo(to, {client: client})
-        .then(function () {
-          return self._getMyLatest({client: client})
-        })
-        .then(function (newLatest) {
-          latest = newLatest
-        })
-    })
-    .then(function () {
-      return self._getBlock(latest.height + 1)
-    })
-    .then(function (block) {
-      // check hashPrevBlock
-      if (latest.hash !== util.encode(block.header.prevHash)) {
-        throw new errors.Master.InvalidHashPrevBlock(latest.hash, block.hash)
-      }
-
-      stopwatch = util.stopwatch.start()
-      return self._importBlock(latest.height + 1, block, client)
-    })
-    .then(function () {
-      stopwatch = stopwatch.value()
-      return self._getMyLatest({client: client})
-    })
-  })
-  .then(function (newLatest) {
-    // new latest
-    self._latest = newLatest
-
-    // verbose logging
-    logger.verbose('Import block #%d, elapsed time: %s (hash: %s)',
-                   self._latest.height,
-                   util.stopwatch.format(stopwatch),
-                   self._latest.hash)
-
-    // emit latest
-    self.emit('latest', self._latest)
-
-    // fill block cache
-    if (self._latest.height + 500 < self._blockchainLatest.height) {
-      var start = self._latest.height + 1
-      var stop = self._latest.height + self._maxCachedBlocks + 1
-      _.range(start, stop).forEach(function (height, index) {
-        setTimeout(function () { self._getBlock(height) }, index)
-      })
-    }
-
-    // run _loop again
-    timers.setImmediate(self._loop.bind(self))
-  })
-  .catch(function (err) {
-    // new attempt after 15s
-    setTimeout(self._loop.bind(self), 15 * 1000)
-    throw err
   })
 }
 
@@ -246,8 +165,36 @@ HistorySync.prototype.run = function () {
   })
   .then(function () {
     return new Promise(function (resolve) {
-      self._finishResolver = resolve
-      timers.setImmediate(self._loop.bind(self))
+      function loop () {
+        if (self._latest.hash === self._blockchainLatest.hash) {
+          return resolve()
+        }
+
+        self._updateChain()
+          .then(function () {
+            // emit latest
+            self.emit('latest', self._latest)
+
+            // fill block cache
+            if (self._latest.height + 500 < self._blockchainLatest.height) {
+              var start = self._latest.height + 1
+              var stop = self._latest.height + self._maxCachedBlocks + 1
+              _.range(start, stop).forEach(function (height, index) {
+                setTimeout(function () { self._getBlock(height) }, index)
+              })
+            }
+
+            // run loop again...
+            timers.setImmediate(loop)
+          })
+          .catch(function (err) {
+            // new attempt after 15s
+            setTimeout(loop, 15 * 1000)
+            throw err
+          })
+      }
+
+      loop()
     })
   })
   .finally(function () {

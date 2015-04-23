@@ -5,7 +5,6 @@ var inherits = require('util').inherits
 var timers = require('timers')
 var Promise = require('bluebird')
 
-var errors = require('../../../lib/errors')
 var logger = require('../../../lib/logger').logger
 var util = require('../../../lib/util')
 var Sync = require('./sync')
@@ -26,87 +25,40 @@ function PeerSync () {
 inherits(PeerSync, Sync)
 
 /**
+ * @param {number} height
+ * @return {Promise<bitcore.block>}
+ */
+PeerSync.prototype._getBlock = function (height) {
+  var stopwatch = util.stopwatch.start()
+  return this._network.getBlock(height)
+    .then(function (block) {
+      logger.verbose('Downloading block %d, elapsed time: %s',
+                     height, stopwatch.formattedValue())
+      return block
+    })
+}
+
+/**
+ * @param {bitcore.Block} block
+ * @param {number} height
+ * @param {pg.Client} client
  * @return {Promise}
  */
-PeerSync.prototype._updateChain = function () {
-console.log('Import block:', this._blockchainLatest.hash)
-  return
+PeerSync.prototype._importBlock = function (block, height, client) {
+  // var self = this
 
-  var self = this
-  if (self._latest.hash === self._blockchainLatest.hash) {
-    return
-  }
+  var txids = _.pluck(block.transactions, 'hash')
 
-  // todo
-  // delete postgres_mempool - bitcoind_mempool
-  // add block - postgres_mempool
-  // update height for block transactions
-  // add bitcoind_mempool - block - postgres_mempool as unconfirmed
-  var stopwatch
-  var latest = _.clone(self._latest)
-  return self._storage.executeTransaction(function (client) {
-    return Promise.try(function () {
-      if (latest.height + 1 < self._blockchainLatest.height) {
-        return
-      }
-
-      // reorg found
-      var to = self._blockchainLatest.height - 1
-      return self._reorgTo(to, {client: client})
-        .then(function () {
-          return self._getMyLatest({client: client})
-        })
-        .then(function (newLatest) {
-          latest = newLatest
-        })
-    })
-    .then(function () {
-      return self._getBlock(latest.height + 1)
-    })
-    .then(function (block) {
-      // check hashPrevBlock
-      if (latest.hash !== util.encode(block.header.prevHash)) {
-        throw new errors.Master.InvalidHashPrevBlock(latest.hash, block.hash)
-      }
-
-      stopwatch = util.stopwatch.start()
-      return self._importBlock(latest.height + 1, block, client)
-    })
-    .then(function () {
-      stopwatch = stopwatch.value()
-      return self._getMyLatest({client: client})
-    })
+  return Promise.try(function () {
+    // import header
+    return client.queryAsync(SQL.insert.blocks.row, [
+      height,
+      '\\x' + block.hash,
+      '\\x' + block.header.toString(),
+      '\\x' + txids.join('')
+    ])
   })
-  .then(function (newLatest) {
-    // new latest
-    self._latest = newLatest
 
-    // verbose logging
-    logger.verbose('Import block #%d, elapsed time: %s (hash: %s)',
-                   self._latest.height,
-                   util.stopwatch.format(stopwatch),
-                   self._latest.hash)
-
-    // update self._progress and emit progress if need
-    self._updateProgress()
-
-    // fill block cache
-    if (self._latest.height + 500 < self._blockchainLatest.height) {
-      var start = self._latest.height + 1
-      var stop = self._latest.height + self._maxCachedBlocks + 1
-      _.range(start, stop).forEach(function (height, index) {
-        setTimeout(function () { self._getBlock(height) }, index)
-      })
-    }
-
-    // run _loop again
-    timers.setImmediate(self._loop.bind(self))
-  })
-  .catch(function (err) {
-    // new attempt after 15s
-    setTimeout(self._loop.bind(self), 15 * 1000)
-    throw err
-  })
 }
 
 /**
@@ -114,7 +66,6 @@ console.log('Import block:', this._blockchainLatest.hash)
  * @return {Promise}
  */
 PeerSync.prototype._importUnconfirmedTx = function (tx) {
-console.log('Import tx:', tx.hash)
   var self = this
   var stopwatch = util.stopwatch.start()
   var txid = tx.hash
@@ -139,10 +90,6 @@ console.log('Import tx:', tx.hash)
       // import outputs
       return Promise.map(tx.outputs, function (output, index) {
         var addresses = self._safeGetAddresses(output, txid, index)
-        if (addresses === null) {
-          return
-        }
-
         return Promise.map(addresses, function (address) {
           return client.queryAsync(SQL.insert.history.unconfirmedOutput, [
             address,
@@ -165,7 +112,7 @@ console.log('Import tx:', tx.hash)
           return
         }
 
-        // @todo What if output not exists yet?
+        /* @todo What if output not exists yet? */
         return client.queryAsync(SQL.update.history.unconfirmedInput, [
           '\\x' + txid,
           '\\x' + prevTxId,
@@ -224,6 +171,10 @@ PeerSync.prototype.run = function () {
       })
       .then(function (newBlockchainLatest) {
         // update chain
+        if (self._latest.hash === self._blockchainLatest.hash) {
+          return
+        }
+
         return self._updateChain()
       })
       .catch(function (err) {
@@ -246,6 +197,7 @@ PeerSync.prototype.run = function () {
           return timers.setImmediate(runBlockImport)
         }
 
+        /* @todo update mempool */
         // run import for all tx what as planned and drop queue
         var txids = _.uniq(txQueue).reverse()
         txQueue = []
@@ -259,6 +211,7 @@ PeerSync.prototype.run = function () {
    * @param {string} txid
    */
   function runTxImport (txid) {
+    /* @todo make sequential and check for orphans */
     // skip if importing block nowi or planned for importing
     if (blockImportingNow === true || stillNeedBlockImporting === true) {
       return txQueue.push(txid)
