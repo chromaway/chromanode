@@ -154,11 +154,13 @@ Master.prototype._runHistorySync = function () {
   function onLatest (latest) {
     self.status.latest = latest
 
-    var value = (latest.height / self.status.bitcoind.latest.height).toFixed(4)
-    if (self.status.progress !== value) {
+    var value = latest.height / self.status.bitcoind.latest.height
+    var fixedValue = value.toFixed(4)
+    if (self.status.progress !== fixedValue) {
       logger.info('Sync progress: %s (%d of %d)',
-                  value, latest.height, self.status.bitcoind.latest.height)
-      self.status.progress = value
+                  value.toFixed(6),
+                  latest.height, self.status.bitcoind.latest.height)
+      self.status.progress = fixedValue
       self.broadcastStatus()
     }
   }

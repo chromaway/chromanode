@@ -21,7 +21,7 @@ var util = require('../../lib/util')
 
 /**
  * @event Network#tx
- * @param {bitcore.Transaction} tx
+ * @param {string} txid
  */
 
 /**
@@ -88,7 +88,6 @@ Network.prototype._initTrustedPeer = function () {
   // inv event
   self.peer.on('inv', function (message) {
     var names = []
-    var txInv = []
 
     message.inventory.forEach(function (inv) {
       // store inv type name
@@ -96,7 +95,7 @@ Network.prototype._initTrustedPeer = function () {
 
       // store inv if tx type
       if (inv.type === p2p.Inventory.TYPE.TX) {
-        txInv.push(inv)
+        self.emit('tx', util.encode(inv.hash))
       }
 
       // emit block if block type
@@ -107,19 +106,6 @@ Network.prototype._initTrustedPeer = function () {
 
     logger.verbose('Receive inv (%s) message from peer %s:%s',
                    names.join(', '), self.peer.host, self.peer.port)
-
-    // request new transactions
-    if (txInv.length > 0) {
-      var msg = self.peer.messages.GetData(txInv)
-      self.peer.sendMessage(msg)
-    }
-  })
-
-  // tx event
-  self.peer.on('tx', function (message) {
-    logger.verbose('Receive tx message from peer %s:%s',
-                   self.peer.host, self.peer.port)
-    self.emit('tx', message.transaction)
   })
 
   // connect event
@@ -206,6 +192,18 @@ Network.prototype.getLatest = function () {
     })
     .spread(function (height, hash) {
       return {hash: hash, height: height}
+    })
+}
+
+/**
+ * @param {string} txid
+ * @return {Promise<bitcore.Transaction>}
+ */
+Network.prototype.getTx = function (txid) {
+  return this.bitcoind.getRawTransactionAsync(txid)
+    .then(function (ret) {
+      var rawtx = new Buffer(ret.result, 'hex')
+      return new bitcore.Transaction(rawtx)
     })
 }
 

@@ -29,6 +29,7 @@ inherits(PeerSync, Sync)
  * @return {Promise}
  */
 PeerSync.prototype._updateChain = function () {
+console.log('Import block:', this._blockchainLatest.hash)
   return
 
   var self = this
@@ -113,6 +114,7 @@ PeerSync.prototype._updateChain = function () {
  * @return {Promise}
  */
 PeerSync.prototype._importUnconfirmedTx = function (tx) {
+console.log('Import tx:', tx.hash)
   var self = this
   var stopwatch = util.stopwatch.start()
   var txid = tx.hash
@@ -163,6 +165,7 @@ PeerSync.prototype._importUnconfirmedTx = function (tx) {
           return
         }
 
+        // @todo What if output not exists yet?
         return client.queryAsync(SQL.update.history.unconfirmedInput, [
           '\\x' + txid,
           '\\x' + prevTxId,
@@ -183,37 +186,120 @@ PeerSync.prototype._importUnconfirmedTx = function (tx) {
 PeerSync.prototype.run = function () {
   var self = this
 
+  var blockImportingNow = false
+  var stillNeedBlockImporting = false
+  var allowBlockImporting = Promise.defer()
+
+  var txQueue = []
+  var txImportedNow = {}
+
+  /**
+   */
+  function runBlockImport () {
+    // set still need and return if importing block now
+    if (blockImportingNow === true) {
+      stillNeedBlockImporting = true
+      return
+    }
+
+    // block all feature tx import operation and drop still need
+    blockImportingNow = true
+    stillNeedBlockImporting = false
+
+    // resolve allow if not one tx importing now
+    if (allowBlockImporting.promise.isPending() &&
+        _.keys(txImportedNow).length === 0) {
+      allowBlockImporting.resolve()
+    }
+
+    // get latest from network
+    return self._network.getLatest()
+      .then(function (newBlockchainLatest) {
+        // save latest
+        self._blockchainLatest = newBlockchainLatest
+
+        // wait permission for start importing
+        //   (when all import processes of current tx's will be finished)
+        return allowBlockImporting.promisea
+      })
+      .then(function (newBlockchainLatest) {
+        // update chain
+        return self._updateChain()
+      })
+      .catch(function (err) {
+        // drop block importing now and planning importing
+        blockImportingNow = false
+        stillNeedBlockImporting = true
+        // re-throw
+        throw err
+      })
+      .then(function () {
+        // drop block importing now and
+        blockImportingNow = false
+      })
+      .finally(function () {
+        // create new permission for block import
+        allowBlockImporting = Promise.defer()
+
+        // we still need import block...
+        if (stillNeedBlockImporting === true) {
+          return timers.setImmediate(runBlockImport)
+        }
+
+        // run import for all tx what as planned and drop queue
+        var txids = _.uniq(txQueue).reverse()
+        txQueue = []
+        txids.forEach(function (txid) {
+          timers.setImmediate(_.partial(runTxImport, txid))
+        })
+      })
+  }
+
+  /**
+   * @param {string} txid
+   */
+  function runTxImport (txid) {
+    // skip if importing block nowi or planned for importing
+    if (blockImportingNow === true || stillNeedBlockImporting === true) {
+      return txQueue.push(txid)
+    }
+
+    // skip if txid in txImportedNow or add and continue
+    if (txImportedNow[txid] !== undefined) {
+      return
+    }
+    txImportedNow[txid] = true
+
+    // get tx from bitcoind
+    self._network.getTx(txid)
+      .then(function (tx) {
+        // import as unconfirmed tx
+        return self._importUnconfirmedTx(tx)
+      })
+      .finally(function () {
+        // drop from txImportedNow
+        delete txImportedNow[txid]
+
+        // allow import block if not one tx imported now
+        if (_.keys(txImportedNow).length === 0 &&
+            (blockImportingNow === true || stillNeedBlockImporting === true)) {
+          allowBlockImporting.resolve()
+        }
+      })
+  }
+
   return self._getMyLatest()
     .then(function (latest) {
       self._latest = latest
 
-      // only one import process at one moment
-      //  @todo make parallel tx import ?
-      var executor = util.makeConcurrent(function (fn) {
-        return fn()
-      }, {concurrency: 1})
-
       // block handler
-      var onBlock = util.makeConcurrent(function () {
-        return self._network.getLatest()
-          .then(function (newBlockchainLatest) {
-            self._blockchainLatest = newBlockchainLatest
-            return executor(function () {
-              return self._updateChain()
-            })
-          })
-      }, {concurrency: 1})
-
-      self._network.on('block', onBlock)
-      onBlock()
+      self._network.on('block', runBlockImport)
 
       // tx handler
-      var onTx = function (tx) {
-        return executor(function () {
-          return self._importUnconfirmedTx(tx)
-        })
-      }
-      self._network.on('tx', onTx)
+      self._network.on('tx', runTxImport)
+
+      // make sure that we have latest block
+      runBlockImport()
     })
 }
 
