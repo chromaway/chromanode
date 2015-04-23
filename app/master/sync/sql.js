@@ -48,21 +48,36 @@ module.exports = {
     }
   },
   update: {
+    transactions: {
+      makeConfirmed: 'UPDATE transactions ' +
+                     '  SET ' +
+                     '    height = $1 ' +
+                     '  WHERE ' +
+                     '    txid = $2'
+    },
     history: {
-      confirmedInput: 'UPDATE history ' +
-                      '  SET ' +
-                      '    itxid = $1, ' +
-                      '    iheight = $2 ' +
-                      '  WHERE ' +
-                      '    otxid = $3 AND ' +
-                      '    oindex = $4',
+      addConfirmedInput: 'UPDATE history ' +
+                         '  SET ' +
+                         '    itxid = $1, ' +
+                         '    iheight = $2 ' +
+                         '  WHERE ' +
+                         '    otxid = $3 AND ' +
+                         '    oindex = $4',
 
-      unconfirmedInput: 'UPDATE history ' +
-                        '  SET ' +
-                        '    itxid = $1 ' +
-                        '  WHERE ' +
-                        '    otxid = $2 AND ' +
-                        '    oindex = $3',
+      addUnconfirmedInput: 'UPDATE history ' +
+                           '  SET ' +
+                           '    itxid = $1 ' +
+                           '  WHERE ' +
+                           '    otxid = $2 AND ' +
+                           '    oindex = $3',
+
+      makeConfirmed: 'UPDATE history ' +
+                     '  SET ' +
+                     '    iheight = $1, ' +
+                     '    oheight = $1 ' +
+                     '  WHERE ' +
+                     '    itxid = $2 OR ' +
+                     '    otxid = $2',
 
       deleteInputsFromHeight: 'UPDATE history ' +
                               '  SET ' +
