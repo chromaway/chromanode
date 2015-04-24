@@ -2,6 +2,7 @@
 
 var _ = require('lodash')
 var inherits = require('util').inherits
+var timers = require('timers')
 var Promise = require('bluebird')
 
 var logger = require('../../../lib/logger').logger
@@ -9,9 +10,11 @@ var util = require('../../../lib/util')
 var Sync = require('./sync')
 var SQL = require('./sql')
 
-// fake error
+// fake errors
 function TransactionsAlreadyExists () {}
 inherits(TransactionsAlreadyExists, Error)
+function OrphanTxError () {}
+inherits(OrphanTxError, Error)
 
 /**
  * @class PeerSync
@@ -19,6 +22,11 @@ inherits(TransactionsAlreadyExists, Error)
  */
 function PeerSync () {
   Sync.apply(this, arguments)
+
+  this._orphanedTx = {
+    depends: {}, // txid -> txid[]
+    depend: {}   // txid -> txid[]
+  }
 }
 
 inherits(PeerSync, Sync)
@@ -130,8 +138,18 @@ PeerSync.prototype._importBlock = function (block, height, client) {
 }
 
 /**
+ * @param {string} txid
+ * @param {pg.Client} client
+ * @return {Promise<boolean>}
+ */
+PeerSync.prototype._hasTx = function (txid, client) {
+  return client.queryAsync(SQL.select.transactions.has, ['\\x' + txid])
+    .then(function (result) { return result.rows[0].count !== '0' })
+}
+
+/**
  * @param {bitcore.Transaction} tx
- * @return {Promise}
+ * @return {Promise<boolean>}
  */
 PeerSync.prototype._importUnconfirmedTx = function (tx) {
   var self = this
@@ -141,11 +159,29 @@ PeerSync.prototype._importUnconfirmedTx = function (tx) {
   return self._storage.executeTransaction(function (client) {
     return Promise.try(function () {
       // transaction already in database?
-      return client.queryAsync(SQL.select.transactions.has, ['\\x' + txid])
+      return self._hasTx(txid, client)
     })
-    .then(function (result) {
-      if (result.rows[0].count !== '0') {
+    .then(function (alreadyExists) {
+      if (alreadyExists) {
         throw new TransactionsAlreadyExists()
+      }
+
+      // all inputs exists?
+      return Promise.map(tx.inputs, function (input) {
+        var txid = input.prevTxId.toString('hex')
+        return self._hasTx(txid, client)
+          .then(function (exists) { return {txid: txid, exists: exists} })
+      })
+    }).then(function (result) {
+      var depends = _.pluck(_.filter(result, 'exists', false), 'txid')
+      // some input not exists yet, mark as orphaned and delay
+      if (depends.length > 0) {
+        self._orphanedTx.depends[txid] = depends
+        depends.forEach(function (depend) {
+          self._orphanedTx.depend = _.union(self._orphanedTx.depend, [txid])
+        })
+        logger.warning('Found orphan tx: %s', txid)
+        throw new OrphanTxError()
       }
 
       // import transaction
@@ -172,18 +208,9 @@ PeerSync.prototype._importUnconfirmedTx = function (tx) {
     .then(function () {
       // import intputs
       return Promise.map(tx.inputs, function (input, index) {
-        // skip coinbase
-        var prevTxId = input.prevTxId.toString('hex')
-        if (index === 0 &&
-            input.outputIndex === 0xffffffff &&
-            prevTxId === util.ZERO_HASH) {
-          return
-        }
-
-        /* @todo What if output not exists yet? */
         return client.queryAsync(SQL.update.history.addUnconfirmedInput, [
           '\\x' + txid,
-          '\\x' + prevTxId,
+          '\\x' + input.prevTxId.toString('hex'),
           input.outputIndex
         ])
       }, {concurrency: 1})
@@ -191,8 +218,10 @@ PeerSync.prototype._importUnconfirmedTx = function (tx) {
     .then(function () {
       logger.verbose('Import tx %s, elapsed time: %s',
                      txid, stopwatch.formattedValue())
+      return true
     })
-    .catch(TransactionsAlreadyExists, function () {})
+    .catch(TransactionsAlreadyExists, function () { return true })
+    .catch(OrphanTxError, function () { return false })
   })
 }
 
@@ -226,6 +255,31 @@ PeerSync.prototype.run = function () {
         // ... and run import
         return executor(function () {
           return self._importUnconfirmedTx(tx)
+        })
+        .then(function (imported) {
+          if (imported === false) {
+            return
+          }
+
+          // check depends tx that mark as orphaned now
+          var txid = tx.hash
+          var orphans = self._orphanedTx.depend[txid]
+          if (orphans !== undefined) {
+            delete self._orphanedTx.depend[txid]
+            // check every orphaned tx
+            orphans.forEach(function (orphaned) {
+              // all deps resolved?
+              var deps = _.without(self._orphanedTx.depends[orphaned], txid)
+              if (deps.length > 0) {
+                self._orphanedTx.depends[orphaned] = deps
+                return
+              }
+
+              // run import if all ok
+              delete self._orphanedTx[orphaned]
+              timers.setImmediate(runTxImport, orphaned)
+            })
+          }
         })
       })
   }
