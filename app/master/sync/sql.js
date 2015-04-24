@@ -74,14 +74,18 @@ module.exports = {
                          '    iheight = $2 ' +
                          '  WHERE ' +
                          '    otxid = $3 AND ' +
-                         '    oindex = $4',
+                         '    oindex = $4 ' +
+                         '  RETURNING ' +
+                         '    address',
 
       addUnconfirmedInput: 'UPDATE history ' +
                            '  SET ' +
                            '    itxid = $1 ' +
                            '  WHERE ' +
                            '    otxid = $2 AND ' +
-                           '    oindex = $3',
+                           '    oindex = $3' +
+                           '  RETURNING ' +
+                           '    address',
 
       makeConfirmed: 'UPDATE history ' +
                      '  SET ' +
@@ -89,7 +93,9 @@ module.exports = {
                      '    oheight = $1 ' +
                      '  WHERE ' +
                      '    itxid = $2 OR ' +
-                     '    otxid = $2',
+                     '    otxid = $2 ' +
+                     '  RETURNING ' +
+                     '    address',
 
       deleteInputsFromHeight: 'UPDATE history ' +
                               '  SET ' +

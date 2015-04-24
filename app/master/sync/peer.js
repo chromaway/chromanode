@@ -59,53 +59,84 @@ PeerSync.prototype._importBlock = function (block, height, client) {
 
   return Promise.try(function () {
     // import header
-    return client.queryAsync(SQL.insert.blocks.row, [
+    var insert = client.queryAsync(SQL.insert.blocks.row, [
       height,
       '\\x' + block.hash,
       '\\x' + block.header.toString(),
       '\\x' + txids.join('')
     ])
+
+    var broadcast = self._slaves.broadcastBlock(
+      block.hash, height, {client: client})
+
+    return Promise.all([insert, broadcast])
   })
   .then(function () {
     // import transactions
     return Promise.map(block.transactions, function (tx, txIndex) {
       var txid = txids[txIndex]
-      return client.queryAsync(SQL.select.transactions.has, ['\\x' + txid])
-        .then(function (result) {
-          if (result.rows[0].count === '0') {
-            return client.queryAsync(SQL.insert.transactions.confirmed, [
-              '\\x' + txid,
-              height,
-              '\\x' + tx.toString()
-            ])
-          }
 
-          existingTx[txid] = true
-          return self._storage.executeQueries([
-            [SQL.update.transactions.makeConfirmed, [height, '\\x' + txid]],
-            [SQL.update.history.makeConfirmed, [height, '\\x' + txid]]
-          ], {concurrency: 1, client: client})
+      var insert = client.queryAsync(
+        SQL.select.transactions.has, ['\\x' + txid]
+      )
+      .then(function (result) {
+        if (result.rows[0].count === '0') {
+          return client.queryAsync(SQL.insert.transactions.confirmed, [
+            '\\x' + txid,
+            height,
+            '\\x' + tx.toString()
+          ])
+        }
+
+        existingTx[txid] = true
+        return self._storage.executeQueries([
+          [SQL.update.transactions.makeConfirmed, [height, '\\x' + txid]],
+          [SQL.update.history.makeConfirmed, [height, '\\x' + txid]]
+        ], {concurrency: 1, client: client})
+        .then(function (results) {
+          var promises = _.chain(results[1].rows)
+            .pluck('address')
+            .invoke('toString', 'hex')
+            .map(function (address) {
+              return self._slaves.broadcastAddress(
+                address, txid, block.hash, height, {client: client})
+            })
+            .value()
+
+          return Promise.all(promises)
         })
+      })
+
+      var broadcast = self._slaves.broadcastTx(
+        txid, block.hash, height, {client: client})
+
+      return Promise.all([insert, broadcast])
     }, {concurrency: 1})
   })
   .then(function () {
     // import outputs
     return Promise.map(block.transactions, function (tx, txIndex) {
-      if (existingTx[txids[txIndex]] === true) {
+      var txid = txids[txIndex]
+      if (existingTx[txid] === true) {
         return
       }
 
       return Promise.map(tx.outputs, function (output, index) {
-        var addresses = self._safeGetAddresses(output, txids[txIndex], index)
+        var addresses = self._safeGetAddresses(output, txid, index)
         return Promise.map(addresses, function (address) {
-          return client.queryAsync(SQL.insert.history.confirmedOutput, [
+          var insert = client.queryAsync(SQL.insert.history.confirmedOutput, [
             address,
-            '\\x' + txids[txIndex],
+            '\\x' + txid,
             index,
             output.satoshis,
             '\\x' + output.script.toHex(),
             height
           ])
+
+          var broadcast = self._slaves.broadcastAddress(
+            address, txid, block.hash, height, {client: client})
+
+          return Promise.all([insert, broadcast])
         }, {concurrency: 1})
       }, {concurrency: 1})
     }, {concurrency: 1})
@@ -113,7 +144,8 @@ PeerSync.prototype._importBlock = function (block, height, client) {
   .then(function () {
     // import inputs
     return Promise.map(block.transactions, function (tx, txIndex) {
-      if (existingTx[txids[txIndex]] === true) {
+      var txid = txids[txIndex]
+      if (existingTx[txid] === true) {
         return
       }
 
@@ -127,11 +159,23 @@ PeerSync.prototype._importBlock = function (block, height, client) {
         }
 
         return client.queryAsync(SQL.update.history.addConfirmedInput, [
-          '\\x' + txids[txIndex],
+          '\\x' + txid,
           height,
           '\\x' + prevTxId,
           input.outputIndex
         ])
+        .then(function (result) {
+          var promises = _.chain(result.rows)
+            .pluck('address')
+            .invoke('toString', 'hex')
+            .map(function (address) {
+              return self._slaves.broadcastAddress(
+                address, txid, block.hash, height, {client: client})
+            })
+            .value()
+
+          return Promise.all(promises)
+        })
       }, {concurrency: 1})
     }, {concurrency: 1})
   })
@@ -153,9 +197,9 @@ PeerSync.prototype._hasTx = function (txid, client) {
  */
 PeerSync.prototype._importUnconfirmedTx = function (tx) {
   var self = this
-  var stopwatch = util.stopwatch.start()
   var txid = tx.hash
 
+  var stopwatch = util.stopwatch.start()
   return self._storage.executeTransaction(function (client) {
     return Promise.try(function () {
       // transaction already in database?
@@ -196,13 +240,17 @@ PeerSync.prototype._importUnconfirmedTx = function (tx) {
       return Promise.map(tx.outputs, function (output, index) {
         var addresses = self._safeGetAddresses(output, txid, index)
         return Promise.map(addresses, function (address) {
-          return client.queryAsync(SQL.insert.history.unconfirmedOutput, [
+          var insert = client.queryAsync(SQL.insert.history.unconfirmedOutput, [
             address,
             '\\x' + txid,
             index,
             output.satoshis,
             '\\x' + output.script.toHex()
           ])
+          var broadcast = self._slaves.broadcastAddress(
+            address, txid, null, null, {client: client})
+
+          return Promise.all([insert, broadcast])
         }, {concurrency: 1})
       }, {concurrency: 1})
     })
@@ -214,15 +262,31 @@ PeerSync.prototype._importUnconfirmedTx = function (tx) {
           '\\x' + input.prevTxId.toString('hex'),
           input.outputIndex
         ])
+        .then(function (result) {
+          var promises = _.chain(result.rows)
+            .pluck('address')
+            .invoke('toString', 'hex')
+            .map(function (address) {
+              return self._slaves.broadcastAddress(
+                address, txid, null, null, {client: client})
+            })
+            .value()
+
+          return Promise.all(promises)
+        })
       }, {concurrency: 1})
     })
     .then(function () {
-      logger.verbose('Import tx %s, elapsed time: %s',
-                     txid, stopwatch.formattedValue())
-      return true
+      return self._slaves.broadcastTx(txid, null, null, {client: client})
     })
+    .then(function () { return true })
     .catch(TransactionsAlreadyExists, function () { return true })
     .catch(OrphanTxError, function () { return false })
+  })
+  .then(function (value) {
+    logger.verbose('Import tx %s, elapsed time: %s',
+                   txid, stopwatch.formattedValue())
+    return value
   })
 }
 
@@ -249,7 +313,7 @@ PeerSync.prototype._updateMempool = function () {
       return self._storage.executeQueries([
         [SQL.delete.transactions.unconfirmedByTxIds, [toRemove]],
         [SQL.delete.history.unconfirmedByTxIds, [toRemove]],
-        [SQL.update.deleteUnconfirmedInputsByTxIds, [toRemove]]
+        [SQL.update.history.deleteUnconfirmedInputsByTxIds, [toRemove]]
       ], {concurrency: 1})
     })
     .then(function () {
