@@ -37,14 +37,26 @@ module.exports = {
               '    header as header ' +
               '  FROM blocks ' +
               '    ORDER BY height DESC ' +
-              '    LIMIT 1'
+              '    LIMIT 1',
+
+      txids: 'SELECT ' +
+             '    txids as txids ' +
+             '  FROM blocks ' +
+             '    WHERE ' +
+             '      height = $1'
     },
     transactions: {
       has: 'SELECT ' +
            '    COUNT(*) ' +
            '  FROM transactions ' +
            '    WHERE ' +
-           '      txid = $1'
+           '      txid = $1',
+
+      unconfirmed: 'SELECT ' +
+                   '    txid as txid ' +
+                   '  FROM transactions ' +
+                   '    WHERE ' +
+                   '      height is null'
     }
   },
   update: {
@@ -91,7 +103,13 @@ module.exports = {
                                '    itxid = NULL ' +
                                '  WHERE ' +
                                '    itxid IS NOT NULL AND' +
-                               '    iheight IS NULL'
+                               '    iheight IS NULL',
+
+      deleteUnconfirmedInputsByTxIds: 'UPDATE history ' +
+                                      '  SET ' +
+                                      '    itxid = NULL ' +
+                                      '  WHERE ' +
+                                      '    itxid = ANY($1)'
     }
   },
   delete: {
@@ -107,7 +125,11 @@ module.exports = {
 
       unconfirmed: 'DELETE FROM transactions ' +
                    '  WHERE ' +
-                   '    height IS NULL'
+                   '    height IS NULL',
+
+      unconfirmedByTxIds: 'DELETE FROM transactions ' +
+                          '  WHERE ' +
+                          '    txid = ANY($1)'
     },
     history: {
       fromHeight: 'DELETE FROM history ' +
@@ -116,7 +138,11 @@ module.exports = {
 
       unconfirmed: 'DELETE FROM history ' +
                    '  WHERE ' +
-                   '    oheight IS NULL'
+                   '    oheight IS NULL',
+
+      unconfirmedByTxIds: 'DELETE FROM history ' +
+                          '  WHERE ' +
+                          '    otxid = ANY($1)'
     }
   }
 }

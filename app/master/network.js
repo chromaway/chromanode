@@ -215,4 +215,12 @@ Network.prototype.sendTx = function (rawtx) {
   return this.bitcoind.sendRawTransactionAsync(rawtx)
 }
 
+/**
+ * @return {Promise<string[]>}
+ */
+Network.prototype.getMempoolTxs = function () {
+  return this.bitcoind.getRawMemPoolAsync()
+    .then(function (ret) { return ret.result })
+}
+
 module.exports = Network

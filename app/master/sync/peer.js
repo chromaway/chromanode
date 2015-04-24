@@ -24,8 +24,8 @@ function PeerSync () {
   Sync.apply(this, arguments)
 
   this._orphanedTx = {
-    depends: {}, // txid -> txid[]
-    depend: {}   // txid -> txid[]
+    prev: {}, // txid -> txid[]
+    next: {}  // txid -> txid[]
   }
 }
 
@@ -173,14 +173,15 @@ PeerSync.prototype._importUnconfirmedTx = function (tx) {
           .then(function (exists) { return {txid: txid, exists: exists} })
       })
     }).then(function (result) {
-      var depends = _.pluck(_.filter(result, 'exists', false), 'txid')
+      var deps = _.pluck(_.filter(result, 'exists', false), 'txid')
       // some input not exists yet, mark as orphaned and delay
-      if (depends.length > 0) {
-        self._orphanedTx.depends[txid] = depends
-        depends.forEach(function (depend) {
-          self._orphanedTx.depend = _.union(self._orphanedTx.depend, [txid])
+      if (deps.length > 0) {
+        self._orphanedTx.prev[txid] = deps
+        deps.forEach(function (dep) {
+          self._orphanedTx.next[dep] = _.union(self._orphanedTx.next[dep], [txid])
         })
-        logger.warning('Found orphan tx: %s', txid)
+        logger.warn('Found orphan tx: %s (deps: %s)',
+                    txid, deps.join(','))
         throw new OrphanTxError()
       }
 
@@ -226,76 +227,148 @@ PeerSync.prototype._importUnconfirmedTx = function (tx) {
 }
 
 /**
+ * @return {Promise}
+ */
+PeerSync.prototype._updateMempool = function () {
+  var self = this
+  return Promise.all([
+    self._network.getMempoolTxs(),
+    self._storage.executeQuery(SQL.select.transactions.unconfirmed)
+  ])
+  .spread(function (nTxIds, mTxIds) {
+    mTxIds = _.pluck(mTxIds.rows, 'txid')
+
+    var toRemove = _.partial(_.without, mTxIds).apply(null, nTxIds)
+    var toAdd = _.partial(_.without, nTxIds).apply(null, mTxIds)
+
+    return Promise.try(function () {
+      if (toRemove.length === 0) {
+        return
+      }
+
+      return self._storage.executeQueries([
+        [SQL.delete.transactions.unconfirmedByTxIds, [toRemove]],
+        [SQL.delete.history.unconfirmedByTxIds, [toRemove]],
+        [SQL.update.deleteUnconfirmedInputsByTxIds, [toRemove]]
+      ], {concurrency: 1})
+    })
+    .then(function () {
+      toAdd.forEach(self._runTxImport.bind(self))
+    })
+  })
+}
+
+/**
+ * @param {string} txid
+ */
+PeerSync.prototype._importDependsFrom = function (txid) {
+  var self = this
+  // check depends tx that mark as orphaned now
+  var orphans = self._orphanedTx.next[txid]
+  if (orphans !== undefined) {
+    delete self._orphanedTx.next[txid]
+    // check every orphaned tx
+    orphans.forEach(function (orphaned) {
+      // all deps resolved?
+      var deps = _.without(self._orphanedTx.prev[orphaned], txid)
+      if (deps.length > 0) {
+        self._orphanedTx.prev[orphaned] = deps
+        return
+      }
+
+      // run import if all ok
+      delete self._orphanedTx.prev[orphaned]
+      timers.setImmediate(self._runTxImport.bind(self), orphaned)
+      logger.warn('Run import for orphaned tx: %s', orphaned)
+    })
+  }
+}
+
+/**
+ * @param {function} fn
+ * @return {Promise}
+ */
+PeerSync.prototype._executor = util.makeConcurrent(function (fn) {
+  return fn()
+}, {concurrency: 1})
+
+/**
+ * @return {Promise}
+ */
+PeerSync.prototype._runBlockImport = util.makeConcurrent(function () {
+  var self = this
+  // get latest from bitcoind
+  return self._network.getLatest()
+    .then(function (newBlockchainLatest) {
+      // set and run import
+      self._blockchainLatest = newBlockchainLatest
+      return self._executor(function () {
+        return self._updateChain()
+          .then(function (updated) {
+            if (updated === false) {
+              return
+            }
+
+            logger.info('New latest! %s:%s',
+                        self._latest.hash, self._latest.height)
+
+            return self._storage.executeQuery(
+              SQL.select.blocks.txids, [self._latest.height]
+            )
+            .then(function (result) {
+              var txids = result.rows[0].txids.toString('hex')
+              for (; txids.length !== 0; txids = txids.slice(32)) {
+                var txid = txids.slice(0, 32)
+                self._importDependsFrom(txid)
+              }
+            })
+            .then(function () {
+              return self._updateMempool()
+            })
+          })
+      })
+    })
+}, {concurrency: 1})
+
+/**
+ * @return {Promise}
+ */
+PeerSync.prototype._runTxImport = function (txid) {
+  var self = this
+  // get tx from bitcoind
+  return self._network.getTx(txid)
+    .then(function (tx) {
+      // ... and run import
+      return self._executor(function () {
+        return self._importUnconfirmedTx(tx)
+      })
+      .then(function (imported) {
+        if (imported === true) {
+          return self._importDependsFrom(txid)
+        }
+      })
+    })
+}
+
+/**
  */
 PeerSync.prototype.run = function () {
   var self = this
-
-  // only one query at one momeny
-  var executor = util.makeConcurrent(function (fn) {
-    return fn()
-  }, {concurrency: 1})
-
-  var runBlockImport = util.makeConcurrent(function () {
-    // get latest from bitcoind
-    return self._network.getLatest()
-      .then(function (newBlockchainLatest) {
-        // .. set ..
-        self._blockchainLatest = newBlockchainLatest
-        // ... and run import
-        return executor(function () {
-          return self._updateChain()
-        })
-      })
-  }, {concurrency: 1})
-
-  var runTxImport = function (txid) {
-    // get tx from bitcoind
-    self._network.getTx(txid)
-      .then(function (tx) {
-        // ... and run import
-        return executor(function () {
-          return self._importUnconfirmedTx(tx)
-        })
-        .then(function (imported) {
-          if (imported === false) {
-            return
-          }
-
-          // check depends tx that mark as orphaned now
-          var txid = tx.hash
-          var orphans = self._orphanedTx.depend[txid]
-          if (orphans !== undefined) {
-            delete self._orphanedTx.depend[txid]
-            // check every orphaned tx
-            orphans.forEach(function (orphaned) {
-              // all deps resolved?
-              var deps = _.without(self._orphanedTx.depends[orphaned], txid)
-              if (deps.length > 0) {
-                self._orphanedTx.depends[orphaned] = deps
-                return
-              }
-
-              // run import if all ok
-              delete self._orphanedTx[orphaned]
-              timers.setImmediate(runTxImport, orphaned)
-            })
-          }
-        })
-      })
-  }
-
   return self._getMyLatest()
     .then(function (latest) {
       self._latest = latest
 
       // block handler
-      self._network.on('block', runBlockImport)
+      self._network.on('block', self._runBlockImport.bind(self))
 
       // tx handler
-      self._network.on('tx', runTxImport)
+      self._network.on('tx', self._runTxImport.bind(self))
 
       // make sure that we have latest block
-      runBlockImport()
+      self._runBlockImport()
+        .then(function () {
+          return self._executor(self._updateMempool.bind(self))
+        })
     })
 }
 

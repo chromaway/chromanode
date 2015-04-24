@@ -78,14 +78,20 @@ Slaves.prototype.broadcastTx = function (txid, blockHash, blockHeight, opts) {
 /**
  * @param {string} address
  * @param {string} txid
+ * @param {string} blockHash
+ * @param {string} blockHeight
  * @param {Object} [opts]
  * @param {pg.Client} [opts.client]
  * @return {Promise}
  */
-// add blockHash, blockHeight ?
-Slaves.prototype.broadcastAddressTx = function (address, txid, opts) {
-  var payload = JSON.stringify({address: address, txid: txid})
-  return this._storage.notify('broadcastaddresstx', payload, opts)
+Slaves.prototype.broadcastAddress = function (address, txid, blockHash, blockHeight, opts) {
+  var payload = JSON.stringify({
+    address: address,
+    txid: txid,
+    blockHash: blockHash,
+    blockHeight: blockHeight
+  })
+  return this._storage.notify('broadcastaddress', payload, opts)
 }
 
 /**
