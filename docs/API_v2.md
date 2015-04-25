@@ -284,33 +284,33 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
 ## Notifications:
 
-  * [new-block](#new-block)
-  * [new-transaction](#new-transaction)
+  * [block](#block)
+  * [transaction](#transaction)
   * [address](#address)
   * [status](#status)
 
-### new-block
+### block
 
 ```js
     var io = require('socket.io-client')
     var socket = io('http://localhost:3001')
     socket.on('connect', function () {
-      socket.emit('subscribe', {type: 'new-block'})
+      socket.emit('subscribe', {type: 'block'})
     })
-    socket.on('new-block', function (hash, height) {
+    socket.on('block', function (hash, height) {
       console.log('New block ' + hash + '! (height: ' + height + ')')
     })
 ```
 
-### new-transaction
+### transaction
 
 ```js
     var io = require('socket.io-client')
     var socket = io('http://localhost:3001')
     socket.on('connect', function () {
-      socket.emit('subscribe', {type: 'new-transaction'})
+      socket.emit('subscribe', {type: 'transaction'})
     })
-    socket.on('new-transaction', function (txid) {
+    socket.on('transaction', function (txid) {
       console.log('New tx:', txid)
     })
 ```
