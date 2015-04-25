@@ -23,7 +23,7 @@ inherits(Slaves, EventEmitter)
  */
 Slaves.prototype.init = function () {
   var self = this
-  return self._storage.listen('sendTx', function (payload) {
+  return self._storage.listen('sendtx', function (payload) {
     payload = JSON.parse(payload)
     self.emit('sendTx', payload.id, payload.rawtx)
   })
@@ -78,8 +78,8 @@ Slaves.prototype.broadcastTx = function (txid, blockHash, blockHeight, opts) {
 /**
  * @param {string} address
  * @param {string} txid
- * @param {string} blockHash
- * @param {string} blockHeight
+ * @param {?string} blockHash
+ * @param {?string} blockHeight
  * @param {Object} [opts]
  * @param {pg.Client} [opts.client]
  * @return {Promise}

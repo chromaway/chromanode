@@ -7,7 +7,6 @@ var bitcore = require('bitcore')
 var Promise = require('bluebird')
 
 var config = require('../../../lib/config')
-var errors = require('../../../lib/errors')
 var logger = require('../../../lib/logger').logger
 var util = require('../../../lib/util')
 var SQL = require('./sql')
@@ -106,6 +105,14 @@ Sync.prototype._safeGetAddresses = function (output, txid, index) {
 }
 
 /**
+ * @param {number} to
+ * @param {pg.Client} client
+ * @return {Promise}
+ */
+Sync.prototype._reorgTo = function (to, client) {
+}
+
+/**
  * @return {Promise<boolean>}
  */
 Sync.prototype._updateChain = function () {
@@ -117,42 +124,46 @@ Sync.prototype._updateChain = function () {
   var stopwatch
   var latest = _.clone(self._latest)
   return self._storage.executeTransaction(function (client) {
-    return Promise.try(function () {
-      if (latest.height < self._blockchainLatest.height) {
-        return
+    return new Promise(function (resolve, reject) {
+      function tryGetBlock () {
+        return self._getBlock(latest.height + 1)
+          .then(function (block) {
+            if (latest.height < self._blockchainLatest.height &&
+                latest.hash === util.encode(block.header.prevHash)) {
+              return resolve(block)
+            }
+
+            // reorg found
+            if (self._blockCache !== undefined) {
+              self._blockCache.reset()
+            }
+
+            var to = Math.min(latest.height - 1,
+                              self._blockchainLatest.height - 1)
+            var opts = {client: client, concurrency: 1}
+
+            stopwatch = util.stopwatch.start()
+            return self._storage.executeQueries([
+              [SQL.delete.blocks.fromHeight, [to]],
+              [SQL.delete.transactions.fromHeight, [to]],
+              [SQL.delete.history.fromHeight, [to]],
+              [SQL.update.history.deleteInputsFromHeight, [to]]
+            ], opts)
+            .then(function () {
+              logger.warn('Reorg finished (back to %d), elapsed time: %s',
+                             to, stopwatch.formattedValue())
+              return self._getMyLatest({client: client})
+            })
+            .then(function (newLatest) {
+              latest = newLatest
+            })
+            .then(tryGetBlock, reject)
+          })
       }
 
-      // reorg found
-      self._blockCache.reset()
-      var to = self._blockchainLatest.height - 1
-      var opts = {client: client, concurrency: 1}
-
-      stopwatch = util.stopwatch.start()
-      return self._storage.executeQueries([
-        [SQL.delete.blocks.fromHeight, [to]],
-        [SQL.delete.transactions.fromHeight, [to]],
-        [SQL.delete.history.fromHeight, [to]],
-        [SQL.update.history.deleteInputsFromHeight, [to]]
-      ], opts)
-      .then(function () {
-        logger.verbose('Reorg finished, elapsed time: %s',
-                       stopwatch.formattedValue())
-
-        return self._getMyLatest({client: client})
-      })
-      .then(function (newLatest) {
-        latest = newLatest
-      })
-    })
-    .then(function () {
-      return self._getBlock(latest.height + 1)
+      tryGetBlock()
     })
     .then(function (block) {
-      // check hashPrevBlock
-      if (latest.hash !== util.encode(block.header.prevHash)) {
-        throw new errors.Master.InvalidHashPrevBlock(latest.hash, block.hash)
-      }
-
       stopwatch = util.stopwatch.start()
       return self._importBlock(block, latest.height + 1, client)
     })
@@ -178,6 +189,7 @@ Sync.prototype._updateChain = function () {
 /**
  * @param {Objects} [opts]
  * @param {pg.Client} [opts.client]
+ * @return {Promise<{hash: string, height: number}>}
  */
 Sync.prototype._getMyLatest = function (opts) {
   var self = this
