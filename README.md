@@ -42,11 +42,12 @@ To get current version of chromanode make request to `/version`
 
 ## Other open source blockchain apis
 
-  * [insight-api](https://github.com/bitpay/insight-api)
+  * [bitcoin-abe](https://github.com/bitcoin-abe/bitcoin-abe)
   * [bitcore-node](https://github.com/bitpay/bitcore-node)
-  * [toshi](https://github.com/coinbase/toshi)
   * [electrum-server](https://github.com/spesmilo/electrum-server)
+  * [insight-api](https://github.com/bitpay/insight-api)
   * [MyChain](https://github.com/thofmann/mychain)
+  * [toshi](https://github.com/coinbase/toshi)
 
 ## License
 
