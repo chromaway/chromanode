@@ -157,8 +157,9 @@ Sync.prototype._updateChain = function () {
             .then(function (newLatest) {
               latest = newLatest
             })
-            .then(tryGetBlock, reject)
+            .then(tryGetBlock)
           })
+          .catch(reject)
       }
 
       tryGetBlock()
