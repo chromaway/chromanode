@@ -16,7 +16,7 @@ module.exports.run = function () {
   return Promise.try(function () {
     var storage = new Storage()
     var master = new Master(storage)
-    var socket = new SocketIO()
+    var socket = new SocketIO(master)
 
     return Promise.all([
       storage.init()
@@ -28,26 +28,10 @@ module.exports.run = function () {
     })
     .then(function () {
       var expressApp = express()
-      http.setupExpress(expressApp)
-
       var server = http.createServer(expressApp)
+
+      http.setupExpress(expressApp)
       socket.attach(server)
-
-      master.on('block', function (hash, height) {
-        socket.broadcastBlock(hash, height)
-      })
-
-      master.on('tx', function (txid, blockHash, blockHeight) {
-        socket.broadcastTx(txid, blockHash, blockHeight)
-      })
-
-      master.on('address', function (address, txid, blockHash, blockHeight) {
-        socket.broadcastAddress(address, txid, blockHash, blockHeight)
-      })
-
-      master.on('status', function (status) {
-        socket.broadcastStatus(status)
-      })
 
       return server.listen(port)
     })

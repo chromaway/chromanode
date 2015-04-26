@@ -1,5 +1,6 @@
 /* globals Promise:true */
 
+var _ = require('lodash')
 var bitcore = require('bitcore')
 var Promise = require('bluebird')
 
@@ -10,23 +11,26 @@ var errors = require('../../lib/errors')
 
 /**
  * @event Master#block
- * @param {string} hash
- * @param {number} height
+ * @param {Object} payload
+ * @param {string} payload.hash
+ * @param {number} payload.height
  */
 
 /**
  * @event Master#tx
- * @param {string} txid
- * @param {?string} blockHash
- * @param {?string} blockHeight
+ * @param {Object} payload
+ * @param {string} payload.txid
+ * @param {?string} payload.blockHash
+ * @param {?string} payload.blockHeight
  */
 
 /**
  * @event Master#address
- * @param {string} address
- * @param {string} txid
- * @param {?string} blockHash
- * @param {?string} blockHeight
+ * @param {Object} payload
+ * @param {string} payload.address
+ * @param {string} payload.txid
+ * @param {?string} payload.blockHash
+ * @param {?string} payload.blockHeight
  */
 
 /**
@@ -39,9 +43,21 @@ var errors = require('../../lib/errors')
  * @param {Storage} storage
  */
 function Master (storage) {
-  EventEmitter.call(this)
-  this._storage = storage
-  this._sendTxDeferreds = {}
+  var self = this
+  EventEmitter.call(self)
+
+  self._storage = storage
+  self._sendTxDeferreds = {}
+
+  self._lastStatus = new Promise(function (resolve) {
+    self.on('status', function (status) {
+      if (self._lastStatus.isPending()) {
+        return resolve(status)
+      }
+
+      self._lastStatus = Promise.resolve(status)
+    })
+  })
 }
 
 inherits(Master, EventEmitter)
@@ -58,48 +74,30 @@ Master.prototype.init = function () {
    * @return {Promise}
    */
   function listen (channel, handler) {
-    handler = self[handler].bind(self)
+    if (_.isString(handler)) {
+      var event = handler
+      handler = function (payload) { self.emit(event, payload) }
+    }
+
     return this._storage.listen(channel, function (payload) {
       handler(JSON.parse(payload))
     })
   }
 
   return Promise.all([
-    listen('broadcastblock', '_onBroadcastBlock'),
-    listen('broadcasttx', '_onBroadcastTx'),
-    listen('broadcastaddress', '_onBroadcastAddress'),
-    listen('broadcaststatus', '_onBroadcastStatus'),
-    listen('sendtxresponse', '_onSendTxResponse')
+    listen('broadcastblock', 'block'),
+    listen('broadcasttx', 'tx'),
+    listen('broadcastaddress', 'address'),
+    listen('broadcaststatus', 'status'),
+    listen('sendtxresponse', self._onSendTxResponse.bind(self))
   ])
 }
 
 /**
- * @param {Object} payload
+ * @return {Promise<Object>}
  */
-Master.prototype._onBroadcastBlock = function (payload) {
-  this.emit('block', payload.hash, payload.height)
-}
-
-/**
- * @param {Object} payload
- */
-Master.prototype._onBroadcastTx = function (payload) {
-  this.emit('tx', payload.txid, payload.blockHash, payload.blockHeight)
-}
-
-/**
- * @param {Object} payload
- */
-Master.prototype._onBroadcastAddress = function (payload) {
-  this.emit('address',
-    payload.address, payload.txid, payload.blockHash, payload.blockHeight)
-}
-
-/**
- * @param {Object} payload
- */
-Master.prototype._onBroadcastStatus = function (payload) {
-  this.emit('status', payload)
+Master.prototype.getStatus = function () {
+  return this._lastStatus
 }
 
 /**

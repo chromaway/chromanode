@@ -6,81 +6,102 @@ var logger = require('../../../lib/logger').logger
 
 /**
  * @class SocketIO
+ * @param {Master} master
  */
-function SocketIO () {
-  this.ios = null
+function SocketIO (master) {
+  var self = this
+  self._ios = null
+
+  master.on('block', function (payload) {
+    self._ios.sockets.in('new-block').emit('new-block', payload)
+  })
+
+  master.on('tx', function (payload) {
+    self._ios.sockets.in('new-tx').emit('new-tx', payload)
+    self._ios.sockets.in('tx-' + payload.txid).emit('tx', payload)
+  })
+
+  master.on('address', function (payload) {
+    self._ios.sockets.in('address-' + payload.address).emit('address', payload)
+  })
+
+  master.on('status', function (payload) {
+    self._ios.sockets.in('status').emit('status', payload)
+  })
 }
 
 /**
  */
 SocketIO.prototype.attach = function (server) {
-  this.ios = io(server, {serveClient: false})
-  this.ios.sockets.on('connection', function (socket) {
+  var self = this
+  self._ios = io(server, {serveClient: false})
+  self._ios.sockets.on('connection', function (socket) {
     logger.verbose('New connection from %s', socket.id)
-
-    socket.on('subscribe', function (opts) {
-      Promise.try(function () {
-        var room = opts.type
-
-        // type check
-        if (['block', 'tx', 'address', 'status'].indexOf(opts.type) === -1) {
-          throw new Error('wrong type')
-        }
-
-        // address check
-        if (opts.type === 'address') {
-          Address.fromString(opts.address, config.get('chromanode.network'))
-          room += opts.address
-        }
-
-        socket.join(room)
-      })
-      .catch(function (err) {
-        return err.message
-      })
-      .then(function (err) {
-        socket.emit('subscribe', opts, err || null)
-      })
-    })
 
     socket.on('disconnect', function () {
       logger.verbose('disconnected %s', socket.id)
     })
+
+    /**
+     * @param {string} event
+     * @param {string} handler
+     */
+    function createRoomHandler (event, handler) {
+      handler = Promise.promisify(socket[handler].bind(socket))
+
+      socket.on(event, function (opts) {
+        self._getRoom(opts)
+          .then(function (room) {
+            return handler(room)
+          })
+          .catch(function (err) {
+            return err.message || err
+          })
+          .then(function (err) {
+            socket.emit(event, opts, err || null)
+          })
+      })
+    }
+
+    createRoomHandler('subscribe', 'join')
+    createRoomHandler('unsubscribe', 'leave')
   })
 }
 
 /**
- * @param {string} hash
- * @param {number} height
+ * @param {Object} opts
+ * @return {Promise<string>}
  */
-SocketIO.prototype.broadcastBlock = function (hash, height) {
-  this.ios.sockets.in('block').emit('block', hash, height)
-}
+SocketIO.prototype._getRoom = function (opts) {
+  return Promise.try(function () {
+    var room = opts.type
 
-/**
- * @param {string} txid
- * @param {?string} blockHash
- * @param {?string} blockHeight
- */
-SocketIO.prototype.broadcastTx = function (txid, blockHash, blockHeight) {
-  this.ios.sockets.in('new-tx').emit('new-tx', txid)
-}
+    // type check
+    var rooms = ['new-block', 'new-tx', 'tx', 'address', 'status']
+    if (rooms.indexOf(opts.room) === -1) {
+      throw new Error('wrong type')
+    }
 
-/**
- * @param {string} address
- * @param {string} txid
- * @param {?string} blockHash
- * @param {?string} blockHeight
- */
-SocketIO.prototype.broadcastAddressTouched = function (address, txid, blockHash, blockHeight) {
-  this.ios.sockets.in(address).emit(address, txid)
-}
+    // tx check
+    if (room === 'tx') {
+      if (/^[0-9a-fA-F]{64}$/.test(opts.txid)) {
+        throw new Error('Wrong txid')
+      }
 
-/**
- * @param {Object} status
- */
-SocketIO.prototype.broadcastStatus = function (status) {
-  this.ios.sockets.in('status').emit('status', status)
+      room = 'tx-' + opts.txid
+    }
+
+    // address check
+    if (room === 'address') {
+      try {
+        Address.fromString(opts.address, config.get('chromanode.network'))
+      } catch (err) {
+        throw new Error('Wrong address (' + err.message + ')')
+      }
+
+      room = 'address-' + opts.address
+    }
+  })
 }
 
 module.exports = SocketIO
