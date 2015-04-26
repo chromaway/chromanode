@@ -2,7 +2,6 @@
 
 var Promise = require('bluebird')
 
-var db = require('../../db').default()
 var qutil = require('../util/query')
 
 module.exports.query = function (req, res) {

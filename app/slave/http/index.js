@@ -65,11 +65,17 @@ module.exports.createServer = function (expressApp) {
   return Promise.promisifyAll(server)
 }
 
-module.exports.setupExpress = function (app) {
+module.exports.setup = function (app, storage, master) {
   // app.set('showStackError', true)
   app.set('etag', false)
 
   app.enable('jsonp callback')
+
+  app.all('*', function (req, res, next) {
+    req.storage = storage
+    req.master = master
+    next()
+  })
 
   app.use(cors())
   app.use(compression())

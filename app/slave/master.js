@@ -79,7 +79,7 @@ Master.prototype.init = function () {
       handler = function (payload) { self.emit(event, payload) }
     }
 
-    return this._storage.listen(channel, function (payload) {
+    return self._storage.listen(channel, function (payload) {
       handler(JSON.parse(payload))
     })
   }

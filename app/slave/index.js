@@ -1,4 +1,7 @@
+/* globals Promise:true */
+
 var express = require('express')
+var Promise = require('bluebird')
 
 var config = require('../../lib/config')
 var logger = require('../../lib/logger').logger
@@ -30,7 +33,7 @@ module.exports.run = function () {
       var expressApp = express()
       var server = http.createServer(expressApp)
 
-      http.setupExpress(expressApp)
+      http.setup(expressApp, storage, master)
       socket.attach(server)
 
       return server.listen(port)

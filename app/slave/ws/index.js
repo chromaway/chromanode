@@ -1,7 +1,10 @@
+/* globals Promise:true */
+
 var io = require('socket.io')
 var Address = require('bitcore').Address
+var Promise = require('bluebird')
 
-var config = require('../../lib/config')
+var config = require('../../../lib/config')
 var logger = require('../../../lib/logger').logger
 
 /**
