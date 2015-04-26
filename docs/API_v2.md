@@ -93,7 +93,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
     /v2/headers/query?from=00000000f872dcf...cb828d3c561e9012&count=1
 
     // get first chunk (count omitted, because query return maximum 2016 headers)
-    /v2/headers/query?from=0
+    /v2/headers/query?
 
   **result**
 

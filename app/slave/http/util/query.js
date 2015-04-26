@@ -8,6 +8,7 @@ var isHexa = bitcore.util.js.isHexa
 
 var config = require('../../../../lib/config')
 var errors = require('../../../../lib/errors')
+var SQL = require('../../sql')
 
 /**
  * @param {string} name
@@ -21,7 +22,7 @@ function createTransformFromTo (name) {
 
     var num = parseInt(val, 10)
     if (!_.isNaN(num) && val.length < 7) {
-      if (num >= 0 && num < 1000000) {
+      if (num >= 0 && num < 1e7) {
         return num
       }
 
@@ -74,7 +75,7 @@ module.exports.transformCount = function (val) {
  * @throws {errors.Slave}
  */
 module.exports.transformAddresses = function (val) {
-  if (val === undefined) {
+  if (!!val || val.indexOf === undefined) {
     throw new errors.Slave.InvalidAddresses()
   }
 
@@ -129,4 +130,24 @@ module.exports.transformTxId = function (val) {
   }
 
   throw new errors.Slave.InvalidTxId()
+}
+
+/**
+ * @param {pg.Client} client
+ * @param {(string|number)} point hash or height
+ * @return {Promise<?number>}
+ */
+module.exports.getHeightForPoint = function (client, point) {
+  var args = _.isNumber(point)
+               ? [SQL.select.blocks.heightByHeight, [point]]
+               : [SQL.select.blocks.heightByHash, ['\\x' + point]]
+
+  return client.queryAsync.apply(client, args)
+    .then(function (result) {
+      if (result.rowCount === 0) {
+        return null
+      }
+
+      return result.rows[0].height
+    })
 }
