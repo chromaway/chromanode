@@ -218,7 +218,7 @@ DB.prototype.addressesQuery = function (query) {
                      : self._getHeightForPoint(client, query.from)
         var to = query.to === undefined
                    ? latest.height
-                   : self._getHeightForPoint(client, query.from)
+                   : self._getHeightForPoint(client, query.to)
 
         return Promise.all([latest, from, to])
       })
