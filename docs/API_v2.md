@@ -284,34 +284,61 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
 ## Notifications:
 
-  * [block](#block)
-  * [transaction](#transaction)
+  * [new-block](#new-block)
+  * [new-tx](#new-tx)
+  * [tx](#tx)
   * [address](#address)
   * [status](#status)
 
-### block
+### new-block
 
 ```js
     var io = require('socket.io-client')
     var socket = io('http://localhost:3001')
     socket.on('connect', function () {
-      socket.emit('subscribe', {type: 'block'})
+      socket.emit('subscribe', {type: 'new-block'})
     })
-    socket.on('block', function (hash, height) {
-      console.log('New block ' + hash + '! (height: ' + height + ')')
+    socket.on('new-block', function (payload) {
+      console.log(
+        'New block ' + payload.hash + '! (height: ' + payload.height + ')')
     })
 ```
 
-### transaction
+### new-tx
 
 ```js
     var io = require('socket.io-client')
     var socket = io('http://localhost:3001')
     socket.on('connect', function () {
-      socket.emit('subscribe', {type: 'transaction'})
+      socket.emit('subscribe', {type: 'new-tx'})
     })
-    socket.on('transaction', function (txid) {
-      console.log('New tx:', txid)
+    socket.on('new-tx', function (payload) {
+      console.log('New tx:', payload.txid)
+    })
+```
+
+### tx
+
+```js
+    var tx = new require('bitcore').Transaction()
+      .from(...)
+      .to(...)
+      .change(...)
+      .sign(...)
+
+    var io = require('socket.io-client')
+    var socket = io('http://localhost:3001')
+    socket.on('connect', function () {
+      socket.emit('subscribe', {type: 'tx', txid: tx.hash})
+      blockchain.propagate(tx.toString()) // broadcast tx ...
+    })
+    socket.on('tx', function (payload) {
+      if (payload.txid !== tx.hash || payload.blockHash === null) {
+        return
+      }
+
+      console.log('Tx included in block ', payload.blockHeight)
+      socket.emit('unsubscribe', {type: 'tx', txid: tx.hash})
     })
 ```
 
@@ -326,8 +353,8 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
         address: 'mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2'
       })
     })
-    socket.on('address', function (address, txid) {
-      console.log('New affected tx:', txid)
+    socket.on('address', function (payload) {
+      console.log('New affected tx:', payload.txid)
     })
 ```
 
