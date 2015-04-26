@@ -10,7 +10,7 @@ var config = require('../../../lib/config')
 var logger = require('../../../lib/logger').logger
 var util = require('../../../lib/util')
 var Sync = require('./sync')
-var SQL = require('./sql')
+var SQL = require('../sql')
 
 /**
  * @class HistorySync

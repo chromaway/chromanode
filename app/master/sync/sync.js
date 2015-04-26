@@ -9,7 +9,7 @@ var Promise = require('bluebird')
 var config = require('../../../lib/config')
 var logger = require('../../../lib/logger').logger
 var util = require('../../../lib/util')
-var SQL = require('./sql')
+var SQL = require('../sql')
 
 var Address = bitcore.Address
 var Hash = bitcore.crypto.Hash

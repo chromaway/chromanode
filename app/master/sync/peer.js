@@ -8,7 +8,7 @@ var Promise = require('bluebird')
 var logger = require('../../../lib/logger').logger
 var util = require('../../../lib/util')
 var Sync = require('./sync')
-var SQL = require('./sql')
+var SQL = require('../sql')
 
 // fake errors
 function TransactionsAlreadyExists () {}
@@ -310,10 +310,11 @@ PeerSync.prototype._updateMempool = function () {
         return
       }
 
+      var params = [self._storage.arr2any(toRemove)]
       return self._storage.executeQueries([
-        [SQL.delete.transactions.unconfirmedByTxIds, [toRemove]],
-        [SQL.delete.history.unconfirmedByTxIds, [toRemove]],
-        [SQL.update.history.deleteUnconfirmedInputsByTxIds, [toRemove]]
+        [SQL.delete.transactions.unconfirmedByTxIds, params],
+        [SQL.delete.history.unconfirmedByTxIds, params],
+        [SQL.update.history.deleteUnconfirmedInputsByTxIds, params]
       ], {concurrency: 1})
     })
     .then(function () {
@@ -375,6 +376,8 @@ PeerSync.prototype._runBlockImport = util.makeConcurrent(function () {
 
             logger.info('New latest! %s:%s',
                         self._latest.hash, self._latest.height)
+
+            self.emit('latest', self._latest)
 
             return self._storage.executeQuery(
               SQL.select.blocks.txids, [self._latest.height]
