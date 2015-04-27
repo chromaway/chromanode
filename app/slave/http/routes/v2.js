@@ -9,19 +9,19 @@ module.exports.createRouter = function () {
   var router = express.Router()
 
   // node routes
-  router.get('/status', node.status)
+  router.get('/status', node.v2.status)
 
   // header routes
-  router.get('/headers/latest', headers.latest)
-  router.get('/headers/query', headers.query)
+  router.get('/headers/latest', headers.v2.latest)
+  router.get('/headers/query', headers.v2.query)
 
   // transaction routes
-  router.get('/transactions/raw', transactions.raw)
-  router.get('/transactions/merkle', transactions.merkle)
-  router.post('/transactions/send', transactions.send)
+  router.get('/transactions/raw', transactions.v2.raw)
+  router.get('/transactions/merkle', transactions.v2.merkle)
+  router.post('/transactions/send', transactions.v2.send)
 
   // address routes
-  router.get('/addresses/query', addresses.query)
+  router.get('/addresses/query', addresses.v2.query)
 
   return router
 }

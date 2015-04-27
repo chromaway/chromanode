@@ -7,8 +7,8 @@ var errors = require('../../../../lib/errors')
 var SQL = require('../../sql')
 var qutil = require('../util/query')
 
-module.exports.query = function (req, res) {
-  var result = Promise.try(function () {
+function query (req) {
+  return Promise.try(function () {
     var query = {
       addresses: qutil.transformAddresses(unescape(req.query.addresses)),
       source: qutil.transformSource(req.query.source),
@@ -51,65 +51,85 @@ module.exports.query = function (req, res) {
             client.queryAsync(sql, [query.addresses])
           ])
         })
-        .spread(function (latest, from, to, results) {
-          var value = []
+    })
+    .spread(function (latest, from, to, results) {
+      var value = []
 
-          if (query.status === 'unspent') {
-            value = results.rows.map(function (row) {
-              return {
-                txid: row.otxid.toString('hex'),
-                vount: row.oindex,
-                value: row.ovalue,
-                script: row.oscript.toString('hex'),
-                height: row.oheight
-              }
+      if (query.status === 'unspent') {
+        value = results.rows.map(function (row) {
+          return {
+            txid: row.otxid.toString('hex'),
+            vount: row.oindex,
+            value: row.ovalue,
+            script: row.oscript.toString('hex'),
+            height: row.oheight
+          }
+        })
+      } else {
+        value = _.flatten(results.rows.map(function (row) {
+          var items = [{
+            txid: row.otxid.toString('hex'),
+            height: row.oheight
+          }]
+
+          if (row.itxid !== null) {
+            items.push({
+              txid: row.itxid.toString('hex'),
+              height: row.iheight
             })
-          } else {
-            value = _.flatten(results.rows.map(function (row) {
-              var items = [{
-                txid: row.otxid.toString('hex'),
-                height: row.oheight
-              }]
-
-              if (row.itxid !== null) {
-                items.push({
-                  txid: row.itxid.toString('hex'),
-                  height: row.iheight
-                })
-              }
-
-              return items
-            }))
           }
 
-          value = _.sortBy(value.filter(function (item) {
-            if (!(item.height > from && item.height <= to)) {
-              return false
-            }
+          return items
+        }))
+      }
 
-            if (query.source === 'blocks' && item.height === null) {
-              return false
-            }
+      value = _.sortBy(value.filter(function (item) {
+        if (!(item.height > from && item.height <= to)) {
+          return false
+        }
 
-            if (query.source === 'mempool' && item.height !== null) {
-              return false
-            }
+        if (query.source === 'blocks' && item.height === null) {
+          return false
+        }
 
-            return true
-          }), 'height')
+        if (query.source === 'mempool' && item.height !== null) {
+          return false
+        }
 
-          var ret = query.status === 'unspent'
-                      ? {unspent: value}
-                      : {transactions: value}
-          return _.extend(ret, {
-            latest: {
-              height: latest.height,
-              hash: latest.hash.toString('hex')
-            }
-          })
-        })
+        return true
+      }), 'height')
+
+      var ret = query.status === 'unspent'
+                  ? {unspent: value}
+                  : {transactions: value}
+      return _.extend(ret, {
+        latest: {
+          height: latest.height,
+          hash: latest.hash.toString('hex')
+        }
+      })
     })
   })
+}
 
-  res.promise(result)
+module.exports.v1 = {}
+module.exports.v1.query = function (req, res) {
+  var promise = query(req)
+    .then(function (result) {
+      if (result.transactions === undefined) {
+        result.transactions = result.unspent.map(function (item) {
+          return {txid: item.txid, height: item.height}
+        })
+        delete result.unspent
+      }
+
+      return result
+    })
+
+  res.promise(promise)
+}
+
+module.exports.v2 = {}
+module.exports.v2.query = function (req, res) {
+  res.promise(query(req))
 }

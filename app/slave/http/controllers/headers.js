@@ -7,8 +7,11 @@ var errors = require('../../../../lib/errors')
 var SQL = require('../../sql')
 var qutil = require('../util/query')
 
-module.exports.latest = function (req, res) {
-  var promise = req.storage.executeQuery(SQL.select.blocks.latest)
+module.exports.v1 = {}
+module.exports.v2 = {}
+
+function latest (req) {
+  return req.storage.executeQuery(SQL.select.blocks.latest)
     .then(function (result) {
       var row = result.rows[0]
       return {
@@ -17,11 +20,24 @@ module.exports.latest = function (req, res) {
         header: row.header.toString('hex')
       }
     })
+}
+
+module.exports.v1.latest = function (req, res) {
+  var promise = latest(req)
+    .then(function (result) {
+      result.blockid = result.hash
+      delete result.hash
+      return result
+    })
 
   res.promise(promise)
 }
 
-module.exports.query = function (req, res) {
+module.exports.v2.latest = function (req, res) {
+  res.promise(latest(req))
+}
+
+function query (req, res, shift) {
   var result = Promise.try(function () {
     var query = {
       from: qutil.transformFrom(req.query.from),
@@ -61,9 +77,10 @@ module.exports.query = function (req, res) {
           throw new errors.Slave.InvalidRequestedCount()
         }
 
+        var params = [from + shift, to + shift]
         return Promise.all([
           from,
-          client.queryAsync(SQL.select.blocks.headers, [from, to])
+          client.queryAsync(SQL.select.blocks.headers, params)
         ])
       })
       .spread(function (from, result) {
@@ -80,3 +97,6 @@ module.exports.query = function (req, res) {
 
   res.promise(result)
 }
+
+module.exports.v1.query = function (req, res) { query(req, res, -1) }
+module.exports.v2.query = function (req, res) { query(req, res, 0) }

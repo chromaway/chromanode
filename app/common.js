@@ -24,7 +24,7 @@ module.exports.run = function (init) {
   // logging unhadled errors
   var logger = require('../lib/logger').logger
   Promise.onPossiblyUnhandledRejection(function (err) {
-    logger.error('Unhandled error: %s', err)
+    logger.error('Unhandled error: %s', err.stack || err)
   })
 
   // check network

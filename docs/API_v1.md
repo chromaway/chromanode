@@ -30,7 +30,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
     {
       "height": 329741,
-      "hash": "00000000f872dcf2242fdf93ecfe8da1ba02304ea6c05b56cb828d3c561e9012",
+      "blockid": "00000000f872dcf2242fdf93ecfe8da1ba02304ea6c05b56cb828d3c561e9012",
       "header": "02000000f71f5d49b11756cbf9c2b9b53d...1d0047ed74" // 80 bytes
     }
 

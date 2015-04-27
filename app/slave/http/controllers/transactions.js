@@ -10,7 +10,10 @@ var util = require('../../../../lib/util')
 var SQL = require('../../sql')
 var qutil = require('../util/query')
 
-module.exports.raw = function (req, res) {
+var v1 = module.exports.v1 = {}
+var v2 = module.exports.v2 = {}
+
+v1.raw = v2.raw = function (req, res) {
   var result = Promise.try(function () {
     var txid = '\\x' + qutil.transformTxId(req.query.txid)
     return req.storage.executeQuery(SQL.select.transactions.byTxId, [txid])
@@ -26,7 +29,7 @@ module.exports.raw = function (req, res) {
   res.promise(result)
 }
 
-module.exports.merkle = function (req, res) {
+v1.merkle = v2.merkle = function (req, res) {
   var result = Promise.try(function () {
     var txid = qutil.transformTxId(req.query.txid)
     return req.storage.executeTransaction(function (client) {
@@ -91,6 +94,6 @@ module.exports.merkle = function (req, res) {
   res.promise(result)
 }
 
-module.exports.send = function (req, res) {
+v1.send = v2.send = function (req, res) {
   res.promise(req.master.sendTx(req.body.rawtx))
 }
