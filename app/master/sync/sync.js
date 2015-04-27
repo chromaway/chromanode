@@ -105,14 +105,6 @@ Sync.prototype._safeGetAddresses = function (output, txid, index) {
 }
 
 /**
- * @param {number} to
- * @param {pg.Client} client
- * @return {Promise}
- */
-Sync.prototype._reorgTo = function (to, client) {
-}
-
-/**
  * @return {Promise<boolean>}
  */
 Sync.prototype._updateChain = function () {

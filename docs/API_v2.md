@@ -217,7 +217,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 | source    | blocks or mempool, may be omitted (both will be used) |
 | from      | hash or height, may be omitted                        |
 | to        | hash or height, may be omitted                        |
-| status    | now only unspent available, may be omitted            |
+| status    | transactions or unspent, may be omitted               |
 
     // get all affected transactions for addresses (from blocks and mempool)
     /v2/addresses/query?addresses=mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2,msGccLNBLYWBg9U1J2RVribprvsEF3uYGK
@@ -253,7 +253,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
     // status is unspent
     {
-      "transactions": [{
+      "unspent": [{
         "txid", "a9566f182b27355b4a7470d7fd77809ba0a5a3d19831e271516fe38584c33dee",
         "vout": 0,
         "value": 5000000000,

@@ -32,7 +32,8 @@ module.exports = {
                '    header as header ' +
                '  FROM blocks ' +
                '    WHERE ' +
-               '      height > $1 AND height <= $2 ' +
+               '      height > $1 AND ' +
+               '      height <= $2 ' +
                '    ORDER BY ' +
                '      height ASC'
     },
@@ -43,6 +44,27 @@ module.exports = {
               '  FROM transactions ' +
               '    WHERE ' +
               '      txid = $1'
+    },
+    history: {
+      transactions: 'SELECT ' +
+                    '    otxid as otxid, ' +
+                    '    oheight as oheight, ' +
+                    '    itxid as itxid, ' +
+                    '    iheight as iheight ' +
+                    '  FROM history ' +
+                    '    WHERE ' +
+                    '      address = ANY($1) ',
+
+      unspent: 'SELECT ' +
+               '    otxid as otxid, ' +
+               '    oindex as oindex, ' +
+               '    ovalue as ovalue, ' +
+               '    oscript as oscript, ' +
+               '    oheight as oheight ' +
+               '  FROM history ' +
+               '    WHERE ' +
+               '      address = ANY($1) AND ' +
+               '      itxid IS NULL'
     }
   }
 }

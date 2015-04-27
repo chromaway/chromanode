@@ -310,11 +310,11 @@ PeerSync.prototype._updateMempool = function () {
         return
       }
 
-      var params = [self._storage.arr2any(toRemove)]
+      toRemove = toRemove.map(function (txid) { return '\\x' + txid })
       return self._storage.executeQueries([
-        [SQL.delete.transactions.unconfirmedByTxIds, params],
-        [SQL.delete.history.unconfirmedByTxIds, params],
-        [SQL.update.history.deleteUnconfirmedInputsByTxIds, params]
+        [SQL.delete.transactions.unconfirmedByTxIds, [toRemove]],
+        [SQL.delete.history.unconfirmedByTxIds, [toRemove]],
+        [SQL.update.history.deleteUnconfirmedInputsByTxIds, [toRemove]]
       ], {concurrency: 1})
     })
     .then(function () {

@@ -46,7 +46,7 @@ To get current version of chromanode make request to `/version`
   * [bitcore-node](https://github.com/bitpay/bitcore-node)
   * [electrum-server](https://github.com/spesmilo/electrum-server)
   * [insight-api](https://github.com/bitpay/insight-api)
-  * [MyChain](https://github.com/thofmann/mychain)
+  * [mychain](https://github.com/thofmann/mychain)
   * [toshi](https://github.com/coinbase/toshi)
 
 ## License

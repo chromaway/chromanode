@@ -75,7 +75,7 @@ module.exports.transformCount = function (val) {
  * @throws {errors.Slave}
  */
 module.exports.transformAddresses = function (val) {
-  if (!!val || val.indexOf === undefined) {
+  if (!val || val.indexOf === undefined) {
     throw new errors.Slave.InvalidAddresses()
   }
 
@@ -113,7 +113,7 @@ module.exports.transformSource = function (val) {
  * @throws {errors.Slave.InvalidStatus}
  */
 module.exports.transformStatus = function (val) {
-  if (val !== undefined && ['unspent'].indexOf(val) === -1) {
+  if (val !== undefined && ['transactions', 'unspent'].indexOf(val) === -1) {
     throw new errors.Slave.InvalidStatus()
   }
 

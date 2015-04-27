@@ -196,6 +196,7 @@ Network.prototype.getLatest = function () {
 }
 
 /**
+ * @todo Add concurrency
  * @param {string} txid
  * @return {Promise<bitcore.Transaction>}
  */
