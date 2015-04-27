@@ -24,7 +24,7 @@ module.exports.run = function (init) {
   // logging unhadled errors
   var logger = require('../lib/logger').logger
   Promise.onPossiblyUnhandledRejection(function (err) {
-    logger.error(err.stack || err.toString())
+    logger.error('Unhandled error: %s', err)
   })
 
   // check network
@@ -32,7 +32,7 @@ module.exports.run = function (init) {
 
   // initialize
   init().catch(function (err) {
-    logger.error('Error on initialization: %s', err)
+    logger.error('Error on initialization: %s', err.stack)
     process.exit(1)
   })
 }

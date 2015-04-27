@@ -1,21 +1,19 @@
-/* globals Promise:true */
-
 var EventEmitter = require('events').EventEmitter
 var inherits = require('util').inherits
-var Promise = require('bluebird')
-
-var messages = require('../../lib/messages').default()
 
 /**
  * @event Slaves#sendTx
- * @param {string} rawTx
+ * @param {string} id
+ * @param {string} rawtx
  */
 
 /**
  * @class Slaves
+ * @param {Storage} storage
  */
-function Slaves () {
+function Slaves (storage) {
   EventEmitter.call(this)
+  this._storage = storage
 }
 
 inherits(Slaves, EventEmitter)
@@ -25,63 +23,86 @@ inherits(Slaves, EventEmitter)
  */
 Slaves.prototype.init = function () {
   var self = this
-
-  function onSendTx (payload) {
+  return self._storage.listen('sendtx', function (payload) {
     payload = JSON.parse(payload)
     self.emit('sendTx', payload.id, payload.rawtx)
-  }
-
-  return Promise.all([
-    messages.listen('sendtx', onSendTx)
-  ])
+  })
 }
 
 /**
- * @param {pg.Client} client
  * @param {string} id
- * @param {(Object|undefined)} err
+ * @param {?Object} err
+ * @param {Object} [opts]
+ * @param {pg.Client} [opts.client]
  * @return {Promise}
  */
-Slaves.prototype.sendTxResponse = function (client, id, err) {
+Slaves.prototype.sendTxResponse = function (id, err, opts) {
   var payload = JSON.stringify({
-    status: err === undefined ? 'success' : 'fail',
+    status: err === null ? 'success' : 'fail',
     id: id,
     code: (err || {}).code,
     message: escape((err || {}).message)
   })
-  return messages.notify(client, 'sendtxresponse', payload)
+  return this._storage.notify('sendtxresponse', payload, opts)
 }
 
 /**
- * @param {pg.Client} client
- * @param {string} blockid
+ * @param {string} hash
  * @param {number} height
+ * @param {Object} [opts]
+ * @param {pg.Client} [opts.client]
  * @return {Promise}
  */
-Slaves.prototype.newBlock = function (client, blockid, height) {
-  var payload = JSON.stringify({blockid: blockid, height: height})
-  return messages.notify(client, 'newblock', payload)
+Slaves.prototype.broadcastBlock = function (hash, height, opts) {
+  var payload = JSON.stringify({hash: hash, height: height})
+  return this._storage.notify('broadcastblock', payload, opts)
 }
 
 /**
- * @param {pg.Client} client
  * @param {string} txid
+ * @param {?string} blockHash
+ * @param {?number} blockHeight
+ * @param {Object} [opts]
+ * @param {pg.Client} [opts.client]
  * @return {Promise}
  */
-Slaves.prototype.newTx = function (client, txid) {
-  var payload = JSON.stringify({txid: txid})
-  return messages.notify(client, 'newtx', payload)
+Slaves.prototype.broadcastTx = function (txid, blockHash, blockHeight, opts) {
+  var payload = JSON.stringify({
+    txid: txid,
+    blockHash: blockHash,
+    blockHeight: blockHeight
+  })
+  return this._storage.notify('broadcasttx', payload, opts)
 }
 
 /**
- * @param {pg.Client} client
  * @param {string} address
  * @param {string} txid
+ * @param {?string} blockHash
+ * @param {?string} blockHeight
+ * @param {Object} [opts]
+ * @param {pg.Client} [opts.client]
  * @return {Promise}
  */
-Slaves.prototype.addressTouched = function (client, address, txid) {
-  var payload = JSON.stringify({address: address, txid: txid})
-  return messages.notify(client, 'addresstouched', payload)
+Slaves.prototype.broadcastAddress = function (address, txid, blockHash, blockHeight, opts) {
+  var payload = JSON.stringify({
+    address: address,
+    txid: txid,
+    blockHash: blockHash,
+    blockHeight: blockHeight
+  })
+  return this._storage.notify('broadcastaddress', payload, opts)
 }
 
-module.exports = require('soop')(Slaves)
+/**
+ * @param {Object} status
+ * @param {Object} [opts]
+ * @param {pg.Client} [opts.client]
+ * @return {Promise}
+ */
+Slaves.prototype.broadcastStatus = function (status, opts) {
+  var payload = JSON.stringify(status)
+  return this._storage.notify('broadcaststatus', payload, opts)
+}
+
+module.exports = Slaves

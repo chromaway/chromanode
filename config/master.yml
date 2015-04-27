@@ -1,6 +1,7 @@
 chromanode:
   network: testnet # livenet | testnet
-  updateInterval: 5000 # in milliseconds
+  sync:
+    maxCachedBlocks: 2 # useful for remote bitcoind
 
 logger:
   level: verbose # verbose, info, warning, error
@@ -9,9 +10,13 @@ logger:
 postgresql:
   url: postgres://user:pass@host:port/database_name
 
-bitcoind: # config for https://github.com/bitpay/bitcoind-rpc
-  protocol: http
-  user: user
-  pass: pass
-  host: localhost
-  port: 18332
+bitcoind:
+  peer:
+    host: localhost
+    port: 18333
+  rpc:
+    host: localhost
+    port: 18332
+    user: bitcoinrpc
+    pass: uMXXbdR2D7gh8BDofJC47dB6WyBEa8sRmM1N4JyPHv6
+    protocol: http

@@ -1,5 +1,6 @@
 /* globals Promise:true */
 
+var _ = require('lodash')
 var bitcore = require('bitcore')
 var Promise = require('bluebird')
 
@@ -7,32 +8,56 @@ var EventEmitter = require('events').EventEmitter
 var inherits = require('util').inherits
 
 var errors = require('../../lib/errors')
-var messages = require('../../lib/messages').default()
-var storage = require('../../lib/storage').default()
 
 /**
- * @event Master#newBlock
- * @param {string} blockid
- * @param {number} height
+ * @event Master#block
+ * @param {Object} payload
+ * @param {string} payload.hash
+ * @param {number} payload.height
  */
 
 /**
- * @event Master#newTx
- * @param {string} txid
+ * @event Master#tx
+ * @param {Object} payload
+ * @param {string} payload.txid
+ * @param {?string} payload.blockHash
+ * @param {?string} payload.blockHeight
  */
 
 /**
- * @event Master#addressTouched
- * @param {string} address
- * @param {string} txid
+ * @event Master#address
+ * @param {Object} payload
+ * @param {string} payload.address
+ * @param {string} payload.txid
+ * @param {?string} payload.blockHash
+ * @param {?string} payload.blockHeight
+ */
+
+/**
+ * @event Master#status
+ * @param {Object} status
  */
 
 /**
  * @class Master
+ * @param {Storage} storage
  */
-function Master () {
-  EventEmitter.call(this)
-  this._sendTxDeferreds = {}
+function Master (storage) {
+  var self = this
+  EventEmitter.call(self)
+
+  self._storage = storage
+  self._sendTxDeferreds = {}
+
+  self._lastStatus = new Promise(function (resolve) {
+    self.on('status', function (status) {
+      if (self._lastStatus.isPending()) {
+        return resolve(status)
+      }
+
+      self._lastStatus = Promise.resolve(status)
+    })
+  })
 }
 
 inherits(Master, EventEmitter)
@@ -43,44 +68,55 @@ inherits(Master, EventEmitter)
 Master.prototype.init = function () {
   var self = this
 
-  function onNewBlock (payload) {
-    payload = JSON.parse(payload)
-    self.emit('newBlock', payload.blockid, payload.height)
-  }
-
-  function onNewTx (payload) {
-    payload = JSON.parse(payload)
-    self.emit('newTx', payload.txid)
-  }
-
-  function onAddressTouched (payload) {
-    payload = JSON.parse(payload)
-    self.emit('addressTouched', payload.address, payload.txid)
-  }
-
-  function onSendTxResponse (payload) {
-    payload = JSON.parse(payload)
-    var defer = self._sendTxDeferreds[payload.id]
-    if (defer === undefined) {
-      return
+  /**
+   * @param {string} channel
+   * @param {string} handler
+   * @return {Promise}
+   */
+  function listen (channel, handler) {
+    if (_.isString(handler)) {
+      var event = handler
+      handler = function (payload) { self.emit(event, payload) }
     }
 
-    delete self._sendTxDeferreds[payload.id]
-    if (payload.status === 'success') {
-      return defer.resolve()
-    }
-
-    var err = new errors.Slave.SendTxError()
-    err.data = {code: payload.code, message: unescape(payload.message)}
-    return defer.reject(err)
+    return self._storage.listen(channel, function (payload) {
+      handler(JSON.parse(payload))
+    })
   }
 
   return Promise.all([
-    messages.listen('newblock', onNewBlock),
-    messages.listen('newtx', onNewTx),
-    messages.listen('addresstouched', onAddressTouched),
-    messages.listen('sendtxresponse', onSendTxResponse)
+    listen('broadcastblock', 'block'),
+    listen('broadcasttx', 'tx'),
+    listen('broadcastaddress', 'address'),
+    listen('broadcaststatus', 'status'),
+    listen('sendtxresponse', self._onSendTxResponse.bind(self))
   ])
+}
+
+/**
+ * @return {Promise<Object>}
+ */
+Master.prototype.getStatus = function () {
+  return this._lastStatus
+}
+
+/**
+ * @param {Object} payload
+ */
+Master.prototype._onSendTxResponse = function (payload) {
+  var defer = this._sendTxDeferreds[payload.id]
+  if (defer === undefined) {
+    return
+  }
+
+  delete this._sendTxDeferreds[payload.id]
+  if (payload.status === 'success') {
+    return defer.resolve()
+  }
+
+  var err = new errors.Slave.SendTxError()
+  err.data = {code: payload.code, message: unescape(payload.message)}
+  return defer.reject(err)
 }
 
 /**
@@ -88,18 +124,16 @@ Master.prototype.init = function () {
  * @return {Promise}
  */
 Master.prototype.sendTx = function (rawtx) {
-  var deferred = Promise.defer()
-  var id = bitcore.crypto.Random.getRandomBuffer(10).toString('hex')
-
-  this._sendTxDeferreds[id] = deferred
-
-  return storage.execute(function (client) {
+  var self = this
+  return new Promise(function (resolve, reject) {
+    var id = bitcore.crypto.Random.getRandomBuffer(10).toString('hex')
     var payload = JSON.stringify({id: id, rawtx: rawtx})
-    return messages.notify(client, 'sendtx', payload)
-  })
-  .then(function () {
-    return deferred.promise
+    self._storage.notify('sendtx', payload)
+      .then(function () {
+        self._sendTxDeferreds[id] = {resolve: resolve, reject: reject}
+      })
+      .catch(reject)
   })
 }
 
-module.exports = require('soop')(Master)
+module.exports = Master

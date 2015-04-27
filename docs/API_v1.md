@@ -8,7 +8,6 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
 ## Methods:
 
-  * [status](#status)
   * [headers](#headers)
     * [latest](#latest)
     * [query](#query)
@@ -18,37 +17,6 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
     * [send](#send)
   * [addresses](#addresses)
     * [query](#query)
-
-### Status
-
-@todo
-
-  **url**
-
-    /v1/status
-
-  **result**
-
-    {
-      "bitcoind": {
-        "version": 99900,
-        "protocolversion": 70002,
-        "blocks": 329741,
-        "connections": 8,
-        "difficulty": 1,
-        "testnet": true,
-        "errors": "This is a pre-release test build - use at your own risk - do not use for mining or merchant applications",
-        ...
-      },
-      "chromanode": {
-        "status": "starting|syncing|finished",
-        "latest": {
-          "height": 329736,
-          "hash": "000000002eb3d5d9cac7d04b56f6d0afba66b46bd3715f0c56a240ef7b491937",
-        },
-        "version": "a.b.c"
-      }
-    }
 
 ### Headers
 
@@ -205,8 +173,6 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 ### Addresses
 
 #### Query
-
-@todo add extra fields for coins
 
   \* *half-close interval for (from-to]*
 

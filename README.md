@@ -35,28 +35,20 @@
 
 ## API
 
-[API v1](docs/API_v1.md)
+  * [API v1](docs/API_v1.md) \**deprecated*\*
+  * [API v2](docs/API_v2.md)
 
 To get current version of chromanode make request to `/version`
 
 ## Other open source blockchain apis
 
-  * [Insight-api](https://github.com/bitpay/insight-api)
-  * [Toshi](https://github.com/coinbase/toshi)
-  * [Electrum-server](https://github.com/spesmilo/electrum-server)
-  * [MyChain](https://github.com/thofmann/mychain)
+  * [bitcoin-abe](https://github.com/bitcoin-abe/bitcoin-abe)
+  * [bitcore-node](https://github.com/bitpay/bitcore-node)
+  * [electrum-server](https://github.com/spesmilo/electrum-server)
+  * [insight-api](https://github.com/bitpay/insight-api)
+  * [mychain](https://github.com/thofmann/mychain)
+  * [toshi](https://github.com/coinbase/toshi)
 
 ## License
 
 Code released under [the MIT license](https://github.com/chromaway/chromanode/blob/master/LICENSE).
-
-## Todo
-
-  * store scriptPubKey? scriptSig?
-  * switch to electrumjs table structure
-  * implement status method
-  * return coins (txid, outputindex, value, script, confirmations|height) in addressesQuery?
-  * update config (using default value)
-  * romove `soop` package?
-  * code refactoring!
-  * add tests (regtest mode?)
