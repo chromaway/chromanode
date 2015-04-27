@@ -35,10 +35,10 @@
 
 ## API
 
-  * [API v1](docs/API_v1.md) \**deprecated*\*
-  * [API v2](docs/API_v2.md)
+  * [API v1](docs/API_v1.md)
+  * [API v2](docs/API_v2.md) \**WIP*\*
 
-To get current version of chromanode make request to `/version`
+To get latest version of supported API make request to `/version`
 
 ## Other open source blockchain apis
 
