@@ -16,20 +16,39 @@ function SocketIO (master) {
   self._ios = null
 
   master.on('block', function (payload) {
-    self._ios.sockets.in('new-block').emit('new-block', payload)
+    // api_v1
+    var hash = payload.hash
+    var height = payload.height
+    self._ios.sockets.in('new-block').emit('new-block', hash, height)
+    self._sV1.in('new-block').emit('new-block', hash, height)
+
+    // api_v2
+    self._sV2.in('new-block').emit('new-block', payload)
   })
 
   master.on('tx', function (payload) {
-    self._ios.sockets.in('new-tx').emit('new-tx', payload)
-    self._ios.sockets.in('tx-' + payload.txid).emit('tx', payload)
+    // api_v1
+    self._ios.sockets.in('new-tx').emit('new-tx', payload.txid)
+    self._sV1.in('new-tx').emit('new-tx', payload.txid)
+
+    // api_v2
+    self._sV2.in('new-tx').emit('new-tx', payload)
+    self._sV2.in('tx-' + payload.txid).emit('tx', payload)
   })
 
   master.on('address', function (payload) {
-    self._ios.sockets.in('address-' + payload.address).emit('address', payload)
+    // api_v1
+    self._ios.sockets.in(payload.address).emit(payload.address, payload.txid)
+    self._sV1.in(payload.address).emit(payload.address, payload.txid)
+
+    // api_v2
+    self._sV2.in('address-' + payload.address).emit('address', payload)
   })
 
   master.on('status', function (payload) {
-    self._ios.sockets.in('status').emit('status', payload)
+    // api_v1
+    // api_v2
+    self._sV2.in('status').emit('status', payload)
   })
 }
 
@@ -37,74 +56,94 @@ function SocketIO (master) {
  */
 SocketIO.prototype.attach = function (server) {
   var self = this
+
   self._ios = io(server, {serveClient: false})
-  self._ios.sockets.on('connection', function (socket) {
+
+  // witout namespace: write socket.id to log and call v1
+  self._ios.on('connection', function (socket) {
     logger.verbose('New connection from %s', socket.id)
 
     socket.on('disconnect', function () {
       logger.verbose('disconnected %s', socket.id)
     })
 
-    /**
-     * @param {string} event
-     * @param {string} handler
-     */
-    function createRoomHandler (event, handler) {
-      handler = Promise.promisify(socket[handler].bind(socket))
+    self._onV1Connection(socket)
+  })
 
-      socket.on(event, function (opts) {
-        self._getRoom(opts)
-          .then(function (room) {
-            return handler(room)
-          })
-          .catch(function (err) {
-            return err.message || err
-          })
-          .then(function (err) {
-            socket.emit(event, opts, err || null)
-          })
-      })
-    }
+  // api_v1
+  self._sV1 = self._ios.of('/v1')
+  self._sV1.on('connection', self._onV1Connection.bind(self))
 
-    createRoomHandler('subscribe', 'join')
-    createRoomHandler('unsubscribe', 'leave')
+  // api_v2
+  self._sV2 = self._ios.of('/v2')
+  self._sV2.on('connection', self._onV2Connection.bind(self))
+}
+
+/**
+ * @param {socket.io.Socket} socket
+ */
+SocketIO.prototype._onV1Connection = function (socket) {
+  socket.on('subscribe', function (room) {
+    socket.join(room)
+    socket.emit('subscribed', room)
   })
 }
 
 /**
- * @param {Object} opts
- * @return {Promise<string>}
+ * @param {socket.io.Socket} socket
  */
-SocketIO.prototype._getRoom = function (opts) {
-  return Promise.try(function () {
-    var room = opts.type
+SocketIO.prototype._onV2Connection = function (socket) {
+  /**
+   * @param {string} event
+   * @param {string} handler
+   */
+  function createRoomHandler (event, handler) {
+    handler = Promise.promisify(socket[handler].bind(socket))
 
-    // type check
-    var rooms = ['new-block', 'new-tx', 'tx', 'address', 'status']
-    if (rooms.indexOf(opts.room) === -1) {
-      throw new Error('wrong type')
-    }
+    socket.on(event, function (opts) {
+      return Promise.try(function () {
+        var room = opts.type
 
-    // tx check
-    if (room === 'tx') {
-      if (/^[0-9a-fA-F]{64}$/.test(opts.txid)) {
-        throw new Error('Wrong txid')
-      }
+        // type check
+        var rooms = ['new-block', 'new-tx', 'tx', 'address', 'status']
+        if (rooms.indexOf(opts.type) === -1) {
+          throw new Error('wrong type')
+        }
 
-      room = 'tx-' + opts.txid
-    }
+        // tx check
+        if (room === 'tx') {
+          if (/^[0-9a-fA-F]{64}$/.test(opts.txid)) {
+            throw new Error('Wrong txid')
+          }
 
-    // address check
-    if (room === 'address') {
-      try {
-        Address.fromString(opts.address, config.get('chromanode.network'))
-      } catch (err) {
-        throw new Error('Wrong address (' + err.message + ')')
-      }
+          room = 'tx-' + opts.txid
+        }
 
-      room = 'address-' + opts.address
-    }
-  })
+        // address check
+        if (room === 'address') {
+          try {
+            Address.fromString(opts.address, config.get('chromanode.network'))
+          } catch (err) {
+            throw new Error('Wrong address (' + err.message + ')')
+          }
+
+          room = 'address-' + opts.address
+        }
+
+        return handler(room)
+      })
+      .catch(function (err) {
+        logger.error('Socket (%s) %s error: %s', socket.id, event, err)
+        return err.message || err
+      })
+      .then(function (err) {
+        socket.emit(event, opts, err || null)
+      })
+    })
+  }
+
+  createRoomHandler('subscribe', 'join')
+  createRoomHandler('unsubscribe', 'leave')
 }
 
 module.exports = SocketIO

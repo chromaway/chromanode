@@ -186,8 +186,8 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 |:----------|:------------------------------------------------------|
 | addresses | array of addresses                                    |
 | source    | blocks or mempool, may be omitted (both will be used) |
-| from      | hash or height, may be omitted                     |
-| to        | hash or height, may be omitted                     |
+| from      | hash or height, may be omitted                        |
+| to        | hash or height, may be omitted                        |
 | status    | now only unspent available, may be omitted            |
 
     // get all affected transactions for addresses (from blocks and mempool)
@@ -242,7 +242,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
 ```js
     var io = require('socket.io-client')
-    var socket = io('http://localhost:3001')
+    var socket = io('http://localhost:3001/v1')
     socket.on('connect', function () {
       socket.emit('subscribe', 'new-block')
     })
@@ -255,7 +255,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
 ```js
     var io = require('socket.io-client')
-    var socket = io('http://localhost:3001')
+    var socket = io('http://localhost:3001/v1')
     socket.on('connect', function () {
       socket.emit('subscribe', 'new-tx')
     })
@@ -268,7 +268,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
 ```js
     var io = require('socket.io-client')
-    var socket = io('http://localhost:3001')
+    var socket = io('http://localhost:3001/v1')
     socket.on('connect', function () {
       socket.emit('subscribe', 'mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2')
     })

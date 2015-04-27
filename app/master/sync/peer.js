@@ -300,7 +300,9 @@ PeerSync.prototype._updateMempool = function () {
     self._storage.executeQuery(SQL.select.transactions.unconfirmed)
   ])
   .spread(function (nTxIds, mTxIds) {
-    mTxIds = _.pluck(mTxIds.rows, 'txid')
+    mTxIds = mTxIds.rows.map(function (row) {
+      return row.txid.toString('hex')
+    })
 
     var toRemove = _.partial(_.without, mTxIds).apply(null, nTxIds)
     var toAdd = _.partial(_.without, nTxIds).apply(null, mTxIds)

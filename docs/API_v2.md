@@ -294,7 +294,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
 ```js
     var io = require('socket.io-client')
-    var socket = io('http://localhost:3001')
+    var socket = io('http://localhost:3001/v2')
     socket.on('connect', function () {
       socket.emit('subscribe', {type: 'new-block'})
     })
@@ -308,7 +308,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
 ```js
     var io = require('socket.io-client')
-    var socket = io('http://localhost:3001')
+    var socket = io('http://localhost:3001/v2')
     socket.on('connect', function () {
       socket.emit('subscribe', {type: 'new-tx'})
     })
@@ -327,7 +327,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
       .sign(...)
 
     var io = require('socket.io-client')
-    var socket = io('http://localhost:3001')
+    var socket = io('http://localhost:3001/v2')
     socket.on('connect', function () {
       socket.emit('subscribe', {type: 'tx', txid: tx.hash})
       blockchain.propagate(tx.toString()) // broadcast tx ...
@@ -346,7 +346,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
 ```js
     var io = require('socket.io-client')
-    var socket = io('http://localhost:3001')
+    var socket = io('http://localhost:3001/v2')
     socket.on('connect', function () {
       socket.emit('subscribe', {
         type: 'address',
@@ -362,7 +362,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
 ```js
     var io = require('socket.io-client')
-    var socket = io('http://localhost:3001')
+    var socket = io('http://localhost:3001/v2')
     socket.on('connect', function () {
       socket.emit('subscribe', {type: 'status'})
     })
