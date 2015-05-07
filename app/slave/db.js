@@ -337,48 +337,48 @@ DB.prototype.getMerkle = function (txid) {
 
         var height = result.rows[0].height
         return client.queryAsync(SQL.selectTxIdsByHeight, [height])
-      })
-      .then(function (result) {
-        var stxids = result.rows[0].txids.toString('hex')
-        var txids = []
-        for (var cnt = stxids.length / 64, idx = 0; idx < cnt; idx += 1) {
-          txids.push(stxids.slice(idx * 64, (idx + 1) * 64))
-        }
-
-        var merkle = []
-        var hashes = txids.map(util.decode)
-        var targetHash = util.decode(txid)
-        while (hashes.length !== 1) {
-          if (hashes.length % 2 === 1) {
-            hashes.push(_.last(hashes))
-          }
-
-          var nHashes = []
-          for (cnt = hashes.length, idx = 0; idx < cnt; idx += 2) {
-            var nHashSrc = Buffer.concat([hashes[idx], hashes[idx + 1]])
-            var nHash = bitcore.crypto.Hash.sha256sha256(nHashSrc)
-            nHashes.push(nHash)
-
-            if (bufferEqual(hashes[idx], targetHash)) {
-              merkle.push(util.encode(hashes[idx + 1]))
-              targetHash = nHash
-            } else if (bufferEqual(hashes[idx + 1], targetHash)) {
-              merkle.push(util.encode(hashes[idx]))
-              targetHash = nHash
+          .then(function (result) {
+            var stxids = result.rows[0].txids.toString('hex')
+            var txids = []
+            for (var cnt = stxids.length / 64, idx = 0; idx < cnt; idx += 1) {
+              txids.push(stxids.slice(idx * 64, (idx + 1) * 64))
             }
-          }
-          hashes = nHashes
-        }
 
-        return {
-          source: 'blocks',
-          block: {
-            height: result.rows[0].height,
-            hash: result.rows[0].blockid.toString('hex'),
-            merkle: merkle,
-            index: txids.indexOf(txid)
-          }
-        }
+            var merkle = []
+            var hashes = txids.map(util.decode)
+            var targetHash = util.decode(txid)
+            while (hashes.length !== 1) {
+              if (hashes.length % 2 === 1) {
+                hashes.push(_.last(hashes))
+              }
+
+              var nHashes = []
+              for (cnt = hashes.length, idx = 0; idx < cnt; idx += 2) {
+                var nHashSrc = Buffer.concat([hashes[idx], hashes[idx + 1]])
+                var nHash = bitcore.crypto.Hash.sha256sha256(nHashSrc)
+                nHashes.push(nHash)
+
+                if (bufferEqual(hashes[idx], targetHash)) {
+                  merkle.push(util.encode(hashes[idx + 1]))
+                  targetHash = nHash
+                } else if (bufferEqual(hashes[idx + 1], targetHash)) {
+                  merkle.push(util.encode(hashes[idx]))
+                  targetHash = nHash
+                }
+              }
+              hashes = nHashes
+            }
+
+            return {
+              source: 'blocks',
+              block: {
+                height: result.rows[0].height,
+                hash: result.rows[0].blockid.toString('hex'),
+                merkle: merkle,
+                index: txids.indexOf(txid)
+              }
+            }
+          })
       })
   })
 }
