@@ -250,7 +250,7 @@ Master.prototype.catchUp = function () {
     }
 
     mempoolTruncated = true
-    return client.queryAsync('TRUNCATE transactions_mempool, history_mempool')
+    return client.queryAsync('DELETE FROM transactions_mempool, history_mempool')
   }
 
   function runReorg (height) {
