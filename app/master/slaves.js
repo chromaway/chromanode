@@ -4,6 +4,7 @@ var EventEmitter = require('events').EventEmitter
 var inherits = require('util').inherits
 var Promise = require('bluebird')
 
+var storage = require('../../lib/storage').default()
 var messages = require('../../lib/messages').default()
 
 /**
@@ -27,8 +28,14 @@ Slaves.prototype.init = function () {
   var self = this
 
   function onSendTx (payload) {
-    payload = JSON.parse(payload)
-    self.emit('sendTx', payload.id, payload.rawtx)
+    var id = JSON.parse(payload).id
+    storage.execute(function (client) {
+      return client.queryAsync('SELECT * FROM new_txs WHERE id = $1', [id])
+        .then(function (result) {
+          self.emit('sendTx', id, result.rows[0].hex)
+          return client.queryAsync('DELETE FROM new_txs WHERE id = $1', [id])
+        })
+    })
   }
 
   return Promise.all([

@@ -88,17 +88,20 @@ Master.prototype.init = function () {
  * @return {Promise}
  */
 Master.prototype.sendTx = function (rawtx) {
-  var deferred = Promise.defer()
-  var id = bitcore.crypto.Random.getRandomBuffer(10).toString('hex')
-
-  this._sendTxDeferreds[id] = deferred
-
+  var self = this
+  var isql = 'INSERT INTO new_txs (hex) VALUES ($1) RETURNING id'
   return storage.execute(function (client) {
-    var payload = JSON.stringify({id: id, rawtx: rawtx})
-    return messages.notify(client, 'sendtx', payload)
-  })
-  .then(function () {
-    return deferred.promise
+    return client.queryAsync(isql, [rawtx])
+      .then(function (result) {
+        var id = result.rows[0].id
+        var payload = JSON.stringify({id: id})
+        return messages.notify(client, 'sendTx', payload)
+          .then(function () {
+            return new Promise(function (resolve, reject) {
+              self._sendTxDeferreds[id] = {resolve: resolve, reject: reject}
+            })
+          })
+      })
   })
 }
 

@@ -250,7 +250,10 @@ Master.prototype.catchUp = function () {
     }
 
     mempoolTruncated = true
-    return client.queryAsync('DELETE FROM transactions_mempool, history_mempool')
+    return Promise.all([
+      client.queryAsync('DELETE FROM transactions_mempool'),
+      client.queryAsync('DELETE FROM history_mempool')
+    ])
   }
 
   function runReorg (height) {
