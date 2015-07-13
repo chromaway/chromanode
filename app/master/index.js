@@ -85,7 +85,7 @@ Master.prototype._installSendTxHandler = function () {
   var self = this
   self.slaves.on('sendTx', function (id, rawtx) {
     self.network.sendTx(rawtx)
-      .then(function () { return })
+      .then(function () { return null })
       .catch(function (err) {
         if (err instanceof Error) {
           return {code: null, message: err.message}
