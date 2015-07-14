@@ -9,6 +9,8 @@ var inherits = require('util').inherits
 
 var errors = require('../../lib/errors')
 
+var sql = require('./sql')
+
 /**
  * @event Master#block
  * @param {Object} payload
@@ -125,14 +127,15 @@ Master.prototype._onSendTxResponse = function (payload) {
  */
 Master.prototype.sendTx = function (rawtx) {
   var self = this
-  return new Promise(function (resolve, reject) {
-    var id = bitcore.crypto.Random.getRandomBuffer(10).toString('hex')
-    var payload = JSON.stringify({id: id, rawtx: rawtx})
-    self._storage.notify('sendtx', payload)
-      .then(function () {
-        self._sendTxDeferreds[id] = {resolve: resolve, reject: reject}
+  return this._storage.execute(function (client) {
+    return client.queryAsync(sql.insert.new_txs.row, [rawtx]).then(
+      function (result) {
+        var id = result.rows[0].id
+        return new Promise(function (resolve, reject) {
+            self._sendTxDeferreds[id] = { resolve: resolve, reject: reject }
+            self._storage.notify('sendtx', JSON.stringify({id: id}).catch(reject)
+        })                                                                     
       })
-      .catch(reject)
   })
 }
 

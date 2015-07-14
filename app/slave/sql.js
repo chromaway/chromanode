@@ -1,4 +1,9 @@
 module.exports = {
+  insert: {
+    new_txs: {
+      row: 'INSERT INTO new_txs (hex) VALUES ($1) RETURNING id'
+    }
+  },
   select: {
     blocks: {
       latest: 'SELECT ' +
