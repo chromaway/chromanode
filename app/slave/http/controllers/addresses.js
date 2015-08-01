@@ -120,7 +120,8 @@ module.exports.v1.query = function (req, res) {
         result.transactions = result.unspent.map(function (item) {
           return {txid: item.txid, height: item.height}
         })
-        delete result.unspent
+        // we call it v1+
+        // delete result.unspent
       }
 
       return result
