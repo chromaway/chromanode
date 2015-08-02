@@ -64,7 +64,14 @@ module.exports = {
                '  FROM history ' +
                '    WHERE ' +
                '      address = ANY($1) AND ' +
-               '      itxid IS NULL'
+               '      itxid IS NULL',
+      spent: 'SELECT ' +
+             '    itxid as itxid, ' +
+             '    iheight as iheight' +
+             '  FROM history '  +
+             '    WHERE ' +
+             '      otxid = $1 AND ' +
+             '      oindex = $2'
     }
   }
 }

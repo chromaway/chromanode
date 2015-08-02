@@ -97,3 +97,36 @@ v1.merkle = v2.merkle = function (req, res) {
 v1.send = v2.send = function (req, res) {
   res.promise(req.master.sendTx(req.body.rawtx))
 }
+
+
+v2.spent = function (req, res) {
+  var result = Promise.try(function () {
+    var otxid = '\\x' + qutil.transformTxId(req.query.otxid)
+    var oindex = parseInt(req.query.oindex, 10)
+    return req.storage.executeQuery(SQL.select.history.spent, [otxid, oindex])
+  })
+  .then(function (result) {
+    if (result.rowCount === 0) {
+      throw new errors.Slave.TxNotFound()
+    }
+
+    var retval;
+    var row = result.rows[0]
+    if (row.itxid) {
+      var itxid = row.itxid.toString('hex')
+      var iheight = row.iheight
+      retval = {
+        spent: true,
+        itxid: itxid,
+        iheight: iheight
+      }
+    } else {
+      retval = {
+        spent: false
+      }
+    }
+    return retval;
+  })
+
+  res.promise(result)
+}

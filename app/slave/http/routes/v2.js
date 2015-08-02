@@ -18,6 +18,7 @@ module.exports.createRouter = function () {
   // transaction routes
   router.get('/transactions/raw', transactions.v2.raw)
   router.get('/transactions/merkle', transactions.v2.merkle)
+  router.get('/transactions/spent', transactions.v2.spent)
   router.post('/transactions/send', transactions.v2.send)
 
   // address routes

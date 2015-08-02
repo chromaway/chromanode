@@ -16,6 +16,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
     * [raw](#raw)
     * [merkle](#merkle)
     * [send](#send)
+    * [spent](#spent)
   * [addresses](#addresses)
     * [query](#query)
 
@@ -198,6 +199,45 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
   **errors**
 
     {"type": "SendTxError", "code": -8, "message": "parameter must be hexadeci..."}
+
+#### Spent
+
+Find whether a specific transaction output is spent and who spends it.
+That is, given otxid and oindex find itxid and iheight.
+
+  **url**
+
+    /v2/transactions/spent
+
+  **query**
+
+| param | description    |
+|:------|:---------------|
+| otxid  | output transaction id |
+| oindex | output index |
+
+
+    /v2/transactions/spent?otxid=f8fa0c30e57a5900c7a0fd96f73ebebe8eafb4667224c3e49a172c20e2b58235&oindex=0
+
+  **result**
+
+    // When spent
+    {
+        "spent": true,
+        "itxid": "19bbfd7fdade0d158fa9e5dd80cf6b8a8bfa85370845c6c356ab1e1f783178b0",
+"iheight": 508508
+    }
+
+    // When unspent
+    {
+        "spent": false
+    }
+    
+
+  **errors**
+
+    {"type": "InvalidTxId"}
+    {"type": "TxNotFound"}
 
 ### Addresses
 
