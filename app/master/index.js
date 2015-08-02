@@ -12,6 +12,7 @@ var Network = require('./network')
 var Slaves = require('./slaves')
 var HistorySync = require('./sync/history')
 var PeerSync = require('./sync/peer')
+var sql = require('./sql')
 
 /**
  * @class Master
@@ -83,19 +84,26 @@ Master.prototype.init = function () {
  */
 Master.prototype._installSendTxHandler = function () {
   var self = this
-  self.slaves.on('sendTx', function (id, rawtx) {
-    self.network.sendTx(rawtx)
-      .then(function () { return })
-      .catch(function (err) {
-        if (err instanceof Error) {
-          return {code: null, message: err.message}
-        }
-
-        return err
+  self.slaves.on('sendTx', function (id) {
+    self.storage.execute(function (client) {
+      return client.queryAsync(sql.select.new_txs.byId, [id]).then(function (result) {
+        logger.info('sendTx', result)
+        return client.queryAsync(sql.delete.new_txs.byId, [id]).then(function () {
+            return self.network.sendTx(result.rows[0].hex)
+		.then(function () { logger.info('sendTx', 'success'); return null })
+		.catch(function (err) {
+		    logger.error('sendTx', err)
+		    if (err instanceof Error) {
+			return {code: null, message: err.message}
+		    }
+		    return err
+		})
+		.then(function (ret) {
+		    self.slaves.sendTxResponse(id, ret)
+		})
+        })
       })
-      .then(function (ret) {
-        self.slaves.sendTxResponse(id, ret)
-      })
+    })
   })
 }
 

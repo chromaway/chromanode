@@ -25,7 +25,7 @@ Slaves.prototype.init = function () {
   var self = this
   return self._storage.listen('sendtx', function (payload) {
     payload = JSON.parse(payload)
-    self.emit('sendTx', payload.id, payload.rawtx)
+    self.emit('sendTx', payload.id)
   })
 }
 

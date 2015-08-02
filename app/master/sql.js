@@ -30,6 +30,9 @@ module.exports = {
     }
   },
   select: {
+    new_txs: {
+      byId: 'SELECT hex FROM new_txs WHERE id = $1'
+    },
     blocks: {
       latest: 'SELECT ' +
               '    height as height, ' +
@@ -119,6 +122,9 @@ module.exports = {
     }
   },
   delete: {
+    new_txs: {
+      byId: "DELETE FROM new_txs WHERE id = $1"      
+    },
     blocks: {
       fromHeight: 'DELETE FROM blocks ' +
                   '  WHERE ' +
