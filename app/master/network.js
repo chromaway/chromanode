@@ -79,8 +79,8 @@ Network.prototype._initTrustedPeer = function () {
 
   // create trusted peer
   self.peer = new p2p.Peer({
-    host: config.get('chromanode.host'),
-    port: config.get('chromanode.port'),
+    host: config.get('bitcoind.peer.host'),
+    port: config.get('bitcoind.peer.port'),
     network: config.get('chromanode.network')
   })
   timers.setImmediate(function () { self.peer.connect() })
