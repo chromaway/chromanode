@@ -1,7 +1,7 @@
 /* globals Promise:true */
 
 var _ = require('lodash')
-var bitcore = require('bitcore')
+var bitcore = require('../../../../lib/patchedbitcore')
 var bufferEqual = require('buffer-equal')
 var Promise = require('bluebird')
 
