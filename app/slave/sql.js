@@ -1,3 +1,5 @@
+'use strict'
+
 module.exports = {
   insert: {
     new_txs: {
@@ -73,7 +75,7 @@ module.exports = {
       spent: 'SELECT ' +
              '    itxid as itxid, ' +
              '    iheight as iheight' +
-             '  FROM history '  +
+             '  FROM history ' +
              '    WHERE ' +
              '      otxid = $1 AND ' +
              '      oindex = $2'

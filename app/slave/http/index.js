@@ -1,4 +1,4 @@
-/* globals Promise:true */
+'use strict'
 
 var bodyParser = require('body-parser')
 var cors = require('cors')

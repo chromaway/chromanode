@@ -1,11 +1,11 @@
-/* globals Promise:true */
+'use strict'
 
 var _ = require('lodash')
 var EventEmitter = require('events').EventEmitter
 var inherits = require('util').inherits
 var timers = require('timers')
 var Promise = require('bluebird')
-var bitcore = require('../../lib/patchedbitcore')
+var bitcore = require('bitcore')
 var p2p = require('bitcore-p2p')
 var RpcClient = require('bitcoind-rpc')
 
@@ -60,9 +60,10 @@ Network.prototype._initBitcoind = function () {
     .then(function (ret) {
       // check network
       var bitcoindNetwork = ret.result.testnet ? 'testnet' : 'livenet'
-      var chromanodeNetwork = util.getNetworkName(config)
-      if (bitcoindNetwork !== chromanodeNetwork && chromanodeNetwork !== 'regtest') {
-        throw new errors.InvalidBitcoindNetwork(bitcoindNetwork, config.get('chromanode.network'))
+      var chromanodeNetwork = config.get('chromanode.network')
+      if (bitcoindNetwork !== chromanodeNetwork &&
+          !(bitcoindNetwork === 'livenet' && chromanodeNetwork === 'regtest')) {
+        throw new errors.InvalidBitcoindNetwork(bitcoindNetwork, chromanodeNetwork)
       }
 
       // show info
@@ -82,7 +83,7 @@ Network.prototype._initTrustedPeer = function () {
   self.peer = new p2p.Peer({
     host: config.get('bitcoind.peer.host'),
     port: config.get('bitcoind.peer.port'),
-    network: util.getNetworkName(config)
+    network: config.get('chromanode.network')
   })
   timers.setImmediate(function () { self.peer.connect() })
 

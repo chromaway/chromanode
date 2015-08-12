@@ -1,7 +1,7 @@
-/* globals Promise:true */
+'use strict'
 
 var _ = require('lodash')
-var bitcore = require('../../../../lib/patchedbitcore')
+var bitcore = require('bitcore')
 var bufferEqual = require('buffer-equal')
 var Promise = require('bluebird')
 
@@ -98,7 +98,6 @@ v1.send = v2.send = function (req, res) {
   res.promise(req.master.sendTx(req.body.rawtx))
 }
 
-
 v2.spent = function (req, res) {
   var result = Promise.try(function () {
     var otxid = '\\x' + qutil.transformTxId(req.query.otxid)
@@ -110,7 +109,7 @@ v2.spent = function (req, res) {
       throw new errors.Slave.TxNotFound()
     }
 
-    var retval;
+    var retval
     var row = result.rows[0]
     if (row.itxid) {
       var itxid = row.itxid.toString('hex')
@@ -125,7 +124,7 @@ v2.spent = function (req, res) {
         spent: false
       }
     }
-    return retval;
+    return retval
   })
 
   res.promise(result)

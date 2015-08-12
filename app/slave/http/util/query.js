@@ -1,8 +1,8 @@
-/* globals Promise:true */
+'use strict'
 
 var _ = require('lodash')
 var assert = require('assert')
-var bitcore = require('../../../../lib/patchedbitcore')
+var bitcore = require('bitcore')
 var Address = bitcore.Address
 var isHexa = bitcore.util.js.isHexa
 

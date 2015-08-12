@@ -1,4 +1,4 @@
-/* globals Promise:true */
+'use strict'
 
 var _ = require('lodash')
 var Promise = require('bluebird')

@@ -1,9 +1,9 @@
-/* globals Promise:true */
+'use strict'
 
 var _ = require('lodash')
 var EventEmitter = require('events').EventEmitter
 var inherits = require('util').inherits
-var bitcore = require('../../../lib/patchedbitcore')
+var bitcore = require('bitcore')
 var Promise = require('bluebird')
 
 var config = require('../../../lib/config')

@@ -1,4 +1,4 @@
-/* globals Promise:true */
+'use strict'
 
 var _ = require('lodash')
 var timers = require('timers')
@@ -86,23 +86,28 @@ Master.prototype._installSendTxHandler = function () {
   var self = this
   self.slaves.on('sendTx', function (id) {
     self.storage.execute(function (client) {
-      return client.queryAsync(sql.select.new_txs.byId, [id]).then(function (result) {
-        logger.info('sendTx', result)
-        return client.queryAsync(sql.delete.new_txs.byId, [id]).then(function () {
-            return self.network.sendTx(result.rows[0].hex)
-		.then(function () { logger.info('sendTx', 'success'); return null })
-		.catch(function (err) {
-		    logger.error('sendTx', err)
-		    if (err instanceof Error) {
-			return {code: null, message: err.message}
-		    }
-		    return err
-		})
-		.then(function (ret) {
-		    self.slaves.sendTxResponse(id, ret)
-		})
+      return client.queryAsync(sql.select.new_txs.byId, [id])
+        .then(function (result) {
+          logger.info('sendTx', result)
+          return client.queryAsync(sql.delete.new_txs.byId, [id])
+            .then(function () {
+              return self.network.sendTx(result.rows[0].hex)
+            })
         })
-      })
+    })
+    .then(function () {
+      logger.info('sendTx', 'success')
+      return null
+    }, function (err) {
+      logger.error('sendTx', err)
+      if (err instanceof Error) {
+        return {code: null, message: err.message}
+      }
+
+      return err
+    })
+    .then(function (ret) {
+      self.slaves.sendTxResponse(id, ret)
     })
   })
 }

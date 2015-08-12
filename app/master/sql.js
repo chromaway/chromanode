@@ -1,3 +1,5 @@
+'use strict'
+
 module.exports = {
   insert: {
     blocks: {
@@ -123,7 +125,7 @@ module.exports = {
   },
   delete: {
     new_txs: {
-      byId: "DELETE FROM new_txs WHERE id = $1"      
+      byId: 'DELETE FROM new_txs WHERE id = $1'
     },
     blocks: {
       fromHeight: 'DELETE FROM blocks ' +

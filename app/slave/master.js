@@ -1,7 +1,6 @@
-/* globals Promise:true */
+'use strict'
 
 var _ = require('lodash')
-var bitcore = require('../../lib/patchedbitcore')
 var Promise = require('bluebird')
 
 var EventEmitter = require('events').EventEmitter
@@ -132,9 +131,9 @@ Master.prototype.sendTx = function (rawtx) {
       function (result) {
         var id = result.rows[0].id
         return new Promise(function (resolve, reject) {
-            self._sendTxDeferreds[id] = { resolve: resolve, reject: reject }
-            self._storage.notify('sendtx', JSON.stringify({id: id})).catch(reject)
-        })                                                                     
+          self._sendTxDeferreds[id] = { resolve: resolve, reject: reject }
+          self._storage.notify('sendtx', JSON.stringify({id: id})).catch(reject)
+        })
       })
   })
 }

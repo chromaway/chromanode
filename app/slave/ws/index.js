@@ -1,7 +1,7 @@
-/* globals Promise:true */
+'use strict'
 
 var io = require('socket.io')
-var Address = require('../../../lib/patchedbitcore').Address
+var Address = require('bitcore').Address
 
 var Promise = require('bluebird')
 

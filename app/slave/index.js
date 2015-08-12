@@ -1,4 +1,4 @@
-/* globals Promise:true */
+'use strict'
 
 var express = require('express')
 var Promise = require('bluebird')

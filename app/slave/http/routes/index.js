@@ -1,3 +1,5 @@
+'use strict'
+
 var express = require('express')
 
 var node = require('../controllers/node')

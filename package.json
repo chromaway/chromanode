@@ -21,7 +21,7 @@
   ],
   "scripts": {
     "test": "echo 'No test specified'",
-    "lint": "standard"
+    "lint": "eslint app bin lib"
   },
   "engines": {
     "node": "~0.10.36"
@@ -49,9 +49,9 @@
     "yargs": "^3.6.0"
   },
   "devDependencies": {
-    "standard": "^3.3.0"
-  },
-  "standard": {
-    "ignore": []
+    "babel-eslint": "^4.0.5",
+    "eslint": "^1.0.0",
+    "eslint-config-standard": "^4.0.0",
+    "eslint-plugin-standard": "^1.2.0"
   }
 }

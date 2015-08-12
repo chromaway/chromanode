@@ -1,3 +1,5 @@
+'use strict'
+
 var util = require('../../../../lib/util')
 
 module.exports.version = function (req, res) {
