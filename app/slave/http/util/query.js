@@ -2,7 +2,7 @@
 
 var _ = require('lodash')
 var assert = require('assert')
-var bitcore = require('bitcore')
+var bitcore = require('../../../../lib/patchedbitcore')
 var Address = bitcore.Address
 var isHexa = bitcore.util.js.isHexa
 

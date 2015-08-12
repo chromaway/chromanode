@@ -1,7 +1,7 @@
 /* globals Promise:true */
 
 var _ = require('lodash')
-var bitcore = require('bitcore')
+var bitcore = require('../../lib/patchedbitcore')
 var Promise = require('bluebird')
 
 var EventEmitter = require('events').EventEmitter
