@@ -84,7 +84,12 @@ module.exports.transformAddresses = function (val) {
   var addresses = val.indexOf(',') !== -1 ? val.split(',') : [val]
   addresses.forEach(function (address) {
     try {
-      assert.equal(Address.fromString(address).network.name, network.name)
+      if (network.name === 'regtest') {
+        assert.equal(Address.fromString(address).network.name, 'testnet')
+      }
+      else {
+        assert.equal(Address.fromString(address).network.name, network.name)
+      }
 
     } catch (err) {
       throw new errors.Slave.InvalidAddresses()
