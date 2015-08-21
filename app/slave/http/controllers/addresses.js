@@ -79,12 +79,13 @@ function query (req) {
             })
           }
 
-          return items
+          return _.unique(items, 'txid')
         }))
       }
 
       value = _.sortBy(value.filter(function (item) {
-        if (!(item.height > from && item.height <= to)) {
+        if ((item.height !== null)
+            && !(item.height > from && item.height <= to)) {
           return false
         }
 
