@@ -7,7 +7,7 @@ var timers = require('timers')
 var Promise = require('bluebird')
 var bitcore = require('bitcore')
 var p2p = require('bitcore-p2p')
-var RpcClient = require('bitcoind-rpc')
+var RpcClient = require('bitcoind-rpc-client')
 
 var config = require('../../lib/config')
 var errors = require('../../lib/errors')
@@ -47,30 +47,32 @@ Network.prototype._initBitcoind = function () {
   var self = this
 
   // create rpc client
-  self.bitcoind = Promise.promisifyAll(new RpcClient({
+  self.bitcoind = new RpcClient({
     host: config.get('bitcoind.rpc.host'),
     port: config.get('bitcoind.rpc.port'),
     user: config.get('bitcoind.rpc.user'),
     pass: config.get('bitcoind.rpc.pass'),
-    protocol: config.get('bitcoind.rpc.protocol')
-  }))
+    ssl: config.get('bitcoind.rpc.protocol') === 'https'
+  })
 
   // request info
-  return self.bitcoind.getInfoAsync()
-    .then(function (ret) {
-      // check network
-      var bitcoindNetwork = ret.result.testnet ? 'testnet' : 'livenet'
-      var chromanodeNetwork = config.get('chromanode.network')
-      if (bitcoindNetwork !== chromanodeNetwork &&
-          !(bitcoindNetwork === 'livenet' && chromanodeNetwork === 'regtest')) {
-        throw new errors.InvalidBitcoindNetwork(bitcoindNetwork, chromanodeNetwork)
-      }
+  return Promise.try(function () {
+    return self.bitcoind.getInfo()
+  })
+  .then(function (ret) {
+    // check network
+    var bitcoindNetwork = ret.result.testnet ? 'testnet' : 'livenet'
+    var chromanodeNetwork = config.get('chromanode.network')
+    if (bitcoindNetwork !== chromanodeNetwork &&
+        !(bitcoindNetwork === 'livenet' && chromanodeNetwork === 'regtest')) {
+      throw new errors.InvalidBitcoindNetwork(bitcoindNetwork, chromanodeNetwork)
+    }
 
-      // show info
-      logger.info(
-        'Bitcoind checked. (version %d, bestHeight: %s, connections: %s)',
-        ret.result.version, ret.result.blocks, ret.result.connections)
-    })
+    // show info
+    logger.info(
+      'Bitcoind checked. (version %d, bestHeight: %s, connections: %s)',
+      ret.result.version, ret.result.blocks, ret.result.connections)
+  })
 }
 
 /**
@@ -140,16 +142,22 @@ Network.prototype._initTrustedPeer = function () {
  * @return {Promise<Object>}
  */
 Network.prototype.getBitcoindInfo = function () {
-  return this.bitcoind.getInfoAsync()
-    .then(function (ret) { return ret.result })
+  var self = this
+  return Promise.try(function () {
+    return self.bitcoind.getInfo()
+  })
+  .then(function (ret) { return ret.result })
 }
 
 /**
  * @return {Promise<number>}
  */
 Network.prototype.getBlockCount = function () {
-  return this.bitcoind.getBlockCountAsync()
-    .then(function (ret) { return ret.result })
+  var self = this
+  return Promise.try(function () {
+    return self.bitcoind.getBlockCount()
+  })
+  .then(function (ret) { return ret.result })
 }
 
 /**
@@ -157,8 +165,11 @@ Network.prototype.getBlockCount = function () {
  * @return {Promise<string>}
  */
 Network.prototype.getBlockHash = function (height) {
-  return this.bitcoind.getBlockHashAsync(height)
-    .then(function (ret) { return ret.result })
+  var self = this
+  return Promise.try(function () {
+    return self.bitcoind.getBlockHash(height)
+  })
+  .then(function (ret) { return ret.result })
 }
 
 /**
@@ -175,7 +186,7 @@ Network.prototype.getBlock = function (id) {
     return id
   })
   .then(function (hash) {
-    return self.bitcoind.getBlockAsync(hash, false)
+    return self.bitcoind.getBlock(hash, false)
   })
   .then(function (ret) {
     var rawBlock = new Buffer(ret.result, 'hex')
@@ -188,13 +199,15 @@ Network.prototype.getBlock = function (id) {
  */
 Network.prototype.getLatest = function () {
   var self = this
-  return self.getBlockCount()
-    .then(function (height) {
-      return Promise.all([height, self.getBlockHash(height)])
-    })
-    .spread(function (height, hash) {
-      return {hash: hash, height: height}
-    })
+  return Promise.try(function () {
+    return self.getBlockCount()
+  })
+  .then(function (height) {
+    return Promise.all([height, self.getBlockHash(height)])
+  })
+  .spread(function (height, hash) {
+    return {hash: hash, height: height}
+  })
 }
 
 /**
@@ -203,11 +216,14 @@ Network.prototype.getLatest = function () {
  * @return {Promise<bitcore.Transaction>}
  */
 Network.prototype.getTx = function (txid) {
-  return this.bitcoind.getRawTransactionAsync(txid)
-    .then(function (ret) {
-      var rawtx = new Buffer(ret.result, 'hex')
-      return new bitcore.Transaction(rawtx)
-    })
+  var self = this
+  return Promise.try(function () {
+    return self.bitcoind.getRawTransaction(txid)
+  })
+  .then(function (ret) {
+    var rawtx = new Buffer(ret.result, 'hex')
+    return new bitcore.Transaction(rawtx)
+  })
 }
 
 /**
@@ -215,15 +231,21 @@ Network.prototype.getTx = function (txid) {
  * @return {Promise}
  */
 Network.prototype.sendTx = function (rawtx) {
-  return this.bitcoind.sendRawTransactionAsync(rawtx)
+  var self = this
+  return Promise.try(function () {
+    return self.bitcoind.sendRawTransaction(rawtx)
+  })
 }
 
 /**
  * @return {Promise<string[]>}
  */
 Network.prototype.getMempoolTxs = function () {
-  return this.bitcoind.getRawMemPoolAsync()
-    .then(function (ret) { return ret.result })
+  var self = this
+  return Promise.try(function () {
+    return self.bitcoind.getRawMemPool()
+  })
+  .then(function (ret) { return ret.result })
 }
 
 module.exports = Network

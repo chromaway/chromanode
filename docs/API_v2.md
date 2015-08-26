@@ -211,10 +211,10 @@ That is, given otxid and oindex find itxid and iheight.
 
   **query**
 
-| param | description    |
-|:------|:---------------|
+| param  | description           |
+|:-------|:----------------------|
 | otxid  | output transaction id |
-| oindex | output index |
+| oindex | output index          |
 
 
     /v2/transactions/spent?otxid=f8fa0c30e57a5900c7a0fd96f73ebebe8eafb4667224c3e49a172c20e2b58235&oindex=0
@@ -232,7 +232,7 @@ That is, given otxid and oindex find itxid and iheight.
     {
         "spent": false
     }
-    
+
 
   **errors**
 

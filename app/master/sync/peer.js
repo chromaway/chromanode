@@ -4,6 +4,7 @@ var _ = require('lodash')
 var inherits = require('util').inherits
 var timers = require('timers')
 var Promise = require('bluebird')
+var makeConcurrent = require('make-concurrent')(Promise)
 
 var logger = require('../../../lib/logger').logger
 var util = require('../../../lib/util')
@@ -355,14 +356,14 @@ PeerSync.prototype._importDependsFrom = function (txid) {
  * @param {function} fn
  * @return {Promise}
  */
-PeerSync.prototype._executor = util.makeConcurrent(function (fn) {
+PeerSync.prototype._executor = makeConcurrent(function (fn) {
   return fn()
 }, {concurrency: 1})
 
 /**
  * @return {Promise}
  */
-PeerSync.prototype._runBlockImport = util.makeConcurrent(function () {
+PeerSync.prototype._runBlockImport = makeConcurrent(function () {
   var self = this
   // get latest from bitcoind
   return self._network.getLatest()

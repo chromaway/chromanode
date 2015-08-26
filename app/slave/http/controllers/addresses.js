@@ -59,7 +59,7 @@ function query (req) {
         value = results.rows.map(function (row) {
           return {
             txid: row.otxid.toString('hex'),
-            vount: row.oindex,
+            vout: row.oindex,
             value: row.ovalue,
             script: row.oscript.toString('hex'),
             height: row.oheight

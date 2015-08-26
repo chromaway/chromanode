@@ -4,6 +4,7 @@ var _ = require('lodash')
 var inherits = require('util').inherits
 var timers = require('timers')
 var Promise = require('bluebird')
+var makeConcurrent = require('make-concurrent')(Promise)
 var LRU = require('lru-cache')
 
 var config = require('../../../lib/config')
@@ -132,7 +133,7 @@ HistorySync.prototype._importBlock = function (block, height, client) {
 HistorySync.prototype.run = function () {
   var self = this
 
-  var onBlockchainNewBlock = util.makeConcurrent(function () {
+  var onBlockchainNewBlock = makeConcurrent(function () {
     return self._network.getLatest()
       .then(function (newBlockchainLatest) {
         self._blockchainLatest = newBlockchainLatest

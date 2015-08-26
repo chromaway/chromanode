@@ -3,6 +3,7 @@
 var _ = require('lodash')
 var timers = require('timers')
 var Promise = require('bluebird')
+var makeConcurrent = require('make-concurrent')(Promise)
 
 var config = require('../../lib/config')
 var logger = require('../../lib/logger').logger
@@ -140,7 +141,7 @@ Master.prototype._installBitcoindHandlers = function () {
       })
   }
 
-  var onNewBlock = util.makeConcurrent(function () {
+  var onNewBlock = makeConcurrent(function () {
     return self.network.getLatest()
       .then(function (latest) {
         if (self.status.bitcoind.latest.hash !== latest.hash) {

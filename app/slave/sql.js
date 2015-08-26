@@ -60,8 +60,7 @@ module.exports = {
                     '    iheight as iheight ' +
                     '  FROM history ' +
                     '    WHERE ' +
-                    '      address = ANY($1) ',
-
+                    '      address = ANY($1)',
       unspent: 'SELECT ' +
                '    otxid as otxid, ' +
                '    oindex as oindex, ' +
