@@ -1,5 +1,4 @@
 #!/usr/bin/env node
 
-require('../app/common').run(function () {
-  return require('../app/slave').run()
-})
+var app = require('../app/slave')
+require('../app/lib/init')(app)

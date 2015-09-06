@@ -1,6 +1,4 @@
-'use strict'
-
-module.exports = {
+export default {
   insert: {
     blocks: {
       row: 'INSERT INTO blocks ' +
@@ -13,7 +11,6 @@ module.exports = {
                  '    (txid, height, tx) ' +
                  '  VALUES ' +
                  '    ($1, $2, $3)',
-
       unconfirmed: 'INSERT INTO transactions ' +
                    '    (txid, tx) ' +
                    '  VALUES ' +
@@ -24,7 +21,6 @@ module.exports = {
                        '    (address, otxid, oindex, ovalue, oscript, oheight) ' +
                        '  VALUES ' +
                        '    ($1, $2, $3, $4, $5, $6)',
-
       unconfirmedOutput: 'INSERT INTO history ' +
                          '    (address, otxid, oindex, ovalue, oscript) ' +
                          '  VALUES ' +
@@ -32,7 +28,7 @@ module.exports = {
     }
   },
   select: {
-    new_txs: {
+    newTx: {
       byId: 'SELECT hex FROM new_txs WHERE id = $1'
     },
     blocks: {
@@ -43,7 +39,6 @@ module.exports = {
               '  FROM blocks ' +
               '    ORDER BY height DESC ' +
               '    LIMIT 1',
-
       txids: 'SELECT ' +
              '    txids as txids ' +
              '  FROM blocks ' +
@@ -56,7 +51,6 @@ module.exports = {
            '  FROM transactions ' +
            '    WHERE ' +
            '      txid = $1',
-
       unconfirmed: 'SELECT ' +
                    '    txid as txid ' +
                    '  FROM transactions ' +
@@ -82,7 +76,6 @@ module.exports = {
                          '    oindex = $4 ' +
                          '  RETURNING ' +
                          '    address',
-
       addUnconfirmedInput: 'UPDATE history ' +
                            '  SET ' +
                            '    itxid = $1 ' +
@@ -91,7 +84,6 @@ module.exports = {
                            '    oindex = $3' +
                            '  RETURNING ' +
                            '    address',
-
       makeConfirmed: 'UPDATE history ' +
                      '  SET ' +
                      '    iheight = $1, ' +
@@ -101,21 +93,18 @@ module.exports = {
                      '    otxid = $2 ' +
                      '  RETURNING ' +
                      '    address',
-
       deleteInputsFromHeight: 'UPDATE history ' +
                               '  SET ' +
                               '    itxid = NULL, ' +
                               '    iheight = NULL ' +
                               '  WHERE ' +
                               '    iheight > $1',
-
       deleteUnconfirmedInputs: 'UPDATE history ' +
                                '  SET ' +
                                '    itxid = NULL ' +
                                '  WHERE ' +
                                '    itxid IS NOT NULL AND' +
                                '    iheight IS NULL',
-
       deleteUnconfirmedInputsByTxIds: 'UPDATE history ' +
                                       '  SET ' +
                                       '    itxid = NULL ' +
@@ -124,7 +113,7 @@ module.exports = {
     }
   },
   delete: {
-    new_txs: {
+    newTx: {
       byId: 'DELETE FROM new_txs WHERE id = $1'
     },
     blocks: {
@@ -136,11 +125,9 @@ module.exports = {
       fromHeight: 'DELETE FROM transactions ' +
                   '  WHERE ' +
                   '    height > $1',
-
       unconfirmed: 'DELETE FROM transactions ' +
                    '  WHERE ' +
                    '    height IS NULL',
-
       unconfirmedByTxIds: 'DELETE FROM transactions ' +
                           '  WHERE ' +
                           '    txid = ANY($1)'
@@ -149,11 +136,9 @@ module.exports = {
       fromHeight: 'DELETE FROM history ' +
                   '  WHERE ' +
                   '    oheight > $1',
-
       unconfirmed: 'DELETE FROM history ' +
                    '  WHERE ' +
                    '    oheight IS NULL',
-
       unconfirmedByTxIds: 'DELETE FROM history ' +
                           '  WHERE ' +
                           '    otxid = ANY($1)'
