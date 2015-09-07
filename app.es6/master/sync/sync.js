@@ -18,6 +18,11 @@ let Hash = bitcore.crypto.Hash
  */
 
 /**
+ * @event Sync#tx
+ * @param {string} txid
+ */
+
+/**
  * @class Sync
  * @extends events.EventEmitter
  */

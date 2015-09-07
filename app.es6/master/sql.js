@@ -28,9 +28,6 @@ export default {
     }
   },
   select: {
-    newTx: {
-      byId: 'SELECT hex FROM new_txs WHERE id = $1'
-    },
     blocks: {
       latest: 'SELECT ' +
               '    height as height, ' +
@@ -59,6 +56,9 @@ export default {
     }
   },
   update: {
+    newTx: {
+      getAndRemove: 'DELETE FROM new_txs WHERE id = $1 RETURNING hex'
+    },
     transactions: {
       makeConfirmed: 'UPDATE transactions ' +
                      '  SET ' +
@@ -113,9 +113,6 @@ export default {
     }
   },
   delete: {
-    newTx: {
-      byId: 'DELETE FROM new_txs WHERE id = $1'
-    },
     blocks: {
       fromHeight: 'DELETE FROM blocks ' +
                   '  WHERE ' +

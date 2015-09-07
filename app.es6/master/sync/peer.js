@@ -238,7 +238,8 @@ export default class PeerSync extends Sync {
       return true
     })
     .then((value) => {
-      logger.verbose(`Import tx ${txid}, elapsed time: ${stopwatch.getValue()}`)
+      this.emit('tx', txid)
+      logger.verbose(`Import unconfirmed tx ${txid}, elapsed time: ${stopwatch.getValue()}`)
       return value
     })
     .catch((err) => {
@@ -298,6 +299,7 @@ export default class PeerSync extends Sync {
       for (; txids.length !== 0; txids = txids.slice(32)) {
         let txid = txids.slice(0, 32)
         setImmediate(::this._importDependsFrom, txid)
+        this.emit('tx', txid)
       }
 
       // sync with bitcoind mempool

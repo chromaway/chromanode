@@ -2,6 +2,7 @@ import _ from 'lodash'
 import { setImmediate } from 'timers'
 import makeConcurrent from 'make-concurrent'
 import PUtils from 'promise-useful-utils'
+import bitcore from 'bitcore'
 
 import config from '../lib/config'
 import logger from '../lib/logger'
@@ -9,10 +10,13 @@ import Storage from '../lib/storage'
 import Messages from '../lib/messages'
 import Network from './network'
 import Slaves from './slaves'
+import util from '../lib/util'
 import { VERSION } from '../lib/const'
 import HistorySync from './sync/history'
 import PeerSync from './sync/peer'
 import SQL from './sql'
+
+let sha256sha256 = bitcore.crypto.Hash.sha256sha256
 
 export default async function () {
   let status = {
@@ -84,18 +88,33 @@ export default async function () {
   await onNewBlock()
 
   // setup listener for event sendTx from slaves
+  let sendTxDeferreds = {}
   slaves.on('sendTx', (id) => {
-    // TODO: wait event from chromanode that tx was added to storage!
+    let txid
     storage.executeTransaction(async (client) => {
-      let result = await client.queryAsync(SQL.select.newTx.byId, [id])
-      logger.verbose(`sendTx ${result.rows[0].hex}`)
-      await client.queryAsync(SQL.delete.newTx.byId, [id])
+      let result = await client.queryAsync(SQL.update.newTx.getAndRemove, [id])
+      let rawTx = result.rows[0].hex
+      txid = util.encode(sha256sha256(new Buffer(rawTx, 'hex')))
+      logger.verbose(`sendTx: ${txid} (${rawTx})`)
+
+      let addedToStorage = new Promise((resolve) => {
+        sendTxDeferreds[txid] = {resolve: resolve}
+      })
+
       await network.sendTx(result.rows[0].hex)
-      logger.verbose('sendTx', 'success')
+
+      await addedToStorage
+
+      logger.verbose(`sendTx: success (${txid})`)
       return null
     })
     .catch((err) => {
-      logger.error('sendTx', err)
+      logger.error(`sendTx: (${txid}) ${err.stack}`)
+
+      if (txid) {
+        delete sendTxDeferreds[txid]
+      }
+
       if (err instanceof Error) {
         return {code: null, message: err.message}
       }
@@ -133,9 +152,18 @@ export default async function () {
   // dynamically sync with bitcoin p2p network
   sync = new PeerSync(storage, messages, network, slaves)
   logger.info('Run peer sync ...')
+
   sync.on('latest', (latest) => {
     status.latest = latest
     broadcastStatus()
+  })
+
+  sync.on('tx', (txid) => {
+    let deferred = sendTxDeferreds[txid]
+    if (deferred) {
+      delete sendTxDeferreds[txid]
+      deferred.resolve()
+    }
   })
 
   await sync.run()
