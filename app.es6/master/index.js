@@ -97,8 +97,11 @@ export default async function () {
       txid = util.encode(sha256sha256(new Buffer(rawTx, 'hex')))
       logger.verbose(`sendTx: ${txid} (${rawTx})`)
 
-      let addedToStorage = new Promise((resolve) => {
-        sendTxDeferreds[txid] = {resolve: resolve}
+      let addedToStorage = new Promise((resolve, reject) => {
+        sendTxDeferreds[txid] = {
+          resolve: resolve,
+          timeoutId: setTimeout(reject, 1800000) // 30 min.
+        }
       })
 
       await network.sendTx(result.rows[0].hex)
@@ -111,7 +114,8 @@ export default async function () {
     .catch((err) => {
       logger.error(`sendTx: (${txid}) ${err.stack}`)
 
-      if (txid) {
+      if (txid && sendTxDeferreds[txid]) {
+        clearTimeout(sendTxDeferreds[txid].timeoutId)
         delete sendTxDeferreds[txid]
       }
 
@@ -161,8 +165,9 @@ export default async function () {
   sync.on('tx', (txid) => {
     let deferred = sendTxDeferreds[txid]
     if (deferred) {
-      delete sendTxDeferreds[txid]
       deferred.resolve()
+      clearTimeout(deferred.timeoutId)
+      delete sendTxDeferreds[txid]
     }
   })
 
