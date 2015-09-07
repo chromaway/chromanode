@@ -81,7 +81,7 @@ export default class Network extends EventEmitter {
       network: config.get('chromanode.network')
     })
 
-    setImmediate(() => { this._peer.connect() })
+    setImmediate(::this._peer.connect)
 
     // inv event
     this._peer.on('inv', (message) => {

@@ -64,7 +64,6 @@ export default async function () {
           status.errors = info.errors
           broadcastStatus()
         }
-
       } catch (err) {
         logger.error(`Update bitcoind info: ${err.stack}`)
       }
@@ -87,12 +86,12 @@ export default async function () {
   // setup listener for event sendTx from slaves
   slaves.on('sendTx', (id) => {
     // TODO: wait event from chromanode that tx was added to storage!
-    storage.execute(async (client) => {
+    storage.executeTransaction(async (client) => {
       let result = await client.queryAsync(SQL.select.newTx.byId, [id])
-      logger.info(`sendTx ${result.rows[0].hex}`)
+      logger.verbose(`sendTx ${result.rows[0].hex}`)
       await client.queryAsync(SQL.delete.newTx.byId, [id])
       await network.sendTx(result.rows[0].hex)
-      logger.info('sendTx', 'success')
+      logger.verbose('sendTx', 'success')
       return null
     })
     .catch((err) => {

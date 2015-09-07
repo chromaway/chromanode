@@ -26,7 +26,6 @@ export default class Slaves extends EventEmitter {
     PUtils.try(async () => {
       await this.messages.ready
       await this.messages.listen('sendtx', (payload) => {
-        payload = JSON.parse(payload)
         this.emit('sendTx', payload.id)
       })
     })
@@ -37,17 +36,6 @@ export default class Slaves extends EventEmitter {
   }
 
   /**
-   * @param {string} channel
-   * @param {Object} obj
-   * @param {Object} [opts]
-   * @param {pg.Client} [opts.client]
-   * @return {Promise}
-   */
-  notify (channel, obj, opts) {
-    return this.messages.notify(channel, JSON.stringify(obj), opts)
-  }
-
-  /**
    * @param {string} id
    * @param {?Object} err
    * @param {Object} [opts]
@@ -55,7 +43,7 @@ export default class Slaves extends EventEmitter {
    * @return {Promise}
    */
   sendTxResponse (id, err, opts) {
-    return this.notify('sendtxresponse', {
+    return this.messages.notify('sendtxresponse', {
       id: id,
       status: err === null ? 'success' : 'fail',
       code: _.get(err, 'code'),
@@ -71,7 +59,7 @@ export default class Slaves extends EventEmitter {
    * @return {Promise}
    */
   broadcastBlock (hash, height, opts) {
-    return this.notify('broadcastblock', {
+    return this.messages.notify('broadcastblock', {
       hash: hash,
       height: height
     }, opts)
@@ -86,7 +74,7 @@ export default class Slaves extends EventEmitter {
    * @return {Promise}
    */
   broadcastTx (txid, blockHash, blockHeight, opts) {
-    return this.notify('broadcasttx', {
+    return this.messages.notify('broadcasttx', {
       txid: txid,
       blockHash: blockHash,
       blockHeight: blockHeight
@@ -103,7 +91,7 @@ export default class Slaves extends EventEmitter {
    * @return {Promise}
    */
   broadcastAddress (address, txid, blockHash, blockHeight, opts) {
-    return this.notify('broadcastaddress', {
+    return this.messages.notify('broadcastaddress', {
       address: address,
       txid: txid,
       blockHash: blockHash,
@@ -118,7 +106,7 @@ export default class Slaves extends EventEmitter {
    * @return {Promise}
    */
   broadcastStatus (status, opts) {
-    return this.notify('broadcaststatus', status, opts)
+    return this.messages.notify('broadcaststatus', status, opts)
   }
 }
 

@@ -47,6 +47,7 @@
     "bitcoind-rpc-client": "^0.1.1",
     "bitcore": "^0.13.2",
     "bitcore-p2p": "^0.15.1",
+    "bluebird": "^2.9.34",
     "body-parser": "^1.13.3",
     "buffer-equal": "0.0.1",
     "compression": "^1.5.2",

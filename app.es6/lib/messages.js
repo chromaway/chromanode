@@ -42,7 +42,7 @@ export default class Messages {
 
         // emit msg to _events
         this._listener.on('notification', (msg) => {
-          this._events.emit(msg.channel, msg.payload)
+          this._events.emit(msg.channel, JSON.parse(msg.payload))
         })
 
         // re-create on error
@@ -97,7 +97,7 @@ export default class Messages {
     }
 
     await execute((client) => {
-      return client.queryAsync(`NOTIFY ${channel}, \'${payload}\'`)
+      return client.queryAsync(`NOTIFY ${channel}, \'${JSON.stringify(payload)}\'`)
     })
   }
 }

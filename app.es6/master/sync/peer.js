@@ -1,12 +1,13 @@
 import _ from 'lodash'
 import { setImmediate } from 'timers'
-import makeConcurrent from 'make-concurrent'
 import ElapsedTime from 'elapsed-time'
+import PUtils from 'promise-useful-utils'
 
 import logger from '../../lib/logger'
 import { ZERO_HASH } from '../../lib/const'
 import Sync from './sync'
 import SQL from '../sql'
+import { ConcurrentImport } from '../../lib/util'
 
 /**
  * @class PeerSync
@@ -24,7 +25,9 @@ export default class PeerSync extends Sync {
       next: {}  // txid -> txid[]
     }
 
-    this._withLock = makeConcurrent((fn) => { return fn() }, {concurrency: 1})
+    let ci = new ConcurrentImport()
+    this._importUnconfirmedTx = ci.apply(this._importUnconfirmedTx, this, 'tx')
+    this._runBlockImport = ci.apply(this._runBlockImport, this, 'block')
   }
 
   /**
@@ -37,26 +40,31 @@ export default class PeerSync extends Sync {
     let txids = _.pluck(block.transactions, 'hash')
     let existingTx = {}
 
+    // accamulate not depends queries, should speedup process
+    let promises = []
+
     // import header
-    await client.queryAsync(SQL.insert.blocks.row, [
+    promises.push(client.queryAsync(SQL.insert.blocks.row, [
       height,
       '\\x' + block.hash,
       '\\x' + block.header.toString(),
       '\\x' + txids.join('')
-    ])
+    ]))
 
     // broadcast about block
-    await this._slaves.broadcastBlock(block.hash, height, {client: client})
+    promises.push(
+      this._slaves.broadcastBlock(block.hash, height, {client: client}))
 
     // import transactions & outputs
     await* block.transactions.map(async (tx, txIndex) => {
-      // import transaction
       let txid = txids[txIndex]
 
+      // tx already in storage ?
       let result = await client.queryAsync(
         SQL.select.transactions.has, ['\\x' + txid])
 
       if (result.rows[0].count === '0') {
+        // import transaction
         await client.queryAsync(SQL.insert.transactions.confirmed, [
           '\\x' + txid,
           height,
@@ -67,7 +75,10 @@ export default class PeerSync extends Sync {
         await* tx.outputs.map((output, index) => {
           let addresses = this._safeGetAddresses(output, txid, index)
           return Promise.all(addresses.map((address) => {
-            let insert = client.queryAsync(SQL.insert.history.confirmedOutput, [
+            promises.push(
+              this._slaves.broadcastAddress(address, txid, block.hash, height, {client: client}))
+
+            return client.queryAsync(SQL.insert.history.confirmedOutput, [
               address,
               '\\x' + txid,
               index,
@@ -75,11 +86,6 @@ export default class PeerSync extends Sync {
               '\\x' + output.script.toHex(),
               height
             ])
-
-            let broadcast = this._slaves.broadcastAddress(
-              address, txid, block.hash, height, {client: client})
-
-            return Promise.all([insert, broadcast])
           }))
         })
       } else {
@@ -92,17 +98,15 @@ export default class PeerSync extends Sync {
         result = await client.queryAsync(
           SQL.update.history.makeConfirmed, [height, '\\x' + txid])
 
-        await* _.chain(result.rows)
-          .pluck('address')
-          .invoke('toString', 'hex')
-          .map((address) => {
-            return this._slaves.broadcastAddress(
-              address, txid, block.hash, height, {client: client})
-          })
-          .value()
+        for (let row of result.rows) {
+          let address = row.address.toString('hex')
+          promises.push(
+            this._slaves.broadcastAddress(address, txid, block.hash, height, {client: client}))
+        }
       }
 
-      await this._slaves.broadcastTx(txid, block.hash, height, {client: client})
+      promises.push(
+        this._slaves.broadcastTx(txid, block.hash, height, {client: client}))
     })
 
     // import inputs
@@ -121,25 +125,22 @@ export default class PeerSync extends Sync {
           return
         }
 
-        let result = client.queryAsync(SQL.update.history.addConfirmedInput, [
+        let {rows} = await client.queryAsync(SQL.update.history.addConfirmedInput, [
           '\\x' + txid,
           height,
           '\\x' + prevTxId,
           input.outputIndex
         ])
 
-        let promises = _.chain(result.rows)
-          .pluck('address')
-          .invoke('toString', 'hex')
-          .map((address) => {
-            return this._slaves.broadcastAddress(
-              address, txid, block.hash, height, {client: client})
-          })
-          .value()
-
-        return Promise.all(promises)
+        for (let row of rows) {
+          let address = row.address.toString('hex')
+          promises.push(
+            this._slaves.broadcastAddress(address, txid, block.hash, height, {client: client}))
+        }
       }))
     })
+
+    await* promises
   }
 
   /**
@@ -184,56 +185,55 @@ export default class PeerSync extends Sync {
         for (let dep of deps) {
           this._orphanedTx.next[dep] = _.union(this._orphanedTx.next[dep], [txid])
         }
-        logger.warn(`Found orphan tx: ${txid} (deps: ${deps.join(', ')})`)
+        logger.warn(`Orphan tx: ${txid} (deps: ${deps.join(', ')})`)
         return false
       }
 
+      // accamulate not depends queries, should speedup process
+      let promises = []
+
       // import transaction
-      await client.queryAsync(SQL.insert.transactions.unconfirmed, [
+      promises.push(client.queryAsync(SQL.insert.transactions.unconfirmed, [
         '\\x' + txid,
         '\\x' + tx.toString()
-      ])
+      ]))
 
       // import outputs
       await* tx.outputs.map((output, index) => {
         let addresses = this._safeGetAddresses(output, txid, index)
         return Promise.all(addresses.map((address) => {
-          let insert = client.queryAsync(SQL.insert.history.unconfirmedOutput, [
+          promises.push(
+            this._slaves.broadcastAddress(address, txid, null, null, {client: client}))
+
+          return client.queryAsync(SQL.insert.history.unconfirmedOutput, [
             address,
             '\\x' + txid,
             index,
             output.satoshis,
             '\\x' + output.script.toHex()
           ])
-
-          let broadcast = this._slaves.broadcastAddress(
-            address, txid, null, null, {client: client})
-
-          return Promise.all([insert, broadcast])
         }))
       })
 
       // import intputs
       await* tx.inputs.map(async (input, index) => {
-        let result = await client.queryAsync(SQL.update.history.addUnconfirmedInput, [
+        let {rows} = await client.queryAsync(SQL.update.history.addUnconfirmedInput, [
           '\\x' + txid,
           '\\x' + input.prevTxId.toString('hex'),
           input.outputIndex
         ])
 
-        let promises = _.chain(result.rows)
-          .pluck('address')
-          .invoke('toString', 'hex')
-          .map((address) => {
-            return this._slaves.broadcastAddress(
-              address, txid, null, null, {client: client})
-          })
-          .value()
-
-        return Promise.all(promises)
+        for (let row of rows) {
+          let address = row.address.toString('hex')
+          promises.push(
+            this._slaves.broadcastAddress(address, txid, null, null, {client: client}))
+        }
       })
 
-      await this._slaves.broadcastTx(txid, null, null, {client: client})
+      promises.push(
+        this._slaves.broadcastTx(txid, null, null, {client: client}))
+
+      await* promises
 
       return true
     })
@@ -244,34 +244,6 @@ export default class PeerSync extends Sync {
     .catch((err) => {
       logger.error(`Import unconfirmed tx: ${err.stack}`)
     })
-  }
-
-  /**
-   * @return {Promise}
-   */
-  async _updateMempool () {
-    let [nTxIds, sTxIds] = await Promise.all([
-      this._network.getMempoolTxs(),
-      this._storage.executeQuery(SQL.select.transactions.unconfirmed)
-    ])
-
-    sTxIds = sTxIds.rows.map((row) => { return row.txid.toString('hex') })
-
-    let toRemove = _.difference(sTxIds, nTxIds)
-    if (toRemove.length > 0) {
-      toRemove = toRemove.map((txid) => { return '\\x' + txid })
-      await this._storage.executeTransaction((client) => {
-        return Promise.all([
-          client.queryAsync(SQL.delete.transactions.unconfirmedByTxIds, [toRemove]),
-          client.queryAsync(SQL.delete.history.unconfirmedByTxIds, [toRemove]),
-          client.queryAsync(SQL.update.history.deleteUnconfirmedInputsByTxIds, [toRemove])
-        ])
-      })
-    }
-
-    for (let txid of _.difference(nTxIds, sTxIds)) {
-      this._runTxImport(txid)
-    }
   }
 
   /**
@@ -292,7 +264,7 @@ export default class PeerSync extends Sync {
       let deps = _.without(this._orphanedTx.prev[orphaned], txid)
       if (deps.length > 0) {
         this._orphanedTx.prev[orphaned] = deps
-        return
+        continue
       }
 
       // run import if all ok
@@ -305,36 +277,66 @@ export default class PeerSync extends Sync {
   /**
    * @return {Promise}
    */
-  _runBlockImport = makeConcurrent(async function () {
+  async _runBlockImport () {
     try {
       this._blockchainLatest = await this._network.getLatest()
 
-      await this._withLock(async () => {
-        let updated = await this._updateChain()
-        if (updated === false) {
-          return
-        }
+      let updated = await this._updateChain()
+      if (updated === false) {
+        return
+      }
 
-        logger.info(`New latest! ${this._latest.hash}:${this._latest.height}`)
+      logger.info(`New latest! ${this._latest.hash}:${this._latest.height}`)
 
-        this.emit('latest', this._latest)
+      this.emit('latest', this._latest)
 
-        let result = await this._storage.executeQuery(
-          SQL.select.blocks.txids, [this._latest.height])
+      // update orphaned tx's
+      let result = await this._storage.executeQuery(
+        SQL.select.blocks.txids, [this._latest.height])
 
-        let txids = result.rows[0].txids.toString('hex')
-        for (; txids.length !== 0; txids = txids.slice(32)) {
-          let txid = txids.slice(0, 32)
-          this._importDependsFrom(txid)
-        }
+      let txids = result.rows[0].txids.toString('hex')
+      for (; txids.length !== 0; txids = txids.slice(32)) {
+        let txid = txids.slice(0, 32)
+        setImmediate(::this._importDependsFrom, txid)
+      }
 
-        await this._updateMempool()
-      })
+      // sync with bitcoind mempool
+      let [nTxIds, sTxIds] = await Promise.all([
+        this._network.getMempoolTxs(),
+        this._storage.executeQuery(SQL.select.transactions.unconfirmed)
+      ])
+
+      sTxIds = sTxIds.rows.map((row) => { return row.txid.toString('hex') })
+
+      let toRemove = _.difference(sTxIds, nTxIds)
+      if (toRemove.length > 0) {
+        toRemove = toRemove.map((txid) => { return '\\x' + txid })
+        await this._storage.executeTransaction((client) => {
+          return Promise.all([
+            client.queryAsync(SQL.delete.transactions.unconfirmedByTxIds, [toRemove]),
+            client.queryAsync(SQL.delete.history.unconfirmedByTxIds, [toRemove]),
+            client.queryAsync(SQL.update.history.deleteUnconfirmedInputsByTxIds, [toRemove])
+          ])
+        })
+      }
+
+      for (let txid of _.difference(nTxIds, sTxIds)) {
+        setImmediate(::this._runTxImport, txid)
+      }
     } catch (err) {
-      // TODO: rollback this._latest !
       logger.error(`Block import: ${err.stack}`)
+
+      while (true) {
+        try {
+          this._latest = await this._getLatest()
+          break
+        } catch (err) {
+          logger.error(`Block import (get latest): ${err.stack}`)
+          await PUtils.delay(1000)
+        }
+      }
     }
-  }, {concurrency: 1})
+  }
 
   /**
    * @param {string} txid
@@ -345,10 +347,7 @@ export default class PeerSync extends Sync {
       let tx = await this._network.getTx(txid)
 
       // ... and run import
-      let imported = await this._withLock(() => {
-        return this._importUnconfirmedTx(tx)
-      })
-
+      let imported = await this._importUnconfirmedTx(tx)
       if (imported) {
         this._importDependsFrom(txid)
       }
