@@ -46,6 +46,7 @@ let SQL = {
       history: {
         address: 'CREATE INDEX ON history (address)',
         otxid_oindex: 'CREATE INDEX ON history (otxid, oindex)',
+        otxid: 'CREATE INDEX ON history (otxid)',
         oheight: 'CREATE INDEX ON history (oheight)',
         itxid: 'CREATE INDEX ON history (itxid)',
         iheight: 'CREATE INDEX ON history (iheight)'

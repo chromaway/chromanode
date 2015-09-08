@@ -93,11 +93,10 @@ export default class PeerSync extends Sync {
       } else {
         existingTx[txid] = true
 
-        await client.queryAsync(
-          SQL.update.transactions.makeConfirmed, [height, '\\x' + txid])
-
-        let {rows} = await client.queryAsync(
-          SQL.update.history.makeOutputConfirmed, [height, '\\x' + txid])
+        let [, {rows}] = await* [
+          client.queryAsync(SQL.update.transactions.makeConfirmed, [height, '\\x' + txid]),
+          client.queryAsync(SQL.update.history.makeOutputConfirmed, [height, '\\x' + txid])
+        ]
 
         for (let row of rows) {
           let address = row.address.toString('hex')
@@ -291,8 +290,8 @@ export default class PeerSync extends Sync {
         let result = await this._storage.executeQuery(
           SQL.select.blocks.txids, [this._latest.height])
         let txids = result.rows[0].txids.toString('hex')
-        for (let i = 0, length = txids.length / 32; i < length; i += 1) {
-          this.emit('tx', txids.slice(i * 32, (i + 1) * 32))
+        for (let i = 0, length = txids.length / 64; i < length; i += 1) {
+          this.emit('tx', txids.slice(i * 64, (i + 1) * 64))
         }
       } catch (err) {
         logger.error(`Block import: ${err.stack}`)

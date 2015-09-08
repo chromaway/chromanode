@@ -113,7 +113,7 @@ export default {
                                '  SET ' +
                                '    itxid = NULL ' +
                                '  WHERE ' +
-                               '    itxid IS NOT NULL AND' +
+                               '    itxid IS NOT NULL AND ' +
                                '    iheight IS NULL',
       deleteUnconfirmedInputsByTxIds: 'UPDATE history ' +
                                       '  SET ' +
@@ -146,7 +146,6 @@ export default {
       unconfirmed: 'DELETE FROM history ' +
                    '  WHERE ' +
                    '    oheight IS NULL',
-      // TODO: add otxid index? very rare case, but ... ?
       unconfirmedByTxIds: 'DELETE FROM history ' +
                           '  WHERE ' +
                           '    otxid = ANY($1)'
