@@ -89,9 +89,20 @@ export default class HistorySync extends Sync {
    * @return {Promise}
    */
   async run () {
+    // update latests
+    this._latest = await this._getLatest()
+    this._blockchainLatest = await this._network.getLatest()
+
+    // show info message
+    logger.info(`Got ${this._latest.height + 1} blocks in current db, out of ${this._blockchainLatest.height + 1} block at bitcoind`)
+
+    // return if difference not big
+    if (this._blockchainLatest.height - this._latest.height < 6 * 24 * 3) {
+      return
+    }
+
     // remove unconfirmed data
     await this._storage.executeTransaction(async (client) => {
-      // TODO: add indices ?
       let queries = [
         SQL.delete.transactions.unconfirmed,
         SQL.delete.history.unconfirmed,
@@ -111,13 +122,6 @@ export default class HistorySync extends Sync {
       this._blockchainLatest = await this._network.getLatest()
     }, {concurrency: 1})
     this._network.on('block', onBlockchainNewBlock)
-
-    // update latests
-    this._latest = await this._getLatest()
-    await onBlockchainNewBlock()
-
-    // show info message
-    logger.info(`Got ${this._latest.height + 1} blocks in current db, out of ${this._blockchainLatest.height + 1} block at bitcoind`)
 
     // sync with storage chain
     let needUpdate = true

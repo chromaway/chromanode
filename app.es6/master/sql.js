@@ -43,11 +43,15 @@ export default {
              '      height = $1'
     },
     transactions: {
-      has: 'SELECT ' +
-           '    COUNT(*) ' +
-           '  FROM transactions ' +
-           '    WHERE ' +
-           '      txid = $1',
+      exists: 'SELECT ' +
+              '    COUNT(*) ' +
+              '  FROM transactions ' +
+              '    WHERE ' +
+              '      txid = $1',
+      existsMany: 'SELECT ' +
+                  '    txid as txid ' +
+                  '  FROM transactions ' +
+                  '    WHERE txid = ANY($1)',
       unconfirmed: 'SELECT ' +
                    '    txid as txid ' +
                    '  FROM transactions ' +
@@ -84,15 +88,21 @@ export default {
                            '    oindex = $3' +
                            '  RETURNING ' +
                            '    address',
-      makeConfirmed: 'UPDATE history ' +
-                     '  SET ' +
-                     '    iheight = $1, ' +
-                     '    oheight = $1 ' +
-                     '  WHERE ' +
-                     '    itxid = $2 OR ' +
-                     '    otxid = $2 ' +
-                     '  RETURNING ' +
-                     '    address',
+      makeOutputConfirmed: 'UPDATE history ' +
+                           '  SET ' +
+                           '    oheight = $1 ' +
+                           '  WHERE ' +
+                           '    otxid = $2 ' +
+                           '  RETURNING ' +
+                           '    address',
+      makeInputConfirmed: 'UPDATE history ' +
+                           '  SET ' +
+                           '    iheight = $1 ' +
+                           '  WHERE ' +
+                           '    otxid = $2 AND' +
+                           '    oindex = $3 ' +
+                           '  RETURNING ' +
+                           '    address',
       deleteInputsFromHeight: 'UPDATE history ' +
                               '  SET ' +
                               '    itxid = NULL, ' +
@@ -136,6 +146,7 @@ export default {
       unconfirmed: 'DELETE FROM history ' +
                    '  WHERE ' +
                    '    oheight IS NULL',
+      // TODO: add otxid index? very rare case, but ... ?
       unconfirmedByTxIds: 'DELETE FROM history ' +
                           '  WHERE ' +
                           '    otxid = ANY($1)'

@@ -129,6 +129,7 @@ export default class Sync extends EventEmitter {
           break
         }
 
+        // don't remove? make unconfirmed?
         let queries = [
           SQL.delete.blocks.fromHeight,
           SQL.delete.transactions.fromHeight,

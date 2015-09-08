@@ -28,6 +28,8 @@ export default class PeerSync extends Sync {
     let ci = new ConcurrentImport()
     this._importUnconfirmedTx = ci.apply(this._importUnconfirmedTx, this, 'tx')
     this._runBlockImport = ci.apply(this._runBlockImport, this, 'block')
+
+    this.on('tx', ::this._importDependsFrom)
   }
 
   /**
@@ -61,7 +63,7 @@ export default class PeerSync extends Sync {
 
       // tx already in storage ?
       let result = await client.queryAsync(
-        SQL.select.transactions.has, ['\\x' + txid])
+        SQL.select.transactions.exists, ['\\x' + txid])
 
       if (result.rows[0].count === '0') {
         // import transaction
@@ -94,11 +96,10 @@ export default class PeerSync extends Sync {
         await client.queryAsync(
           SQL.update.transactions.makeConfirmed, [height, '\\x' + txid])
 
-        // TODO make wrong confirmed '(
-        result = await client.queryAsync(
-          SQL.update.history.makeConfirmed, [height, '\\x' + txid])
+        let {rows} = await client.queryAsync(
+          SQL.update.history.makeOutputConfirmed, [height, '\\x' + txid])
 
-        for (let row of result.rows) {
+        for (let row of rows) {
           let address = row.address.toString('hex')
           promises.push(
             this._slaves.broadcastAddress(address, txid, block.hash, height, {client: client}))
@@ -112,10 +113,6 @@ export default class PeerSync extends Sync {
     // import inputs
     await* block.transactions.map((tx, txIndex) => {
       let txid = txids[txIndex]
-      if (existingTx[txid] === true) {
-        return
-      }
-
       return Promise.all(tx.inputs.map(async (input, index) => {
         // skip coinbase
         let prevTxId = input.prevTxId.toString('hex')
@@ -125,14 +122,23 @@ export default class PeerSync extends Sync {
           return
         }
 
-        let {rows} = await client.queryAsync(SQL.update.history.addConfirmedInput, [
-          '\\x' + txid,
-          height,
-          '\\x' + prevTxId,
-          input.outputIndex
-        ])
+        let result
+        if (existingTx[txid] === true) {
+          result = await client.queryAsync(SQL.update.history.makeInputConfirmed, [
+            height,
+            '\\x' + prevTxId,
+            input.outputIndex
+          ])
+        } else {
+          result = await client.queryAsync(SQL.update.history.addConfirmedInput, [
+            '\\x' + txid,
+            height,
+            '\\x' + prevTxId,
+            input.outputIndex
+          ])
+        }
 
-        for (let row of rows) {
+        for (let row of result.rows) {
           let address = row.address.toString('hex')
           promises.push(
             this._slaves.broadcastAddress(address, txid, block.hash, height, {client: client}))
@@ -148,36 +154,23 @@ export default class PeerSync extends Sync {
    * @return {Promise<boolean>}
    */
   _importUnconfirmedTx (tx) {
-    /*
-     * @param {string} txid
-     * @param {pg.Client} client
-     * @return {Promise<boolean>}
-     */
-    let hasTx = async (txid, client) => {
-      let {rows} = await client.queryAsync(
-        SQL.select.transactions.has, ['\\x' + txid])
-
-      return rows[0].count !== '0'
-    }
-
-    let txid = tx.hash
+    let txid = tx.id
 
     let stopwatch = ElapsedTime.new().start()
     return this._storage.executeTransaction(async (client) => {
       // transaction already in database?
-      let alreadyExists = await hasTx(txid, client)
-      if (alreadyExists) {
+      let result = await client.queryAsync(
+        SQL.select.transactions.exists, ['\\x' + txid])
+      if (result.rows[0].count !== '0') {
         return false
       }
 
       // all inputs exists?
-      let deps = _.filter(await* tx.inputs.map(async (input) => {
-        let txid = input.prevTxId.toString('hex')
-        let exists = await hasTx(txid, client)
-        if (!exists) {
-          return txid
-        }
-      }))
+      let txids = _.invoke(_.pluck(tx.inputs, 'prevTxId'), 'toString', 'hex')
+      result = await client.queryAsync(
+        SQL.select.transactions.existsMany, [txids.map((i) => { return '\\x' + i })])
+      let deps = _.difference(txid,
+        _.invoke(_.pluck(result.rows, 'txid'), 'toString', 'hex'))
 
       // some input not exists yet, mark as orphaned and delay
       if (deps.length > 0) {
@@ -279,29 +272,44 @@ export default class PeerSync extends Sync {
    * @return {Promise}
    */
   async _runBlockImport () {
+    // while not reached latest block
+    do {
+      try {
+        this._blockchainLatest = await this._network.getLatest()
+
+        // out if already latest
+        let updated = await this._updateChain()
+        if (updated === false) {
+          return
+        }
+
+        logger.info(`New latest! ${this._latest.hash}:${this._latest.height}`)
+
+        this.emit('latest', this._latest)
+
+        // notify that tx was imported
+        let result = await this._storage.executeQuery(
+          SQL.select.blocks.txids, [this._latest.height])
+        let txids = result.rows[0].txids.toString('hex')
+        for (let i = 0, length = txids.length / 32; i < length; i += 1) {
+          this.emit('tx', txids.slice(i * 32, (i + 1) * 32))
+        }
+      } catch (err) {
+        logger.error(`Block import: ${err.stack}`)
+
+        while (true) {
+          try {
+            this._latest = await this._getLatest()
+            break
+          } catch (err) {
+            logger.error(`Block import (get latest): ${err.stack}`)
+            await PUtils.delay(1000)
+          }
+        }
+      }
+    } while (this._latest.hash !== this._blockchainLatest.hash)
+
     try {
-      this._blockchainLatest = await this._network.getLatest()
-
-      let updated = await this._updateChain()
-      if (updated === false) {
-        return
-      }
-
-      logger.info(`New latest! ${this._latest.hash}:${this._latest.height}`)
-
-      this.emit('latest', this._latest)
-
-      // update orphaned tx's
-      let result = await this._storage.executeQuery(
-        SQL.select.blocks.txids, [this._latest.height])
-
-      let txids = result.rows[0].txids.toString('hex')
-      for (; txids.length !== 0; txids = txids.slice(32)) {
-        let txid = txids.slice(0, 32)
-        setImmediate(::this._importDependsFrom, txid)
-        this.emit('tx', txid)
-      }
-
       // sync with bitcoind mempool
       let [nTxIds, sTxIds] = await Promise.all([
         this._network.getMempoolTxs(),
@@ -310,33 +318,25 @@ export default class PeerSync extends Sync {
 
       sTxIds = sTxIds.rows.map((row) => { return row.txid.toString('hex') })
 
+      // remove tx that not in mempool but in our storage
       let toRemove = _.difference(sTxIds, nTxIds)
       if (toRemove.length > 0) {
         toRemove = toRemove.map((txid) => { return '\\x' + txid })
-        await this._storage.executeTransaction((client) => {
-          return Promise.all([
+        await this._storage.executeTransaction(async (client) => {
+          await* [
             client.queryAsync(SQL.delete.transactions.unconfirmedByTxIds, [toRemove]),
-            client.queryAsync(SQL.delete.history.unconfirmedByTxIds, [toRemove]),
-            client.queryAsync(SQL.update.history.deleteUnconfirmedInputsByTxIds, [toRemove])
-          ])
+            client.queryAsync(SQL.delete.history.unconfirmedByTxIds, [toRemove])
+          ]
+          await client.queryAsync(SQL.update.history.deleteUnconfirmedInputsByTxIds, [toRemove])
         })
       }
 
+      // add skipped tx in our storage
       for (let txid of _.difference(nTxIds, sTxIds)) {
         setImmediate(::this._runTxImport, txid)
       }
     } catch (err) {
-      logger.error(`Block import: ${err.stack}`)
-
-      while (true) {
-        try {
-          this._latest = await this._getLatest()
-          break
-        } catch (err) {
-          logger.error(`Block import (get latest): ${err.stack}`)
-          await PUtils.delay(1000)
-        }
-      }
+      logger.error(`On updating mempool: ${err.stack}`)
     }
   }
 
