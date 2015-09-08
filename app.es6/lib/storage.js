@@ -207,7 +207,7 @@ export default class Storage {
         throw err
       }
 
-      client.queryAsync('COMMIT')
+      await client.queryAsync('COMMIT')
       return result
     })
   }
