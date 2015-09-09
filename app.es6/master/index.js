@@ -17,6 +17,9 @@ import SQL from './sql'
 
 let sha256sha256 = bitcore.crypto.Hash.sha256sha256
 
+/**
+ * @return {Promise}
+ */
 export default async function () {
   let status = {
     version: VERSION,

@@ -429,12 +429,11 @@ export default class Sync extends EventEmitter {
           if (latest.hash !== this._latest.hash) {
             stopwatch.reset().start()
             this._latest = await this._storage.executeTransaction(async (client) => {
-              // TODO: don't remove? make unconfirmed?
               let queries = [
                 SQL.delete.blocks.fromHeight,
-                SQL.delete.transactions.fromHeight,
-                SQL.delete.history.fromHeight,
-                SQL.update.history.deleteInputsFromHeight
+                SQL.update.transactions.makeUnconfirmed,
+                SQL.update.history.makeOutputsUnconfirmed,
+                SQL.update.history.makeInputsUnconfirmed
               ]
               for (let query of queries) {
                 await client.queryAsync(query, [latest.height - 1])

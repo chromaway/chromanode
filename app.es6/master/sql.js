@@ -74,7 +74,12 @@ export default {
                      '  SET ' +
                      '    height = $1 ' +
                      '  WHERE ' +
-                     '    txid = $2'
+                     '    txid = $2',
+      makeUnconfirmed: 'UPDATE transactions ' +
+                       '  SET ' +
+                       '    height = NULL ' +
+                       '  WHERE ' +
+                       '    height > $1'
     },
     history: {
       addConfirmedInput: 'UPDATE history ' +
@@ -101,6 +106,11 @@ export default {
                            '    otxid = $2 ' +
                            '  RETURNING ' +
                            '    address',
+      makeOutputsUnconfirmed: 'UPDATE history ' +
+                              '  SET ' +
+                              '    oheight = NULL ' +
+                              '  WHERE ' +
+                              '    oheight > $1',
       makeInputConfirmed: 'UPDATE history ' +
                            '  SET ' +
                            '    iheight = $1 ' +
@@ -109,12 +119,11 @@ export default {
                            '    oindex = $3 ' +
                            '  RETURNING ' +
                            '    address',
-      deleteInputsFromHeight: 'UPDATE history ' +
-                              '  SET ' +
-                              '    itxid = NULL, ' +
-                              '    iheight = NULL ' +
-                              '  WHERE ' +
-                              '    iheight > $1',
+      makeInputsUnconfirmed: 'UPDATE history ' +
+                             '  SET ' +
+                             '    iheight = NULL ' +
+                             '  WHERE ' +
+                             '    iheight > $1',
       deleteUnconfirmedInputsByTxIds: 'UPDATE history ' +
                                       '  SET ' +
                                       '    itxid = NULL ' +
@@ -129,17 +138,11 @@ export default {
                   '    height > $1'
     },
     transactions: {
-      fromHeight: 'DELETE FROM transactions ' +
-                  '  WHERE ' +
-                  '    height > $1',
       unconfirmedByTxIds: 'DELETE FROM transactions ' +
                           '  WHERE ' +
                           '    txid = ANY($1)'
     },
     history: {
-      fromHeight: 'DELETE FROM history ' +
-                  '  WHERE ' +
-                  '    oheight > $1',
       unconfirmedByTxIds: 'DELETE FROM history ' +
                           '  WHERE ' +
                           '    otxid = ANY($1)'
