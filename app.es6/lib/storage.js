@@ -19,7 +19,7 @@ let SQL = {
               '  header BYTEA NOT NULL,' +
               '  txids BYTEA NOT NULL)',
       transactions: 'CREATE TABLE transactions (' +
-                    '  txid BYTEA NOT NULL,' +
+                    '  txid BYTEA PRIMARY KEY,' +
                     '  height INTEGER,' +
                     '  tx BYTEA NOT NULL)',
       history: 'CREATE TABLE history (' +
@@ -40,7 +40,6 @@ let SQL = {
         hash: 'CREATE INDEX ON blocks (hash)'
       },
       transactions: {
-        txid: 'CREATE INDEX ON transactions (txid)',
         height: 'CREATE INDEX ON transactions (height)'
       },
       history: {
@@ -146,7 +145,6 @@ export default class Storage {
     logger.info('Creating db indices...')
     await* [
       client.queryAsync(SQL.create.indices.blocks.hash),
-      client.queryAsync(SQL.create.indices.transactions.txid),
       client.queryAsync(SQL.create.indices.transactions.height),
       client.queryAsync(SQL.create.indices.history.address),
       client.queryAsync(SQL.create.indices.history.otxid_oindex),

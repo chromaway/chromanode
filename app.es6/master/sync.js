@@ -3,6 +3,7 @@ import { EventEmitter } from 'events'
 import { setImmediate } from 'timers'
 import bitcore from 'bitcore'
 import ElapsedTime from 'elapsed-time'
+import makeConcurrent from 'make-concurrent'
 import PUtils from 'promise-useful-utils'
 
 import config from '../lib/config'
@@ -52,10 +53,6 @@ export default class Sync extends EventEmitter {
       prev: {}, // txid -> txid[]
       next: {}  // txid -> txid[]
     }
-
-    let ci = new util.ConcurrentImport()
-    this._importUnconfirmedTx = ci.apply(this._importUnconfirmedTx, this, 'tx')
-    this._runBlockImport = ci.apply(this._runBlockImport, this, 'block')
 
     this.on('tx', ::this._importDependsFrom)
   }
@@ -391,7 +388,7 @@ export default class Sync extends EventEmitter {
   /**
    * @return {Promise}
    */
-  async _runBlockImport () {
+  _runBlockImport = makeConcurrent(async () => {
     let stopwatch = new ElapsedTime()
     let block
 
@@ -522,7 +519,7 @@ export default class Sync extends EventEmitter {
         await PUtils.delay(5000)
       }
     }
-  }
+  }, {concurrency: 1})
 
   /**
    */
