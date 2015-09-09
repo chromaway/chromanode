@@ -12,8 +12,7 @@ import Network from './network'
 import Slaves from './slaves'
 import util from '../lib/util'
 import { VERSION } from '../lib/const'
-import HistorySync from './sync/history'
-import PeerSync from './sync/peer'
+import Sync from './sync'
 import SQL from './sql'
 
 let sha256sha256 = bitcore.crypto.Hash.sha256sha256
@@ -130,32 +129,23 @@ export default async function () {
     })
   })
 
-  // sync to latest block
-  let sync = new HistorySync(storage, messages, network, slaves)
-  try {
-    logger.info('Run history sync...')
+  // create sync process
+  let sync = new Sync(storage, network, slaves)
+  sync.on('latest', (latest) => {
+    status.latest = latest
 
-    sync.on('latest', (latest) => {
-      status.latest = latest
+    let value = latest.height / status.bitcoind.latest.height
+    let fixedValue = value.toFixed(4)
+    if (status.progress !== fixedValue) {
+      logger.warn(`Sync progress: ${value.toFixed(6)} (${latest.height} of ${status.bitcoind.latest.height})`)
+      status.progress = fixedValue
+      broadcastStatus()
+    }
+  })
 
-      let value = latest.height / status.bitcoind.latest.height
-      let fixedValue = value.toFixed(4)
-      if (status.progress !== fixedValue) {
-        logger.info(`Sync progress: ${value.toFixed(6)} (${latest.height} of ${status.bitcoind.latest.height})`)
-        status.progress = fixedValue
-        broadcastStatus()
-      }
-    })
+  await sync.run()
 
-    await sync.run()
-  } finally {
-    sync.removeAllListeners()
-    logger.info('History sync finished!')
-  }
-
-  // dynamically sync with bitcoin p2p network
-  sync = new PeerSync(storage, messages, network, slaves)
-  logger.info('Run peer sync ...')
+  sync.removeAllListeners()
 
   sync.on('latest', (latest) => {
     status.latest = latest
@@ -170,6 +160,4 @@ export default async function () {
       delete sendTxDeferreds[txid]
     }
   })
-
-  await sync.run()
 }

@@ -36,6 +36,12 @@ export default {
               '  FROM blocks ' +
               '    ORDER BY height DESC ' +
               '    LIMIT 1',
+      byHeight: 'SELECT ' +
+                '    height as height, ' +
+                '    hash as hash ' +
+                '  FROM blocks ' +
+                '    WHERE ' +
+                '      height = $1',
       txids: 'SELECT ' +
              '    txids as txids ' +
              '  FROM blocks ' +
@@ -109,12 +115,6 @@ export default {
                               '    iheight = NULL ' +
                               '  WHERE ' +
                               '    iheight > $1',
-      deleteUnconfirmedInputs: 'UPDATE history ' +
-                               '  SET ' +
-                               '    itxid = NULL ' +
-                               '  WHERE ' +
-                               '    itxid IS NOT NULL AND ' +
-                               '    iheight IS NULL',
       deleteUnconfirmedInputsByTxIds: 'UPDATE history ' +
                                       '  SET ' +
                                       '    itxid = NULL ' +
@@ -132,9 +132,6 @@ export default {
       fromHeight: 'DELETE FROM transactions ' +
                   '  WHERE ' +
                   '    height > $1',
-      unconfirmed: 'DELETE FROM transactions ' +
-                   '  WHERE ' +
-                   '    height IS NULL',
       unconfirmedByTxIds: 'DELETE FROM transactions ' +
                           '  WHERE ' +
                           '    txid = ANY($1)'
@@ -143,9 +140,6 @@ export default {
       fromHeight: 'DELETE FROM history ' +
                   '  WHERE ' +
                   '    oheight > $1',
-      unconfirmed: 'DELETE FROM history ' +
-                   '  WHERE ' +
-                   '    oheight IS NULL',
       unconfirmedByTxIds: 'DELETE FROM history ' +
                           '  WHERE ' +
                           '    otxid = ANY($1)'
