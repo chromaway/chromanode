@@ -125,15 +125,21 @@ export default class Master extends EventEmitter {
    * @param {string} rawtx
    * @return {Promise}
    */
-  sendTx (rawtx) {
-    return this._storage.executeTransaction(async (client) => {
+  async sendTx (rawtx) {
+    let process
+
+    await this._storage.executeTransaction(async (client) => {
       let result = await client.queryAsync(SQL.insert.newTx.row, [rawtx])
       let id = result.rows[0].id
-      await new Promise((resolve, reject) => {
+
+      await this._messages.notify('sendtx', {id: id}, {client: client})
+
+      process = new Promise((resolve, reject) => {
         this._sendTxDeferreds[id] = {resolve: resolve, reject: reject}
-        this._messages.notify('sendtx', {id: id}).catch(reject)
       })
     })
+
+    await process
   }
 }
 

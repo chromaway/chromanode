@@ -10,60 +10,62 @@ let pg = PUtils.promisifyAll(require('pg').native)
 let SQL = {
   create: {
     tables: {
-      info: 'CREATE TABLE info (' +
-            '  key CHAR(100) PRIMARY KEY,' +
-            '  value TEXT NOT NULL)',
-      blocks: 'CREATE TABLE blocks (' +
-              '  height INTEGER PRIMARY KEY,' +
-              '  hash BYTEA NOT NULL,' +
-              '  header BYTEA NOT NULL,' +
-              '  txids BYTEA NOT NULL)',
-      transactions: 'CREATE TABLE transactions (' +
-                    '  txid BYTEA PRIMARY KEY,' +
-                    '  height INTEGER,' +
-                    '  tx BYTEA NOT NULL)',
-      history: 'CREATE TABLE history (' +
-               '  address BYTEA,' +
-               '  otxid BYTEA,' +
-               '  oindex INTEGER,' +
-               '  ovalue BIGINT,' +
-               '  oscript BYTEA,' +
-               '  oheight INTEGER,' +
-               '  itxid BYTEA,' +
-               '  iheight INTEGER)',
-      newTxs: 'CREATE TABLE new_txs (' +
-              '  id SERIAL PRIMARY KEY,' +
-              '  hex BYTEA NOT NULL)'
+      info: `CREATE TABLE info (
+               key CHAR(100) PRIMARY KEY,
+               value TEXT NOT NULL)`,
+      blocks: `CREATE TABLE blocks (
+                 height INTEGER PRIMARY KEY,
+                 hash BYTEA NOT NULL,
+                 header BYTEA NOT NULL,
+                 txids BYTEA NOT NULL)`,
+      transactions: `CREATE TABLE transactions (
+                       txid BYTEA PRIMARY KEY,
+                       height INTEGER,
+                       tx BYTEA NOT NULL)`,
+      history: `CREATE TABLE history (
+                  address BYTEA,
+                  otxid BYTEA,
+                  oindex INTEGER,
+                  ovalue BIGINT,
+                  oscript BYTEA,
+                  oheight INTEGER,
+                  itxid BYTEA,
+                  iheight INTEGER)`,
+      newTxs: `CREATE TABLE new_txs (
+                 id SERIAL PRIMARY KEY,
+                 hex BYTEA NOT NULL)`
     },
     indices: {
       blocks: {
-        hash: 'CREATE INDEX ON blocks (hash)'
+        hash: `CREATE INDEX ON blocks (hash)`
       },
       transactions: {
-        height: 'CREATE INDEX ON transactions (height)'
+        height: `CREATE INDEX ON transactions (height)`
       },
       history: {
-        address: 'CREATE INDEX ON history (address)',
-        otxid_oindex: 'CREATE INDEX ON history (otxid, oindex)',
-        otxid: 'CREATE INDEX ON history (otxid)',
-        oheight: 'CREATE INDEX ON history (oheight)',
-        itxid: 'CREATE INDEX ON history (itxid)',
-        iheight: 'CREATE INDEX ON history (iheight)'
+        address: `CREATE INDEX ON history (address)`,
+        otxid_oindex: `CREATE INDEX ON history (otxid, oindex)`,
+        otxid: `CREATE INDEX ON history (otxid)`,
+        oheight: `CREATE INDEX ON history (oheight)`,
+        itxid: `CREATE INDEX ON history (itxid)`,
+        iheight: `CREATE INDEX ON history (iheight)`
       }
     }
   },
   insert: {
     info: {
-      row: 'INSERT INTO info (key, value) VALUES ($1, $2)'
+      row: `INSERT INTO info (key, value) VALUES ($1, $2)`
     }
   },
   select: {
-    tablesCount: 'SELECT COUNT(*) ' +
-                 '  FROM information_schema.tables ' +
-                 '  WHERE ' +
-                 '    table_name = ANY($1)',
+    tablesCount: `SELECT
+                    COUNT(*)
+                  FROM
+                    information_schema.tables
+                  WHERE
+                    table_name = ANY($1)`,
     info: {
-      valueByKey: 'SELECT value FROM info WHERE key = $1'
+      valueByKey: `SELECT value FROM info WHERE key = $1`
     }
   }
 }

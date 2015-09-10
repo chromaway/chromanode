@@ -43,7 +43,7 @@ function query (req) {
     let sql = query.status === 'unspent'
                 ? SQL.select.history.unspent
                 : SQL.select.history.transactions
-    result = await client.queryAsync(sql, [query.addresses])
+    result = await client.queryAsync(sql, [query.addresses, from, to])
 
     let rows = _.chain(result.rows)
     if (query.status === 'unspent') {
