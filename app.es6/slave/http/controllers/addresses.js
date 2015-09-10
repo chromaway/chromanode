@@ -4,8 +4,9 @@ import errors from '../../../lib/errors'
 import SQL from '../../sql'
 import qutil from '../util/query'
 
-export let v1 = {}
-export let v2 = {}
+let v1 = {}
+let v2 = {}
+export default {v1, v2}
 
 function query (req) {
   return req.storage.executeTransaction(async (client) => {
@@ -97,8 +98,8 @@ function query (req) {
       .value()
 
     return query.status === 'unspent'
-             ? {unspent: value, latest: latest}
-             : {transactions: value, latest: latest}
+             ? {unspent: value, latest}
+             : {transactions: value, latest}
   })
 }
 

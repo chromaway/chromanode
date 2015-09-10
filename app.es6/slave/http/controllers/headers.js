@@ -4,8 +4,9 @@ import errors from '../../../lib/errors'
 import SQL from '../../sql'
 import qutil from '../util/query'
 
-export let v1 = {}
-export let v2 = {}
+let v1 = {}
+let v2 = {}
+export default {v1, v2}
 
 async function latest (req) {
   let result = await req.storage.executeQuery(SQL.select.blocks.latest)

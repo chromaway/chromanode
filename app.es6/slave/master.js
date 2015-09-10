@@ -78,9 +78,7 @@ export default class Master extends EventEmitter {
             handler = (payload) => { this.emit(event, payload) }
           }
 
-          return this._messages.listen(channel, (payload) => {
-            handler(JSON.parse(payload))
-          })
+          return this._messages.listen(channel, handler)
         }
 
         return Promise.all([
@@ -133,10 +131,10 @@ export default class Master extends EventEmitter {
       let id = result.rows[0].id
       await new Promise((resolve, reject) => {
         this._sendTxDeferreds[id] = {resolve: resolve, reject: reject}
-        this._messages.notify('sendtx', JSON.stringify({id: id})).catch(reject)
+        this._messages.notify('sendtx', {id: id}).catch(reject)
       })
     })
   }
 }
 
-readyMixin(Master)
+readyMixin(Master.prototype)

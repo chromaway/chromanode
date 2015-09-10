@@ -11,7 +11,7 @@ import PUtils from 'promise-useful-utils'
 import config from '../../lib/config'
 import errors from '../../lib/errors'
 import logger from '../../lib/logger'
-import routes from '.routes'
+import routes from './routes'
 
 express.response.jsend = function (data) {
   this.jsonp({status: 'success', data: data})

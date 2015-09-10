@@ -6,8 +6,9 @@ import util from '../../../lib/util'
 import SQL from '../../sql'
 import qutil from '../util/query'
 
-export let v1 = {}
-export let v2 = {}
+let v1 = {}
+let v2 = {}
+export default {v1, v2}
 
 v1.raw = v2.raw = (req, res) => {
   res.promise((async () => {
