@@ -1,19 +1,17 @@
-'use strict'
+import bodyParser from 'body-parser'
+import cors from 'cors'
+import compression from 'compression'
+import express from 'express'
+import expressWinston from 'express-winston'
+import fs from 'fs'
+import http from 'http'
+import https from 'https'
+import PUtils from 'promise-useful-utils'
 
-var bodyParser = require('body-parser')
-var cors = require('cors')
-var compression = require('compression')
-var express = require('express')
-var expressWinston = require('express-winston')
-var fs = require('fs')
-var http = require('http')
-var https = require('https')
-var Promise = require('bluebird')
-
-var config = require('../../../lib/config')
-var errors = require('../../../lib/errors')
-var logger = require('../../../lib/logger').logger
-var routes = require('./routes')
+import config from '../../lib/config'
+import errors from '../../lib/errors'
+import logger from '../../lib/logger'
+import routes from '.routes'
 
 express.response.jsend = function (data) {
   this.jsonp({status: 'success', data: data})
@@ -27,51 +25,55 @@ express.response.jerror = function (message) {
   this.jsonp({status: 'error', message: message})
 }
 
-express.response.promise = function (promise) {
-  var self = this
-  promise
-    .then(self.jsend.bind(self))
-    .catch(errors.Slave.SendTxError, function (err) {
+express.response.promise = async function (promise) {
+  try {
+    let result = await promise
+    this.jsend(result)
+  } catch (err) {
+    if (err instanceof errors.Slave.SendTxError) {
       // special case
-      self.jfail({
+      this.jfail({
         type: err.name.slice(20),
         code: err.data.code,
         message: err.data.message
       })
-    })
-    .catch(errors.Slave, function (err) {
-      // logger.info('Invalid query: %s', err.name)
+      return
+    }
+
+    if (err instanceof errors.Slave) {
+      // logger.info(`Invalid query: ${err.name}`)
       // cut ErrorChromanodeSlave
-      self.jfail({type: err.name.slice(20)})
-    })
-    .catch(function (err) {
-      logger.error(err)
-      self.jerror(err.message)
-    })
+      this.jfail({type: err.name.slice(20)})
+      return
+    }
+
+    logger.error(err.stack)
+    this.jerror(err.message)
+  }
 }
 
-module.exports.createServer = function (expressApp) {
-  var server = (function () {
+function createServer (expressApp) {
+  let server = (() => {
     if (!!config.get('chromanode.enableHTTPS') === false) {
       return http.createServer(expressApp)
     }
 
-    var opts = {}
+    let opts = {}
     opts.key = fs.readFileSync('etc/key.pem')
     opts.cert = fs.readFileSync('etc/cert.pem')
     return https.createServer(opts, expressApp)
   })()
 
-  return Promise.promisifyAll(server)
+  return PUtils.promisifyAll(server)
 }
 
-module.exports.setup = function (app, storage, master) {
+function setup (app, storage, master) {
   // app.set('showStackError', true)
   app.set('etag', false)
 
   app.enable('jsonp callback')
 
-  app.all('*', function (req, res, next) {
+  app.all('*', (req, res, next) => {
     req.storage = storage
     req.master = master
     next()
@@ -82,7 +84,7 @@ module.exports.setup = function (app, storage, master) {
   app.use(bodyParser.json())
   app.use(bodyParser.urlencoded({extended: true}))
 
-  app.use(function (req, res, next) {
+  app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE')
     res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,Content-Type,Authorization')
@@ -99,7 +101,12 @@ module.exports.setup = function (app, storage, master) {
 
   app.use('/', routes.createRouter())
 
-  app.use(function (req, res) {
+  app.use((req, res) => {
     res.jfail('The endpoint you are looking for does not exist!')
   })
+}
+
+export default {
+  createServer: createServer,
+  setup: setup
 }

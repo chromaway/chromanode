@@ -1,6 +1,6 @@
 export default {
   insert: {
-    new_txs: {
+    newTx: {
       row: 'INSERT INTO new_txs (hex) VALUES ($1) RETURNING id'
     }
   },
@@ -14,11 +14,15 @@ export default {
               '    ORDER BY height DESC ' +
               '    LIMIT 1',
       txids: 'SELECT ' +
+             '    blocks.height as height, ' +
              '    hash as hash, ' +
-             '    txids as txids ' +
+             '    txids as txids, ' +
+             '    txid as txid ' +
              '  FROM blocks ' +
+             '    RIGHT OUTER JOIN transactions ON ' +
+             '      transactions.height = blocks.height ' +
              '    WHERE ' +
-             '      height = $1',
+             '      txid = $1',
       heightByHash: 'SELECT ' +
                     '    height as height ' +
                     '  FROM blocks ' +

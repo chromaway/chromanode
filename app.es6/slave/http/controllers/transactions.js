@@ -1,97 +1,83 @@
-'use strict'
+import _ from 'lodash'
+import bitcore from 'bitcore'
 
-var _ = require('lodash')
-var bitcore = require('bitcore')
-var bufferEqual = require('buffer-equal')
-var Promise = require('bluebird')
+import errors from '../../../lib/errors'
+import util from '../../../lib/util'
+import SQL from '../../sql'
+import qutil from '../util/query'
 
-var errors = require('../../../../lib/errors')
-var util = require('../../../../lib/util')
-var SQL = require('../../sql')
-var qutil = require('../util/query')
+export let v1 = {}
+export let v2 = {}
 
-var v1 = module.exports.v1 = {}
-var v2 = module.exports.v2 = {}
+v1.raw = v2.raw = (req, res) => {
+  res.promise((async () => {
+    let txid = '\\x' + qutil.transformTxId(req.query.txid)
+    let result = await req.storage.executeQuery(
+      SQL.select.transactions.byTxId, [txid])
 
-v1.raw = v2.raw = function (req, res) {
-  var result = Promise.try(function () {
-    var txid = '\\x' + qutil.transformTxId(req.query.txid)
-    return req.storage.executeQuery(SQL.select.transactions.byTxId, [txid])
-  })
-  .then(function (result) {
     if (result.rowCount === 0) {
       throw new errors.Slave.TxNotFound()
     }
 
     return {hex: result.rows[0].tx.toString('hex')}
-  })
-
-  res.promise(result)
+  })())
 }
 
 v1.merkle = v2.merkle = function (req, res) {
-  var result = Promise.try(function () {
-    var txid = qutil.transformTxId(req.query.txid)
-    return req.storage.executeTransaction(function (client) {
-      return client.queryAsync(SQL.select.transactions.byTxId, ['\\x' + txid])
-        .then(function (result) {
-          if (result.rowCount === 0) {
-            throw new errors.Slave.TxNotFound()
-          }
+  res.promise((async () => {
+    let txid = qutil.transformTxId(req.query.txid)
+    let result = await req.storage.executeQuery(
+      SQL.select.blocks.txids, ['\\x' + txid])
 
-          if (result.rows[0].height === null) {
-            return {source: 'mempool'}
-          }
+    if (result.rowCount === 0) {
+      throw new errors.Slave.TxNotFound()
+    }
 
-          var height = result.rows[0].height
-          return client.queryAsync(SQL.select.blocks.txids, [height])
-            .then(function (result) {
-              var stxids = result.rows[0].txids.toString('hex')
-              var txids = []
-              for (var cnt = stxids.length / 64, idx = 0; idx < cnt; idx += 1) {
-                txids.push(stxids.slice(idx * 64, (idx + 1) * 64))
-              }
+    if (result.rows[0].height === null) {
+      return {source: 'mempool'}
+    }
 
-              var merkle = []
-              var hashes = txids.map(util.decode)
-              var targetHash = util.decode(txid)
-              while (hashes.length !== 1) {
-                if (hashes.length % 2 === 1) {
-                  hashes.push(_.last(hashes))
-                }
+    let bTxIds = result.rows[0].txids.toString('hex')
+    let txids = []
+    for (let cnt = bTxIds.length / 64, idx = 0; idx < cnt; idx += 1) {
+      txids.push(bTxIds.slice(idx * 64, (idx + 1) * 64))
+    }
 
-                var nHashes = []
-                for (cnt = hashes.length, idx = 0; idx < cnt; idx += 2) {
-                  var nHashSrc = Buffer.concat([hashes[idx], hashes[idx + 1]])
-                  var nHash = bitcore.crypto.Hash.sha256sha256(nHashSrc)
-                  nHashes.push(nHash)
+    let merkle = []
+    let hashes = txids.map(util.decode)
+    let targetHash = util.decode(txid)
+    while (hashes.length !== 1) {
+      if (hashes.length % 2 === 1) {
+        hashes.push(_.last(hashes))
+      }
 
-                  if (bufferEqual(hashes[idx], targetHash)) {
-                    merkle.push(util.encode(hashes[idx + 1]))
-                    targetHash = nHash
-                  } else if (bufferEqual(hashes[idx + 1], targetHash)) {
-                    merkle.push(util.encode(hashes[idx]))
-                    targetHash = nHash
-                  }
-                }
-                hashes = nHashes
-              }
+      let nHashes = []
+      for (let cnt = hashes.length, idx = 0; idx < cnt; idx += 2) {
+        let nHashSrc = Buffer.concat([hashes[idx], hashes[idx + 1]])
+        let nHash = bitcore.crypto.Hash.sha256sha256(nHashSrc)
+        nHashes.push(nHash)
 
-              return {
-                source: 'blocks',
-                block: {
-                  height: height,
-                  hash: result.rows[0].hash.toString('hex'),
-                  merkle: merkle,
-                  index: txids.indexOf(txid)
-                }
-              }
-            })
-        })
-    })
-  })
+        if (hashes[idx].equals(targetHash)) {
+          merkle.push(util.encode(hashes[idx + 1]))
+          targetHash = nHash
+        } else if (hashes[idx + 1].equals(targetHash)) {
+          merkle.push(util.encode(hashes[idx]))
+          targetHash = nHash
+        }
+      }
+      hashes = nHashes
+    }
 
-  res.promise(result)
+    return {
+      source: 'blocks',
+      block: {
+        height: result.rows[0].height,
+        hash: result.rows[0].hash.toString('hex'),
+        merkle: merkle,
+        index: txids.indexOf(txid)
+      }
+    }
+  })())
 }
 
 v1.send = v2.send = function (req, res) {
@@ -99,33 +85,24 @@ v1.send = v2.send = function (req, res) {
 }
 
 v2.spent = function (req, res) {
-  var result = Promise.try(function () {
-    var otxid = '\\x' + qutil.transformTxId(req.query.otxid)
-    var oindex = parseInt(req.query.oindex, 10)
-    return req.storage.executeQuery(SQL.select.history.spent, [otxid, oindex])
-  })
-  .then(function (result) {
+  res.promise((async () => {
+    let otxid = '\\x' + qutil.transformTxId(req.query.otxid)
+    let oindex = parseInt(req.query.oindex, 10)
+    let result = await req.storage.executeQuery(
+      SQL.select.history.spent, [otxid, oindex])
+
     if (result.rowCount === 0) {
       throw new errors.Slave.TxNotFound()
     }
 
-    var retval
-    var row = result.rows[0]
-    if (row.itxid) {
-      var itxid = row.itxid.toString('hex')
-      var iheight = row.iheight
-      retval = {
-        spent: true,
-        itxid: itxid,
-        iheight: iheight
-      }
-    } else {
-      retval = {
-        spent: false
-      }
+    if (result.rows[0].itxid === null) {
+      return {spent: false}
     }
-    return retval
-  })
 
-  res.promise(result)
+    return {
+      spent: true,
+      itxid: result.rows[0].itxid.toString('hex'),
+      iheight: result.rows[0].iheight
+    }
+  })())
 }

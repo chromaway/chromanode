@@ -1,4 +1,7 @@
 #!/usr/bin/env node
 
-var app = require('../app/slave')
-require('../app/lib/init')(app)
+require('babel-runtime/core-js/promise').default = require('bluebird')
+
+require('../app/lib/init')(function () {
+  return require('../app/slave')()
+})

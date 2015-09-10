@@ -14,7 +14,7 @@ bitcore.Networks.add({
   xpubkey: 0x043587cf,
   xprivkey: 0x04358394,
   networkMagic: 0xFABFB5DA,
-  port: 8333,
+  port: 18444,
   dnsSeeds: []
 })
 

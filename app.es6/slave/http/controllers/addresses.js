@@ -1,73 +1,64 @@
-'use strict'
+import _ from 'lodash'
 
-var _ = require('lodash')
-var Promise = require('bluebird')
+import errors from '../../../lib/errors'
+import SQL from '../../sql'
+import qutil from '../util/query'
 
-var errors = require('../../../../lib/errors')
-var SQL = require('../../sql')
-var qutil = require('../util/query')
+export let v1 = {}
+export let v2 = {}
 
 function query (req) {
-  return Promise.try(function () {
-    var query = {
+  return req.storage.executeTransaction(async (client) => {
+    let query = {
       addresses: qutil.transformAddresses(unescape(req.query.addresses)),
       source: qutil.transformSource(req.query.source),
-      from: qutil.transformFrom(req.query.from),
-      to: qutil.transformTo(req.query.to),
+      from: qutil.transformFromTo(req.query.from),
+      to: qutil.transformFromTo(req.query.to),
       status: qutil.transformStatus(req.query.status)
     }
 
-    return req.storage.executeTransaction(function (client) {
-      return client.queryAsync(SQL.select.blocks.latest)
-        .then(function (result) {
-          var latest = result.rows[0]
+    let result = await client.queryAsync(SQL.select.blocks.latest)
+    let latest = {
+      height: result.rows[0].height,
+      hash: result.rows[0].hash.toString('hex')
+    }
 
-          var from = query.from === undefined
-                       ? -1
-                       : qutil.getHeightForPoint(client, query.from)
-          var to = query.to === undefined
-                     ? latest.height
-                     : qutil.getHeightForPoint(client, query.to)
+    let from = -1
+    if (query.from !== undefined) {
+      from = await qutil.getHeightForPoint(client, query.from)
+      if (from === null) {
+        throw new errors.Slave.FromNotFound()
+      }
+    }
 
-          return Promise.all([latest, from, to])
-        })
-        .spread(function (latest, from, to) {
-          if (from === null) {
-            throw new errors.Slave.FromNotFound()
-          }
+    let to = latest.height
+    if (query.to !== undefined) {
+      to = await qutil.getHeightForPoint(client, query.to)
+      if (to === null) {
+        throw new errors.Slave.ToNotFound()
+      }
+    }
 
-          if (to === null) {
-            throw new errors.Slave.ToNotFound()
-          }
+    let sql = query.status === 'unspent'
+                ? SQL.select.history.unspent
+                : SQL.select.history.transactions
+    result = await client.queryAsync(sql, [query.addresses])
 
-          var sql = query.status === 'unspent'
-                      ? SQL.select.history.unspent
-                      : SQL.select.history.transactions
-
-          return Promise.all([
-            latest,
-            from,
-            to,
-            client.queryAsync(sql, [query.addresses])
-          ])
-        })
-    })
-    .spread(function (latest, from, to, results) {
-      var value = []
-
-      if (query.status === 'unspent') {
-        value = results.rows.map(function (row) {
-          return {
-            txid: row.otxid.toString('hex'),
-            vout: row.oindex,
-            value: row.ovalue,
-            script: row.oscript.toString('hex'),
-            height: row.oheight
-          }
-        })
-      } else {
-        value = _.flatten(results.rows.map(function (row) {
-          var items = [{
+    let rows = _.chain(result.rows)
+    if (query.status === 'unspent') {
+      rows = rows.map((row) => {
+        return {
+          txid: row.otxid.toString('hex'),
+          vout: row.oindex,
+          value: row.ovalue,
+          script: row.oscript.toString('hex'),
+          height: row.oheight
+        }
+      })
+    } else {
+      rows = rows
+        .map((row) => {
+          let items = [{
             txid: row.otxid.toString('hex'),
             height: row.oheight
           }]
@@ -79,59 +70,53 @@ function query (req) {
             })
           }
 
-          return _.unique(items, 'txid')
-        }))
-      }
+          return items
+        })
+        .flatten()
+        .unique()
+    }
 
-      value = _.sortBy(value.filter(function (item) {
-        if ((item.height !== null)
-            && !(item.height > from && item.height <= to)) {
+    let value = rows
+      .filter((row) => {
+        if ((row.height !== null) &&
+            (row.height > from && row.height <= to)) {
           return false
         }
 
-        if (query.source === 'blocks' && item.height === null) {
+        if (query.source === 'blocks' && row.height === null) {
           return false
         }
 
-        if (query.source === 'mempool' && item.height !== null) {
+        if (query.source === 'mempool' && row.height !== null) {
           return false
         }
 
         return true
-      }), 'height')
-
-      var ret = query.status === 'unspent'
-                  ? {unspent: value}
-                  : {transactions: value}
-      return _.extend(ret, {
-        latest: {
-          height: latest.height,
-          hash: latest.hash.toString('hex')
-        }
       })
-    })
+      .sortBy('height')
+      .value()
+
+    return query.status === 'unspent'
+             ? {unspent: value, latest: latest}
+             : {transactions: value, latest: latest}
   })
 }
 
-module.exports.v1 = {}
-module.exports.v1.query = function (req, res) {
-  var promise = query(req)
-    .then(function (result) {
-      if (result.transactions === undefined) {
-        result.transactions = result.unspent.map(function (item) {
-          return {txid: item.txid, height: item.height}
-        })
-        // we call it v1+
-        // delete result.unspent
-      }
+v1.query = (req, res) => {
+  res.promise((async () => {
+    let result = await query(req)
+    if (result.transactions === undefined) {
+      result.transactions = result.unspent.map((item) => {
+        return {txid: item.txid, height: item.height}
+      })
+      // we call it v1+
+      // delete result.unspent
+    }
 
-      return result
-    })
-
-  res.promise(promise)
+    return result
+  })())
 }
 
-module.exports.v2 = {}
-module.exports.v2.query = function (req, res) {
+v2.query = (req, res) => {
   res.promise(query(req))
 }

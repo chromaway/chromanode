@@ -1,67 +1,47 @@
-'use strict'
+import _ from 'lodash'
+import bitcore from 'bitcore'
+import assert from 'assert'
 
-var _ = require('lodash')
-var assert = require('assert')
-var bitcore = require('bitcore')
-var Address = bitcore.Address
-var isHexa = bitcore.util.js.isHexa
-
-var config = require('../../../../lib/config')
-var errors = require('../../../../lib/errors')
-var SQL = require('../../sql')
+import config from '../../../lib/config'
+import errors from '../../../lib/errors'
+import SQL from '../../sql'
 
 /**
- * @param {string} name
- * @return {function}
+ * @param {string} val
+ * @return {(string|number)}
  */
-function createTransformFromTo (name) {
-  return function (val) {
-    if (val === undefined) {
-      return val
-    }
-
-    var num = parseInt(val, 10)
-    if (!_.isNaN(num) && val.length < 7) {
-      if (num >= 0 && num < 1e7) {
-        return num
-      }
-
-      throw new errors.Slave.InvalidHeight()
-    }
-
-    if (val.length === 64 && isHexa(val)) {
-      return val
-    }
-
-    throw new errors.Slave.InvalidHash()
+export function transformFromTo (val) {
+  if (val === undefined) {
+    return val
   }
+
+  let num = parseInt(val, 10)
+  if (!_.isNaN(num) && val.length < 7) {
+    if (num >= 0 && num < 1e7) {
+      return num
+    }
+
+    throw new errors.Slave.InvalidHeight()
+  }
+
+  if (val.length === 64 && bitcore.util.js.isHexa(val)) {
+    return val
+  }
+
+  throw new errors.Slave.InvalidHash()
 }
-
-/**
- * @param {string} val
- * @return {(string|number)}
- * @throws {errors.Slave}
- */
-module.exports.transformFrom = createTransformFromTo('from')
-
-/**
- * @param {string} val
- * @return {(string|number)}
- * @throws {errors.Slave}
- */
-module.exports.transformTo = createTransformFromTo('to')
 
 /**
  * @param {string} val
  * @return {number}
  * @throws {errors.Slave.InvalidCount}
  */
-module.exports.transformCount = function (val) {
+export function transformCount (val) {
   if (val === undefined) {
-    return val
+    return 2016
   }
 
-  var num = parseInt(val, 10)
+  let num = parseInt(val, 10)
   if (!_.isNaN(num) && num > 0 && num <= 2016) {
     return num
   }
@@ -74,27 +54,25 @@ module.exports.transformCount = function (val) {
  * @return {string[]}
  * @throws {errors.Slave}
  */
-module.exports.transformAddresses = function (val) {
-  if (!val || val.indexOf === undefined) {
+export function transformAddresses (val) {
+  if (!_.isString(val)) {
     throw new errors.Slave.InvalidAddresses()
   }
 
-  var network = bitcore.Networks.get(config.get('chromanode.network'))
+  let networkName = config.get('chromanode.network')
+  if (networkName === 'regtest') {
+    networkName = 'testnet'
+  }
 
-  var addresses = val.indexOf(',') !== -1 ? val.split(',') : [val]
-  addresses.forEach(function (address) {
+  let addresses = val.indexOf(',') !== -1 ? val.split(',') : [val]
+  for (let address of addresses) {
     try {
-      if (network.name === 'regtest') {
-        assert.equal(Address.fromString(address).network.name, 'testnet')
-      }
-      else {
-        assert.equal(Address.fromString(address).network.name, network.name)
-      }
-
+      let addressNetwork = bitcore.Address.fromString(address).network.name
+      assert.equal(addressNetwork, networkName)
     } catch (err) {
       throw new errors.Slave.InvalidAddresses()
     }
-  })
+  }
 
   return addresses
 }
@@ -104,7 +82,7 @@ module.exports.transformAddresses = function (val) {
  * @return {string}
  * @throws {errors.Slave.InvalidSource}
  */
-module.exports.transformSource = function (val) {
+export function transformSource (val) {
   if (val !== undefined && ['blocks', 'mempool'].indexOf(val) === -1) {
     throw new errors.Slave.InvalidSource()
   }
@@ -117,7 +95,7 @@ module.exports.transformSource = function (val) {
  * @return {string}
  * @throws {errors.Slave.InvalidStatus}
  */
-module.exports.transformStatus = function (val) {
+export function transformStatus (val) {
   if (val !== undefined && ['transactions', 'unspent'].indexOf(val) === -1) {
     throw new errors.Slave.InvalidStatus()
   }
@@ -129,8 +107,8 @@ module.exports.transformStatus = function (val) {
  * @param {string} val
  * @return {string}
  */
-module.exports.transformTxId = function (val) {
-  if (!!val && val.length === 64 && isHexa(val)) {
+export function transformTxId (val) {
+  if (!!val && val.length === 64 && bitcore.util.js.isHexa(val)) {
     return val
   }
 
@@ -142,17 +120,15 @@ module.exports.transformTxId = function (val) {
  * @param {(string|number)} point hash or height
  * @return {Promise<?number>}
  */
-module.exports.getHeightForPoint = function (client, point) {
-  var args = _.isNumber(point)
+export async function getHeightForPoint (client, point) {
+  let args = _.isNumber(point)
                ? [SQL.select.blocks.heightByHeight, [point]]
                : [SQL.select.blocks.heightByHash, ['\\x' + point]]
 
-  return client.queryAsync.apply(client, args)
-    .then(function (result) {
-      if (result.rowCount === 0) {
-        return null
-      }
+  let result = await client.queryAsync(...args)
+  if (result.rowCount === 0) {
+    return null
+  }
 
-      return result.rows[0].height
-    })
+  return result.rows[0].height
 }

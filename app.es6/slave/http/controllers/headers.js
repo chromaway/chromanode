@@ -1,102 +1,78 @@
-'use strict'
+import _ from 'lodash'
 
-var _ = require('lodash')
-var Promise = require('bluebird')
+import errors from '../../../lib/errors'
+import SQL from '../../sql'
+import qutil from '../util/query'
 
-var errors = require('../../../../lib/errors')
-var SQL = require('../../sql')
-var qutil = require('../util/query')
+export let v1 = {}
+export let v2 = {}
 
-module.exports.v1 = {}
-module.exports.v2 = {}
+async function latest (req) {
+  let result = await req.storage.executeQuery(SQL.select.blocks.latest)
+  let row = result.rows[0]
 
-function latest (req) {
-  return req.storage.executeQuery(SQL.select.blocks.latest)
-    .then(function (result) {
-      var row = result.rows[0]
-      return {
-        height: row.height,
-        hash: row.hash.toString('hex'),
-        header: row.header.toString('hex')
-      }
-    })
+  return {
+    height: row.height,
+    hash: row.hash.toString('hex'),
+    header: row.header.toString('hex')
+  }
 }
 
-module.exports.v1.latest = function (req, res) {
-  var promise = latest(req)
-    .then(function (result) {
-      result.blockid = result.hash
-      delete result.hash
-      return result
-    })
-
-  res.promise(promise)
+v1.latest = (req, res) => {
+  res.promise((async () => {
+    let latest = await latest(req)
+    return {
+      height: latest.height,
+      blockid: latest.hash,
+      header: latest.header
+    }
+  })())
 }
 
-module.exports.v2.latest = function (req, res) {
+v2.latest = (req, res) => {
   res.promise(latest(req))
 }
 
 function query (req, res, shift) {
-  var result = Promise.try(function () {
-    var query = {
-      from: qutil.transformFrom(req.query.from),
-      to: qutil.transformTo(req.query.to),
-      count: qutil.transformCount(req.query.count) || 2016
+  res.promise(req.storage.executeTransaction(async (client) => {
+    let query = {
+      from: qutil.transformFromTo(req.query.from),
+      to: qutil.transformFromTo(req.query.to),
+      count: qutil.transformCount(req.query.count)
     }
 
-    return req.storage.executeTransaction(function (client) {
-      return Promise.try(function () {
-        if (query.from === undefined) {
-          return -1
-        }
+    let from = -1
+    if (query.from !== undefined) {
+      from = await qutil.getHeightForPoint(client, query.from)
+      if (from === null) {
+        throw new errors.Slave.FromNotFound()
+      }
+    }
 
-        return qutil.getHeightForPoint(client, query.from)
-      })
-      .then(function (from) {
-        if (from === null) {
-          throw new errors.Slave.FromNotFound()
-        }
+    let to = from + query.count
+    if (query.to !== undefined) {
+      to = await qutil.getHeightForPoint(client, query.to)
+      if (to === null) {
+        throw new errors.Slave.ToNotFound()
+      }
+    }
 
-        if (query.to === undefined) {
-          return [from, from + query.count]
-        }
+    let count = to - from
+    if (count <= 0 || count > 2016) {
+      throw new errors.Slave.InvalidRequestedCount()
+    }
 
-        return qutil.getHeightForPoint(client, query.to)
-          .then(function (to) {
-            if (to === null) {
-              throw new errors.Slave.ToNotFound()
-            }
+    let {rows} = await client.queryAsync(
+      SQL.select.blocks.headers, [from + shift, to + shift])
+    let headers = _.chain(rows)
+      .pluck('header')
+      .invoke('toString', 'hex')
+      .join('')
+      .value()
 
-            return [from, to]
-          })
-      })
-      .spread(function (from, to) {
-        var count = to - from
-        if (count <= 0 || count > 2016) {
-          throw new errors.Slave.InvalidRequestedCount()
-        }
-
-        var params = [from + shift, to + shift]
-        return Promise.all([
-          from,
-          client.queryAsync(SQL.select.blocks.headers, params)
-        ])
-      })
-      .spread(function (from, result) {
-        var headers = _.chain(result.rows)
-          .pluck('header')
-          .invoke('toString', 'hex')
-          .join('')
-          .value()
-
-        return {from: from, count: headers.length / 160, headers: headers}
-      })
-    })
-  })
-
-  res.promise(result)
+    return {from: from, count: headers.length / 160, headers: headers}
+  }))
 }
 
-module.exports.v1.query = function (req, res) { query(req, res, -1) }
-module.exports.v2.query = function (req, res) { query(req, res, 0) }
+v1.query = _.partialRight(query, -1) // req, res, -1
+v2.query = _.partialRight(query, 0)  // req, res, 0

@@ -1,11 +1,9 @@
-'use strict'
+import express from 'express'
 
-var express = require('express')
+import node from '../controllers/node'
 
-var node = require('../controllers/node')
-
-module.exports.createRouter = function () {
-  var router = express.Router()
+export function createRouter () {
+  let router = express.Router()
 
   router.use('/v1', require('./v1').createRouter())
   router.use('/v2', require('./v2').createRouter())

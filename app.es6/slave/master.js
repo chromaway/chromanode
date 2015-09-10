@@ -1,14 +1,10 @@
-'use strict'
+import _ from 'lodash'
+import { EventEmitter } from 'events'
+import readyMixin from 'ready-mixin'
 
-var _ = require('lodash')
-var Promise = require('bluebird')
-
-var EventEmitter = require('events').EventEmitter
-var inherits = require('util').inherits
-
-var errors = require('../../lib/errors')
-
-var sql = require('./sql')
+import errors from '../lib/errors'
+import logger from '../lib/logger'
+import SQL from './sql'
 
 /**
  * @event Master#block
@@ -41,101 +37,106 @@ var sql = require('./sql')
 
 /**
  * @class Master
- * @param {Storage} storage
  */
-function Master (storage) {
-  var self = this
-  EventEmitter.call(self)
+export default class Master extends EventEmitter {
+  /**
+   * @constructor
+   * @param {Storage} storage
+   * @param {Messages} messages
+   */
+  constructor (storage, messages) {
+    super()
 
-  self._storage = storage
-  self._sendTxDeferreds = {}
+    this._storage = storage
+    this._messages = messages
 
-  self._lastStatus = new Promise(function (resolve) {
-    self.on('status', function (status) {
-      if (self._lastStatus.isPending()) {
-        return resolve(status)
-      }
+    this._sendTxDeferreds = {}
 
-      self._lastStatus = Promise.resolve(status)
+    this._lastStatus = new Promise((resolve) => {
+      let isResolved = false
+      this.on('status', (status) => {
+        if (isResolved) {
+          this._lastStatus = Promise.resolve(status)
+          return
+        }
+
+        resolve(status)
+        isResolved = true
+      })
     })
-  })
-}
 
-inherits(Master, EventEmitter)
+    Promise.all([this._storage.ready, this._messages.ready])
+      .then(() => {
+        /**
+         * @param {string} channel
+         * @param {string} handler
+         * @return {Promise}
+         */
+        let listen = (channel, handler) => {
+          if (_.isString(handler)) {
+            let event = handler
+            handler = (payload) => { this.emit(event, payload) }
+          }
 
-/**
- * @return {Promise}
- */
-Master.prototype.init = function () {
-  var self = this
+          return this._messages.listen(channel, (payload) => {
+            handler(JSON.parse(payload))
+          })
+        }
+
+        return Promise.all([
+          listen('broadcastblock', 'block'),
+          listen('broadcasttx', 'tx'),
+          listen('broadcastaddress', 'address'),
+          listen('broadcaststatus', 'status'),
+          listen('sendtxresponse', ::this._onSendTxResponse)
+        ])
+      })
+      .then(() => { this._ready(null) }, (err) => { this._ready(err) })
+
+    this.ready
+      .then(() => { logger.info('Master ready ...') })
+  }
 
   /**
-   * @param {string} channel
-   * @param {string} handler
-   * @return {Promise}
+   * @return {Promise<Object>}
    */
-  function listen (channel, handler) {
-    if (_.isString(handler)) {
-      var event = handler
-      handler = function (payload) { self.emit(event, payload) }
+  getStatus () {
+    return this._lastStatus
+  }
+
+  /**
+   * @param {Object} payload
+   */
+  _onSendTxResponse (payload) {
+    let defer = this._sendTxDeferreds[payload.id]
+    if (defer === undefined) {
+      return
     }
 
-    return self._storage.listen(channel, function (payload) {
-      handler(JSON.parse(payload))
+    delete this._sendTxDeferreds[payload.id]
+    if (payload.status === 'success') {
+      return defer.resolve()
+    }
+
+    let err = new errors.Slave.SendTxError()
+    err.data = {code: payload.code, message: unescape(payload.message)}
+    return defer.reject(err)
+  }
+
+  /**
+   * @param {string} rawtx
+   * @return {Promise}
+   */
+  sendTx (rawtx) {
+    return this._storage.executeTransaction(async (client) => {
+      let result = await client.queryAsync(SQL.insert.newTx.row, [rawtx])
+      let id = result.rows[0].id
+      await new Promise((resolve, reject) => {
+        this._sendTxDeferreds[id] = {resolve: resolve, reject: reject}
+        this._messages.notify('sendtx', JSON.stringify({id: id})).catch(reject)
+      })
     })
   }
-
-  return Promise.all([
-    listen('broadcastblock', 'block'),
-    listen('broadcasttx', 'tx'),
-    listen('broadcastaddress', 'address'),
-    listen('broadcaststatus', 'status'),
-    listen('sendtxresponse', self._onSendTxResponse.bind(self))
-  ])
 }
 
-/**
- * @return {Promise<Object>}
- */
-Master.prototype.getStatus = function () {
-  return this._lastStatus
-}
-
-/**
- * @param {Object} payload
- */
-Master.prototype._onSendTxResponse = function (payload) {
-  var defer = this._sendTxDeferreds[payload.id]
-  if (defer === undefined) {
-    return
-  }
-
-  delete this._sendTxDeferreds[payload.id]
-  if (payload.status === 'success') {
-    return defer.resolve()
-  }
-
-  var err = new errors.Slave.SendTxError()
-  err.data = {code: payload.code, message: unescape(payload.message)}
-  return defer.reject(err)
-}
-
-/**
- * @param {string} rawtx
- * @return {Promise}
- */
-Master.prototype.sendTx = function (rawtx) {
-  var self = this
-  return this._storage.execute(function (client) {
-    return client.queryAsync(sql.insert.new_txs.row, [rawtx]).then(
-      function (result) {
-        var id = result.rows[0].id
-        return new Promise(function (resolve, reject) {
-          self._sendTxDeferreds[id] = { resolve: resolve, reject: reject }
-          self._storage.notify('sendtx', JSON.stringify({id: id})).catch(reject)
-        })
-      })
-  })
-}
-
-module.exports = Master
+readyMixin(Master)

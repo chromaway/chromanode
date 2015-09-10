@@ -1,13 +1,11 @@
-'use strict'
+import express from 'express'
 
-var express = require('express')
+import addresses from '../controllers/addresses'
+import headers from '../controllers/headers'
+import node from '../controllers/node'
+import transactions from '../controllers/transactions'
 
-var addresses = require('../controllers/addresses')
-var headers = require('../controllers/headers')
-var node = require('../controllers/node')
-var transactions = require('../controllers/transactions')
-
-module.exports.createRouter = function () {
+export function createRouter () {
   var router = express.Router()
 
   // node routes
