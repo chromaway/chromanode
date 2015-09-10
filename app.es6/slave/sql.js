@@ -66,9 +66,9 @@ export default {
                      FROM
                        history
                      WHERE
-                       address = ANY($1)
+                       address = ANY($1) AND
                        (oheight > $2 OR iheight > $2) AND
-                       (oheight <= $3 OR iheight <= $3)`,
+                       (oheight <= $3 OR iheight <= $3 OR oheight IS NULL OR (iheight IS NULL AND itxid IS NOT NULL)`,
       unspent: `SELECT
                   otxid as otxid,
                   oindex as oindex,
@@ -80,7 +80,7 @@ export default {
                 WHERE
                   address = ANY($1) AND
                   (oheight > $2 OR iheight > $2) AND
-                  (oheight <= $3 OR iheight <= $3) AND
+                  (oheight <= $3 OR iheight <= $3 OR oheight IS NULL) AND
                   itxid IS NULL`,
       spent: `SELECT
                 itxid as itxid,
