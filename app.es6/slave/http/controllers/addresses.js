@@ -41,9 +41,17 @@ function query (req) {
     }
 
     let sql = query.status === 'unspent'
-                ? SQL.select.history.unspent
-                : SQL.select.history.transactions
-    result = await client.queryAsync(sql, [query.addresses, from, to])
+                ? SQL.select.history.unspentToLatest
+                : SQL.select.history.transactionsToLatest
+    let params = [query.addresses, from]
+    if (query.to !== latest.height) {
+      sql = query.status === 'unspent'
+              ? SQL.select.history.unspent
+              : SQL.select.history.transactions
+      params.push(to)
+    }
+
+    result = await client.queryAsync(sql, params)
 
     let rows = _.chain(result.rows)
     if (query.status === 'unspent') {

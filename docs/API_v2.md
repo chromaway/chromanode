@@ -257,7 +257,7 @@ That is, given otxid and oindex find itxid and iheight.
 | source    | blocks or mempool, may be omitted (both will be used) |
 | from      | hash or height, may be omitted                        |
 | to        | hash or height, may be omitted                        |
-| status    | transactions or unspent, may be omitted               |
+| status    | transactions (by default) or unspent, may be omitted  |
 
     // get all affected transactions for addresses (from blocks and mempool)
     /v2/addresses/query?addresses=mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2,msGccLNBLYWBg9U1J2RVribprvsEF3uYGK

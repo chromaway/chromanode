@@ -44,6 +44,7 @@ let SQL = {
       },
       history: {
         address: `CREATE INDEX ON history (address)`,
+        address_itxid: `CREATE INDEX ON history (address, itxid)`,
         otxid_oindex: `CREATE INDEX ON history (otxid, oindex)`,
         otxid: `CREATE INDEX ON history (otxid)`,
         oheight: `CREATE INDEX ON history (oheight)`,
@@ -149,6 +150,7 @@ export default class Storage {
       client.queryAsync(SQL.create.indices.blocks.hash),
       client.queryAsync(SQL.create.indices.transactions.height),
       client.queryAsync(SQL.create.indices.history.address),
+      client.queryAsync(SQL.create.indices.history.address_itxid),
       client.queryAsync(SQL.create.indices.history.otxid_oindex),
       client.queryAsync(SQL.create.indices.history.oheight),
       client.queryAsync(SQL.create.indices.history.itxid),
