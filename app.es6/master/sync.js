@@ -216,7 +216,7 @@ export default class Sync extends EventEmitter {
         ])
 
         return rows.map((row) => {
-          let address = row.address.toString('hex')
+          let address = row.address.toString()
           return this._slaves.broadcastAddress(address, txid, null, null, {client: client})
         })
       })
@@ -311,7 +311,7 @@ export default class Sync extends EventEmitter {
         ]
 
         let pBroadcastAddreses = rows.map((row) => {
-          let address = row.address.toString('hex')
+          let address = row.address.toString()
           return this._slaves.broadcastAddress(address, txid, block.hash, height, {client: client})
         })
 
@@ -375,7 +375,7 @@ export default class Sync extends EventEmitter {
         }
 
         await* result.rows.map((row) => {
-          let address = row.address.toString('hex')
+          let address = row.address.toString()
           return this._slaves.broadcastAddress(address, txid, block.hash, height, {client: client})
         })
       })

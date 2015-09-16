@@ -333,82 +333,82 @@ That is, given otxid and oindex find itxid and iheight.
 ### new-block
 
 ```js
-    var io = require('socket.io-client')
-    var socket = io('http://localhost:3001/v2')
-    socket.on('connect', function () {
-      socket.emit('subscribe', {type: 'new-block'})
-    })
-    socket.on('new-block', function (payload) {
-      console.log(
-        'New block ' + payload.hash + '! (height: ' + payload.height + ')')
-    })
+var io = require('socket.io-client')
+var socket = io('http://localhost:3001/v2')
+socket.on('connect', function () {
+  socket.emit('subscribe', {type: 'new-block'})
+})
+socket.on('new-block', function (payload) {
+  console.log(
+    'New block ' + payload.hash + '! (height: ' + payload.height + ')')
+})
 ```
 
 ### new-tx
 
 ```js
-    var io = require('socket.io-client')
-    var socket = io('http://localhost:3001/v2')
-    socket.on('connect', function () {
-      socket.emit('subscribe', {type: 'new-tx'})
-    })
-    socket.on('new-tx', function (payload) {
-      console.log('New tx:', payload.txid)
-    })
+var io = require('socket.io-client')
+var socket = io('http://localhost:3001/v2')
+socket.on('connect', function () {
+  socket.emit('subscribe', {type: 'new-tx'})
+})
+socket.on('new-tx', function (payload) {
+  console.log('New tx:', payload.txid)
+})
 ```
 
 ### tx
 
 ```js
-    var tx = new require('bitcore').Transaction()
-      .from(...)
-      .to(...)
-      .change(...)
-      .sign(...)
+var tx = new require('bitcore').Transaction()
+  .from(...)
+  .to(...)
+  .change(...)
+  .sign(...)
 
-    var io = require('socket.io-client')
-    var socket = io('http://localhost:3001/v2')
-    socket.on('connect', function () {
-      socket.emit('subscribe', {type: 'tx', txid: tx.hash})
-      blockchain.propagate(tx.toString()) // broadcast tx ...
-    })
-    socket.on('tx', function (payload) {
-      if (payload.txid !== tx.hash || payload.blockHash === null) {
-        return
-      }
+var io = require('socket.io-client')
+var socket = io('http://localhost:3001/v2')
+socket.on('connect', function () {
+  socket.emit('subscribe', {type: 'tx', txid: tx.hash})
+  blockchain.propagate(tx.toString()) // broadcast tx ...
+})
+socket.on('tx', function (payload) {
+  if (payload.txid !== tx.hash || payload.blockHash === null) {
+    return
+  }
 
-      console.log('Tx included in block ', payload.blockHeight)
-      socket.emit('unsubscribe', {type: 'tx', txid: tx.hash})
-    })
+  console.log('Tx included in block ', payload.blockHeight)
+  socket.emit('unsubscribe', {type: 'tx', txid: tx.hash})
+})
 ```
 
 ### address
 
 ```js
-    var io = require('socket.io-client')
-    var socket = io('http://localhost:3001/v2')
-    socket.on('connect', function () {
-      socket.emit('subscribe', {
-        type: 'address',
-        address: 'mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2'
-      })
-    })
-    socket.on('address', function (payload) {
-      console.log('New affected tx:', payload.txid)
-    })
+var io = require('socket.io-client')
+var socket = io('http://localhost:3001/v2')
+socket.on('connect', function () {
+  socket.emit('subscribe', {
+    type: 'address',
+    address: 'mkXsnukPxC8FuEFEWvQdJNt6gvMDpM8Ho2'
+  })
+})
+socket.on('address', function (payload) {
+  console.log('New affected tx:', payload.txid)
+})
 ```
 
 ### status
 
 ```js
-    var io = require('socket.io-client')
-    var socket = io('http://localhost:3001/v2')
-    socket.on('connect', function () {
-      socket.emit('subscribe', {type: 'status'})
-    })
-    socket.on('status', function (status) {
-      console.log('New status:', status)
-    })
+var io = require('socket.io-client')
+var socket = io('http://localhost:3001/v2')
+socket.on('connect', function () {
+  socket.emit('subscribe', {type: 'status'})
+})
+socket.on('status', function (status) {
+  console.log('New status:', status)
+})
 ```
 
 ## Errors

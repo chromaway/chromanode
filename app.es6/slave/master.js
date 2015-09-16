@@ -74,8 +74,8 @@ export default class Master extends EventEmitter {
          */
         let listen = (channel, handler) => {
           if (_.isString(handler)) {
-            let event = handler
-            handler = (payload) => { this.emit(event, payload) }
+            let eventName = handler
+            handler = (payload) => { this.emit(eventName, payload) }
           }
 
           return this._messages.listen(channel, handler)

@@ -62,7 +62,7 @@ let spec = {
     message: 'Storage interval error',
     errors: [{
       name: 'InconsistentTables',
-      message: 'Storage have inconsistent tables'
+      message: 'Storage have inconsistent tables (found only {0} of {1})'
     }, {
       name: 'InvalidNetwork',
       message: 'Storage have other network: {0} (expected {1})'

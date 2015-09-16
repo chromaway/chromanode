@@ -104,10 +104,8 @@ export default class Storage {
 
       if (count === 0) {
         await this._createEnv(client)
-      }
-
-      if (count !== 5) {
-        throw new errors.Storage.InconsistentTables()
+      } else if (count !== 5) {
+        throw new errors.Storage.InconsistentTables(count, 5)
       }
 
       let [version, network] = await* [

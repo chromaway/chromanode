@@ -1,6 +1,13 @@
 language: node_js
 node_js:
   - "0.12"
+addons:
+  postgresql: "9.4"
+before_script:
+  - psql -c 'create database travis_ci_test;' -U postgres
+  - cp test/config/master.travis.yml test/config/master.yml
+  - cp test/config/slave.travis.yml test/config/slave.yml
 env:
   - TEST_SUITE=lint
+  - TEST_SUITE=test
 script: "npm run-script $TEST_SUITE"

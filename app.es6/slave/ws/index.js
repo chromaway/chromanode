@@ -32,7 +32,7 @@ export default class SocketIO {
 
       // api_v2
       this._sV2.in('new-tx').emit('new-tx', payload)
-      this._sV2.in('tx-' + payload.txid).emit('tx', payload)
+      this._sV2.in(`tx-${payload.txid}`).emit('tx', payload)
     })
 
     master.on('address', (payload) => {
@@ -41,7 +41,7 @@ export default class SocketIO {
       this._sV1.in(payload.address).emit(payload.address, payload.txid)
 
       // api_v2
-      this._sV2.in('address-' + payload.address).emit('address', payload)
+      this._sV2.in(`address-${payload.address}`).emit('address', payload)
     })
 
     master.on('status', (payload) => {
@@ -90,15 +90,20 @@ export default class SocketIO {
    * @param {socket.io.Socket} socket
    */
   _onV2Connection (socket) {
-    /**
-     * @param {string} event
-     * @param {string} handler
-     */
-    function createRoomHandler (event, handler) {
-      handler = PUtils.promisify(::socket[handler])
+    let networkName = config.get('chromanode.network')
+    if (networkName === 'regtest') {
+      networkName = 'testnet'
+    }
 
-      socket.on(event, async (opts) => {
-        return PUtils.try(() => {
+    /**
+     * @param {string} eventName
+     * @param {string} handlerName
+     */
+    function createRoomHandler (eventName, handlerName) {
+      let handler = PUtils.promisify(::socket[handlerName])
+
+      socket.on(eventName, (opts) => {
+        PUtils.try(() => {
           let room = opts.type
 
           // type check
@@ -109,7 +114,7 @@ export default class SocketIO {
 
           // tx check
           if (room === 'tx') {
-            if (/^[0-9a-fA-F]{64}$/.test(opts.txid)) {
+            if (!/^[0-9a-fA-F]{64}$/.test(opts.txid)) {
               throw new Error('Wrong txid')
             }
 
@@ -119,7 +124,7 @@ export default class SocketIO {
           // address check
           if (room === 'address') {
             try {
-              Address.fromString(opts.address, config.get('chromanode.network'))
+              Address.fromString(opts.address, networkName)
             } catch (err) {
               throw new Error(`Wrong address (${err.message})`)
             }
@@ -130,11 +135,11 @@ export default class SocketIO {
           return handler(room)
         })
         .catch((err) => {
-          logger.error(`Socket (${socket.id}) ${event} error: ${err.stack}`)
+          logger.error(`Socket (${socket.id}) ${eventName} error: ${err.stack}`)
           return err.message || err
         })
         .then((err) => {
-          socket.emit(event, opts, err || null)
+          socket.emit(`${eventName}d`, opts, err || null)
         })
       })
     }
