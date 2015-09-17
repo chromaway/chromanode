@@ -6,6 +6,7 @@ import yaml from 'js-yaml'
 import BitcoindRegtest from 'bitcoind-regtest'
 import PUtils from 'promise-useful-utils'
 
+import httpTests from './http'
 import wsTests from './ws'
 
 let pg = PUtils.promisifyAll(require('pg').native)
@@ -135,7 +136,7 @@ describe('Run bitcoind, master and slave', function () {
       }
     })
     await opts.bitcoind.ready
-    await opts.bitcoind.generateBlocks(103)
+    let generateBlocks = opts.bitcoind.generateBlocks(102)
     opts.master = await createProcess(masterLocation, ['-c', masterConfigLocation])
     opts.slave = await createProcess(slaveLocation, ['-c', slaveConfigLocation])
 
@@ -152,8 +153,22 @@ describe('Run bitcoind, master and slave', function () {
     opts.slave.on('error', (err) => { console.warn(`Slave error: ${err.stack}`) })
     // opts.slave.on('exit', (code, signal) => {})
 
-    // wait until (theoretically) master is not synced
-    await PUtils.delay(5000)
+    await generateBlocks
+    await new Promise((resolve, reject) => {
+      PUtils.try(async () => {
+        let latestBlockHash
+        let waitLatestBlockHash = (data) => {
+          if (latestBlockHash && latestBlockHash.test(data.toString())) {
+            opts.master.removeListener('data', waitLatestBlockHash)
+            resolve()
+          }
+        }
+        opts.master.on('data', waitLatestBlockHash)
+        latestBlockHash = new RegExp(
+          (await opts.bitcoind.generateBlocks(1))[0])
+      })
+      .catch(reject)
+    })
   })
 
   after(async () => {
@@ -185,5 +200,6 @@ describe('Run bitcoind, master and slave', function () {
     }
   })
 
+  httpTests(opts)
   wsTests(opts)
 })

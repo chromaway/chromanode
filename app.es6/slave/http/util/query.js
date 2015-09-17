@@ -10,7 +10,7 @@ import SQL from '../../sql'
  * @param {string} val
  * @return {(string|number)}
  */
-export function transformFromTo (val) {
+function transformFromTo (val) {
   if (val === undefined) {
     return val
   }
@@ -36,7 +36,7 @@ export function transformFromTo (val) {
  * @return {number}
  * @throws {errors.Slave.InvalidCount}
  */
-export function transformCount (val) {
+function transformCount (val) {
   if (val === undefined) {
     return 2016
   }
@@ -54,7 +54,7 @@ export function transformCount (val) {
  * @return {string[]}
  * @throws {errors.Slave}
  */
-export function transformAddresses (val) {
+function transformAddresses (val) {
   if (!_.isString(val)) {
     throw new errors.Slave.InvalidAddresses()
   }
@@ -82,7 +82,7 @@ export function transformAddresses (val) {
  * @return {string}
  * @throws {errors.Slave.InvalidSource}
  */
-export function transformSource (val) {
+function transformSource (val) {
   if (val !== undefined && ['blocks', 'mempool'].indexOf(val) === -1) {
     throw new errors.Slave.InvalidSource()
   }
@@ -95,7 +95,7 @@ export function transformSource (val) {
  * @return {string}
  * @throws {errors.Slave.InvalidStatus}
  */
-export function transformStatus (val) {
+function transformStatus (val) {
   if (val !== undefined && ['transactions', 'unspent'].indexOf(val) === -1) {
     throw new errors.Slave.InvalidStatus()
   }
@@ -107,7 +107,7 @@ export function transformStatus (val) {
  * @param {string} val
  * @return {string}
  */
-export function transformTxId (val) {
+function transformTxId (val) {
   if (!!val && val.length === 64 && bitcore.util.js.isHexa(val)) {
     return val
   }
@@ -120,7 +120,7 @@ export function transformTxId (val) {
  * @param {(string|number)} point hash or height
  * @return {Promise<?number>}
  */
-export async function getHeightForPoint (client, point) {
+async function getHeightForPoint (client, point) {
   let args = _.isNumber(point)
                ? [SQL.select.blocks.heightByHeight, [point]]
                : [SQL.select.blocks.heightByHash, ['\\x' + point]]
@@ -131,4 +131,14 @@ export async function getHeightForPoint (client, point) {
   }
 
   return result.rows[0].height
+}
+
+export default {
+  transformFromTo: transformFromTo,
+  transformCount: transformCount,
+  transformAddresses: transformAddresses,
+  transformSource: transformSource,
+  transformStatus: transformStatus,
+  transformTxId: transformTxId,
+  getHeightForPoint: getHeightForPoint
 }

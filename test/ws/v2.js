@@ -232,6 +232,7 @@ export default function (opts) {
       await new Promise((resolve, reject) => {
         socket.once('status', (payload) => {
           try {
+            expect(payload).to.have.property('version', require('../../package.json').version)
             expect(payload).to.have.property('network', 'regtest')
             resolve()
           } catch (err) {

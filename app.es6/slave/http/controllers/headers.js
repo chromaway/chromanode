@@ -75,5 +75,5 @@ function query (req, res, shift) {
   }))
 }
 
-v1.query = _.partialRight(query, -1) // req, res, -1
-v2.query = _.partialRight(query, 0)  // req, res, 0
+v1.query = (req, res) => { query(req, res, -1) }
+v2.query = (req, res) => { query(req, res, 0) }
