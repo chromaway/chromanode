@@ -8,7 +8,7 @@
 ## Requirements
 
   * [Bitcoin](https://bitcoin.org/en/download) with txindex=1
-  * [node.js](http://www.nodejs.org/download/) (testned only with v0.10)
+  * [node.js](http://www.nodejs.org/download/) (testned with v0.12, v4.0?)
   * [PostgreSQL](http://www.postgresql.org/download/)
 
 ## Installation

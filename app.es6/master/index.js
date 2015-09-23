@@ -95,7 +95,7 @@ export default async function () {
     let txid
     storage.executeTransaction(async (client) => {
       let result = await client.queryAsync(SQL.update.newTx.getAndRemove, [id])
-      let rawTx = result.rows[0].hex
+      let rawTx = result.rows[0].hex.toString('hex')
       txid = util.encode(sha256sha256(new Buffer(rawTx, 'hex')))
       logger.verbose(`sendTx: ${txid} (${rawTx})`)
 
@@ -106,7 +106,7 @@ export default async function () {
         }
       })
 
-      await network.sendTx(result.rows[0].hex)
+      await network.sendTx(rawTx)
 
       await addedToStorage
 

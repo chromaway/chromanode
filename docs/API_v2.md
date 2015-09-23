@@ -15,8 +15,8 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
   * [transactions](#transactions)
     * [raw](#raw)
     * [merkle](#merkle)
-    * [send](#send)
     * [spent](#spent)
+    * [send](#send)
   * [addresses](#addresses)
     * [query](#query)
 
@@ -178,28 +178,6 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
     {"type": "InvalidTxId"}
     {"type": "TxNotFound"}
 
-#### Send
-
-  **url**
-
-    /v2/transactions/send
-
-  **query**
-
-| param | description     |
-|:------|:----------------|
-| rawtx | raw transaction |
-
-    curl http://localhost:3001/v2/transactions/send --header "Content-Type:application/json" -d '{"rawtx": "..."}'
-
-  **result**
-
-    empty response if success
-
-  **errors**
-
-    {"type": "SendTxError", "code": -8, "message": "parameter must be hexadeci..."}
-
 #### Spent
 
 Find whether a specific transaction output is spent and who spends it.
@@ -225,7 +203,7 @@ That is, given otxid and oindex find itxid and iheight.
     {
         "spent": true,
         "itxid": "19bbfd7fdade0d158fa9e5dd80cf6b8a8bfa85370845c6c356ab1e1f783178b0",
-"iheight": 508508
+        "iheight": 508508
     }
 
     // When unspent
@@ -238,6 +216,28 @@ That is, given otxid and oindex find itxid and iheight.
 
     {"type": "InvalidTxId"}
     {"type": "TxNotFound"}
+
+#### Send
+
+  **url**
+
+    /v2/transactions/send
+
+  **query**
+
+| param | description     |
+|:------|:----------------|
+| rawtx | raw transaction |
+
+    curl http://localhost:3001/v2/transactions/send --header "Content-Type:application/json" -d '{"rawtx": "..."}'
+
+  **result**
+
+    empty response if success
+
+  **errors**
+
+    {"type": "SendTxError", "code": -8, "message": "parameter must be hexadeci..."}
 
 ### Addresses
 

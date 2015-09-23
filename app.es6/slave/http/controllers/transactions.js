@@ -81,10 +81,6 @@ v1.merkle = v2.merkle = function (req, res) {
   })())
 }
 
-v1.send = v2.send = function (req, res) {
-  res.promise(req.master.sendTx(req.body.rawtx))
-}
-
 v2.spent = function (req, res) {
   res.promise((async () => {
     let otxid = '\\x' + qutil.transformTxId(req.query.otxid)
@@ -106,4 +102,8 @@ v2.spent = function (req, res) {
       iheight: result.rows[0].iheight
     }
   })())
+}
+
+v1.send = v2.send = function (req, res) {
+  res.promise(req.master.sendTx(req.body.rawtx))
 }

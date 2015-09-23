@@ -129,7 +129,7 @@ export default class Master extends EventEmitter {
     let process
 
     await this._storage.executeTransaction(async (client) => {
-      let result = await client.queryAsync(SQL.insert.newTx.row, [rawtx])
+      let result = await client.queryAsync(SQL.insert.newTx.row, ['\\x' + rawtx])
       let id = result.rows[0].id
 
       await this._messages.notify('sendtx', {id: id}, {client: client})

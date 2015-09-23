@@ -1,10 +1,10 @@
 import { expect } from 'chai'
 
-import request from './request'
-
 export default function (opts) {
+  let request = require('./request')(opts)
+
   it('version', async () => {
-    let result = await request(opts, '/version')
+    let result = await request.get('/version')
     expect(result).to.deep.equal({
       version: require('../../package.json').version
     })

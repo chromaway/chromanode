@@ -2,9 +2,9 @@ import _ from 'lodash'
 import { expect } from 'chai'
 import bitcore from 'bitcore'
 
-import request from '../request'
-
 export default function (opts) {
+  let request = require('../request')(opts)
+
   let getHeader = async (hash) => {
     if (_.isNumber(hash)) {
       hash = (await opts.bitcoind.rpc.getBlockHash(hash)).result
@@ -25,7 +25,7 @@ export default function (opts) {
 
   describe('headers', () => {
     it('latest', async () => {
-      let result = await request(opts, '/v2/headers/latest')
+      let result = await request.get('/v2/headers/latest')
 
       let height = (await opts.bitcoind.rpc.getBlockCount()).result
       let blockHash = (await opts.bitcoind.rpc.getBlockHash(height)).result
@@ -40,7 +40,7 @@ export default function (opts) {
 
     describe('query', () => {
       it('without arguments', async () => {
-        let result = await request(opts, '/v2/headers/query')
+        let result = await request.get('/v2/headers/query')
 
         let count = (await opts.bitcoind.rpc.getBlockCount()).result + 1
         let headers = ''
@@ -65,14 +65,17 @@ export default function (opts) {
         let hash2 = (await opts.bitcoind.rpc.getBlockHash(2)).result
         let hash4 = (await opts.bitcoind.rpc.getBlockHash(4)).result
 
-        let result1 = await request(opts, `/v2/headers/query?from=${hash2}&to=4`)
+        let result1 = await request.get(
+          '/v2/headers/query', {from: hash2, to: 4})
         expect(result1).to.deep.equal(expected)
-        let result2 = await request(opts, `/v2/headers/query?from=2&to=${hash4}`)
+
+        let result2 = await request.get(
+          '/v2/headers/query', {from: 2, to: hash4})
         expect(result2).to.deep.equal(expected)
       })
 
       it('with count instead to', async () => {
-        let result = await request(opts, '/v2/headers/query?from=2&count=1')
+        let result = await request.get('/v2/headers/query', {from: 2, count: 1})
         expect(result).to.deep.equal({
           from: 2,
           count: 1,
