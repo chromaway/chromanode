@@ -181,7 +181,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 #### Spent
 
 Find whether a specific transaction output is spent and who spends it.
-That is, given otxid and oindex find itxid and iheight.
+That is, given txid and vout find txid and height.
 
   **url**
 
@@ -189,21 +189,21 @@ That is, given otxid and oindex find itxid and iheight.
 
   **query**
 
-| param  | description           |
-|:-------|:----------------------|
-| otxid  | output transaction id |
-| oindex | output index          |
+| param | description           |
+|:------|:----------------------|
+| txid  | output transaction id |
+| vout  | output index          |
 
 
-    /v2/transactions/spent?otxid=f8fa0c30e57a5900c7a0fd96f73ebebe8eafb4667224c3e49a172c20e2b58235&oindex=0
+    /v2/transactions/spent?txid=f8fa0c30e57a5900c7a0fd96f73ebebe8eafb4667224c3e49a172c20e2b58235&vout=0
 
   **result**
 
     // When spent
     {
       "spent": true,
-      "itxid": "19bbfd7fdade0d158fa9e5dd80cf6b8a8bfa85370845c6c356ab1e1f783178b0",
-      "iheight": 508508
+      "txid": "19bbfd7fdade0d158fa9e5dd80cf6b8a8bfa85370845c6c356ab1e1f783178b0",
+      "height": 508508
     }
 
     // When unspent

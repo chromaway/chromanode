@@ -10,8 +10,7 @@ export default function (opts) {
     try {
       await request.get(url, {
         txid: crypto.Random.getRandomBuffer(32).toString('hex'),
-        otxid: crypto.Random.getRandomBuffer(32).toString('hex'),
-        oindex: _.random(0, 2)
+        vout: _.random(0, 2)
       })
     } catch (err) {
       expect(err).to.be.instanceof(request.errors.StatusFail)
@@ -91,7 +90,7 @@ export default function (opts) {
         let unspent = _.sample((await opts.bitcoind.rpc.listUnspent()).result)
 
         let result = await request.get(
-          '/v2/transactions/spent', {otxid: unspent.txid, oindex: unspent.vout})
+          '/v2/transactions/spent', {txid: unspent.txid, vout: unspent.vout})
         expect(result).to.deep.equal({spent: false})
       })
 
@@ -100,14 +99,14 @@ export default function (opts) {
         let txId = (await opts.bitcoind.rpc.getBlock(hash)).result.tx[0]
 
         let result = await request.get(
-          '/v2/transactions/spent', {otxid: txId, oindex: 0})
+          '/v2/transactions/spent', {txid: txId, vout: 0})
         expect(result).to.have.property('spent', true)
 
-        let txInfo = (await opts.bitcoind.rpc.getRawTransaction(result.itxid, 1)).result
+        let txInfo = (await opts.bitcoind.rpc.getRawTransaction(result.txid, 1)).result
         expect(_.pluck(txInfo.vin, 'txid')).to.include(txId)
 
         let txHeight = (await opts.bitcoind.rpc.getBlock(txInfo.blockhash)).result.height
-        expect(txHeight).to.equal(result.iheight)
+        expect(txHeight).to.equal(result.height)
       })
     })
 

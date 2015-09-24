@@ -83,8 +83,8 @@ v1.merkle = v2.merkle = function (req, res) {
 
 v2.spent = function (req, res) {
   res.promise((async () => {
-    let otxid = '\\x' + qutil.transformTxId(req.query.otxid)
-    let oindex = parseInt(req.query.oindex, 10)
+    let otxid = '\\x' + qutil.transformTxId(req.query.txid)
+    let oindex = parseInt(req.query.vout, 10)
     let result = await req.storage.executeQuery(
       SQL.select.history.spent, [otxid, oindex])
 
@@ -98,8 +98,8 @@ v2.spent = function (req, res) {
 
     return {
       spent: true,
-      itxid: result.rows[0].itxid.toString('hex'),
-      iheight: result.rows[0].iheight
+      txid: result.rows[0].itxid.toString('hex'),
+      height: result.rows[0].iheight
     }
   })())
 }
