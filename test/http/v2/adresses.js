@@ -55,7 +55,6 @@ export default function (opts) {
             if (!(err instanceof request.errors.StatusFail)) {
               throw err
             }
-            console.log(`${txid} not ready yet`)
           }
         }
       } while (txids.length > 0)

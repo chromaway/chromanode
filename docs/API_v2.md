@@ -201,14 +201,14 @@ That is, given otxid and oindex find itxid and iheight.
 
     // When spent
     {
-        "spent": true,
-        "itxid": "19bbfd7fdade0d158fa9e5dd80cf6b8a8bfa85370845c6c356ab1e1f783178b0",
-        "iheight": 508508
+      "spent": true,
+      "itxid": "19bbfd7fdade0d158fa9e5dd80cf6b8a8bfa85370845c6c356ab1e1f783178b0",
+      "iheight": 508508
     }
 
     // When unspent
     {
-        "spent": false
+      "spent": false
     }
 
 

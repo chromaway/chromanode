@@ -19,10 +19,6 @@ export default function (opts) {
     }
   }
 
-  function hashDecode (s) {
-    return Array.prototype.reverse.call(new Buffer(s, 'hex'))
-  }
-
   describe('transactions', () => {
     describe('raw', () => {
       it('not found', _.partial(notFoundTest, '/v2/transactions/raw'))
@@ -42,7 +38,18 @@ export default function (opts) {
 
       it('tx from mempool', async () => {
         let txId = (await opts.bitcoind.generateTxs(1))[0]
-        await PUtils.delay(100)
+        while (true) {
+          await PUtils.delay(100)
+          try {
+            await request.get('/v2/transactions/raw', {txid: txId})
+            break
+          } catch (err) {
+            if (!(err instanceof request.errors.StatusFail)) {
+              throw err
+            }
+          }
+        }
+
         let result = await request.get('/v2/transactions/merkle', {txid: txId})
         expect(result).to.deep.equal({source: 'mempool'})
       })
@@ -60,17 +67,20 @@ export default function (opts) {
         expect(result).to.have.deep.property('block.hash', hash)
         expect(result).to.have.deep.property('block.index', txIndex)
 
+        let decode = (s) => Array.prototype.reverse.call(new Buffer(s, 'hex'))
+
         // check merkle
-        let merkle = hashDecode(block.tx[txIndex])
+        let merkle = decode(block.tx[txIndex])
         for (let i = 0; i < result.block.merkle.length; i += 1) {
-          let items = [merkle, hashDecode(result.block.merkle[i])]
+          let items = [merkle, decode(result.block.merkle[i])]
           if ((txIndex >> i) & 1) {
             items.reverse()
           }
 
           merkle = crypto.Hash.sha256sha256(Buffer.concat(items))
         }
-        expect(merkle.reverse().toString('hex')).to.equal(block.merkleroot)
+        let merkleRoot = Array.prototype.reverse.call(merkle).toString('hex')
+        expect(merkleRoot).to.equal(block.merkleroot)
       })
     })
 
