@@ -168,9 +168,9 @@ export default class Sync extends EventEmitter {
 
   /**
    * @param {bitcore.Transaction} tx
-   * @return {Promise<boolean>}
+   * @return {Promise}
    */
-  _importUnconfirmedTx (tx) {
+  _importUnconfirmedTx = makeConcurrent((tx) => {
     let txid = tx.id
 
     let stopwatch = ElapsedTime.new().start()
@@ -179,7 +179,7 @@ export default class Sync extends EventEmitter {
       let result = await client.queryAsync(
         SQL.select.transactions.exists, ['\\x' + txid])
       if (result.rows[0].count !== '0') {
-        return false
+        return
       }
 
       // all inputs exists?
@@ -187,7 +187,7 @@ export default class Sync extends EventEmitter {
       result = await client.queryAsync(
         SQL.select.transactions.existsMany, [txids.map((i) => { return '\\x' + i })])
       let deps = _.difference(
-        txid, result.rows.map((row) => { return row.txid.toString('hex') }))
+        txids, result.rows.map((row) => { return row.txid.toString('hex') }))
 
       // some input not exists yet, mark as orphaned and delay
       if (deps.length > 0) {
@@ -196,7 +196,7 @@ export default class Sync extends EventEmitter {
           this._orphanedTx.next[dep] = _.union(this._orphanedTx.next[dep], [txid])
         }
         logger.warn(`Orphan tx: ${txid} (deps: ${deps.join(', ')})`)
-        return false
+        return
       }
 
       // import transaction
@@ -242,17 +242,13 @@ export default class Sync extends EventEmitter {
       await* _.flattenDeep(
         [pImportTx, pBroadcastTx, pImportInputs, pImportOutputs])
 
-      return true
-    })
-    .then((value) => {
       this.emit('tx', txid)
       logger.verbose(`Import unconfirmed tx ${txid}, elapsed time: ${stopwatch.getValue()}`)
-      return value
     })
     .catch((err) => {
       logger.error(`Import unconfirmed tx: ${err.stack}`)
     })
-  }
+  }, {concurrency: 1})
 
   /**
    * @param {string} txid
@@ -263,10 +259,7 @@ export default class Sync extends EventEmitter {
       let tx = await this._network.getTx(txid)
 
       // ... and run import
-      let imported = await this._importUnconfirmedTx(tx)
-      if (imported) {
-        this._importDependsFrom(txid)
-      }
+      await this._importUnconfirmedTx(tx)
     } catch (err) {
       logger.error(`Tx import: ${err.stack}`)
     }
@@ -279,7 +272,7 @@ export default class Sync extends EventEmitter {
    * @return {Promise}
    */
   async _importBlock (block, height, client) {
-    let txids = _.pluck(block.transactions, 'hash')
+    let txids = _.pluck(block.transactions, 'id')
     let existingTx = {}
 
     // import header
@@ -305,14 +298,16 @@ export default class Sync extends EventEmitter {
       if (result.rows[0].count !== '0') {
         existingTx[txid] = true
 
-        let [, {rows}] = await* [
-          client.queryAsync(SQL.update.transactions.makeConfirmed, [height, '\\x' + txid]),
-          client.queryAsync(SQL.update.history.makeOutputConfirmed, [height, '\\x' + txid])
-        ]
+        let pBroadcastAddreses = PUtils.try(async () => {
+          let [, {rows}] = await* [
+            client.queryAsync(SQL.update.transactions.makeConfirmed, [height, '\\x' + txid]),
+            client.queryAsync(SQL.update.history.makeOutputConfirmed, [height, '\\x' + txid])
+          ]
 
-        let pBroadcastAddreses = rows.map((row) => {
-          let address = row.address.toString()
-          return this._slaves.broadcastAddress(address, txid, block.hash, height, {client: client})
+          return rows.map((row) => {
+            let address = row.address.toString()
+            return this._slaves.broadcastAddress(address, txid, block.hash, height, {client: client})
+          })
         })
 
         return [pBroadcastTx, pBroadcastAddreses]
@@ -353,7 +348,7 @@ export default class Sync extends EventEmitter {
         // skip coinbase
         let prevTxId = input.prevTxId.toString('hex')
         if (index === 0 &&
-            input.outputIndex === 0xffffffff &&
+            input.outputIndex === 0xFFFFFFFF &&
             prevTxId === ZERO_HASH) {
           return
         }

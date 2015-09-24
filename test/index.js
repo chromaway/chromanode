@@ -120,6 +120,9 @@ describe('Run bitcoind, master and slave', function () {
 
     // run bitcoind, master and slave
     opts.bitcoind = new BitcoindRegtest({
+      wallet: {
+        keysPoolSize: _.constant(10)
+      },
       generate: {
         txs: {
           background: _.constant(false)
@@ -136,7 +139,7 @@ describe('Run bitcoind, master and slave', function () {
       }
     })
     await opts.bitcoind.ready
-    let generateBlocks = opts.bitcoind.generateBlocks(102)
+    let generateBlocks = opts.bitcoind.generateBlocks(105)
     opts.master = await createProcess(masterLocation, ['-c', masterConfigLocation])
     opts.slave = await createProcess(slaveLocation, ['-c', slaveConfigLocation])
 

@@ -78,13 +78,10 @@ export default function (opts) {
       it('not found', _.partial(notFoundTest, '/v2/transactions/spent'))
 
       it('unspent', async () => {
-        let hash = (await opts.bitcoind.rpc.getBestBlockHash()).result
-        let block = (await opts.bitcoind.rpc.getBlock(hash)).result
+        let unspent = _.sample((await opts.bitcoind.rpc.listUnspent()).result)
 
-        let txId = _.sample(block.tx)
         let result = await request.get(
-          '/v2/transactions/spent', {otxid: txId, oindex: 0})
-
+          '/v2/transactions/spent', {otxid: unspent.txid, oindex: unspent.vout})
         expect(result).to.deep.equal({spent: false})
       })
 

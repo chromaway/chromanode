@@ -44,7 +44,7 @@ function query (req) {
                 ? SQL.select.history.unspentToLatest
                 : SQL.select.history.transactionsToLatest
     let params = [query.addresses, from]
-    if (query.to !== latest.height) {
+    if (to !== latest.height) {
       sql = query.status === 'unspent'
               ? SQL.select.history.unspent
               : SQL.select.history.transactions
@@ -59,11 +59,12 @@ function query (req) {
         return {
           txid: row.otxid.toString('hex'),
           vout: row.oindex,
-          value: row.ovalue,
+          value: parseInt(row.ovalue, 10),
           script: row.oscript.toString('hex'),
           height: row.oheight
         }
       })
+      .unique((row) => { return row.txid + row.vout })
     } else {
       rows = rows
         .map((row) => {
@@ -82,13 +83,13 @@ function query (req) {
           return items
         })
         .flatten()
-        .unique()
+        .unique('txid')
     }
 
     let value = rows
       .filter((row) => {
         if ((row.height !== null) &&
-            (row.height > from && row.height <= to)) {
+            !(row.height > from && row.height <= to)) {
           return false
         }
 
