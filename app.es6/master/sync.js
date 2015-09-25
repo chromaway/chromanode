@@ -525,13 +525,14 @@ export default class Sync extends EventEmitter {
     // show info message
     logger.info(`Got ${this._latest.height + 1} blocks in current db, out of ${this._blockchainLatest.height + 1} block at bitcoind`)
 
-    // tx handler
-    this._network.on('tx', ::this._runTxImport)
+    // make sure that we have latest block
+    await this._runBlockImport()
 
-    // block handler
+    // set handlers
+    this._network.on('tx', ::this._runTxImport)
     this._network.on('block', ::this._runBlockImport)
 
-    // make sure that we have latest block
+    // and run sync again
     await this._runBlockImport()
   }
 }

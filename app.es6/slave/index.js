@@ -2,7 +2,7 @@ import express from 'express'
 
 import config from '../lib/config'
 import logger from '../lib/logger'
-import http from './http'
+import createServer from './http'
 import SocketIO from './ws'
 import Master from './master'
 import Storage from '../lib/storage'
@@ -15,14 +15,13 @@ export default async function () {
   let storage = new Storage()
   let messages = new Messages({storage: storage})
   let master = new Master(storage, messages)
-  let socket = new SocketIO(master)
 
   await* [storage.ready, messages.ready, master.ready]
 
   let expressApp = express()
-  http.setup(expressApp, storage, master)
+  let server = createServer(expressApp, storage, master)
 
-  let server = http.createServer(expressApp)
+  let socket = new SocketIO(master)
   socket.attach(server)
 
   await server.listen(config.get('chromanode.port'))

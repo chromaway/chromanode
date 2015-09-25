@@ -10,9 +10,10 @@ export default function (opts) {
 
     let subscribe = (opts) => {
       return new Promise((resolve, reject) => {
-        socket.once('subscribed', (payload) => {
+        socket.once('subscribed', (payload, err) => {
           try {
             expect(payload).to.deep.equal(opts)
+            expect(err).to.be.null
             resolve()
           } catch (err) {
             reject(err)
@@ -47,9 +48,10 @@ export default function (opts) {
     it('subscribe/unsubscribe', async () => {
       await subscribe({type: 'status'})
       await new Promise((resolve, reject) => {
-        socket.once('unsubscribed', (payload) => {
+        socket.once('unsubscribed', (payload, err) => {
           try {
             expect(payload).to.deep.equal({type: 'status'})
+            expect(err).to.be.null
             resolve()
           } catch (err) {
             reject(err)

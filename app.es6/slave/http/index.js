@@ -52,22 +52,7 @@ express.response.promise = async function (promise) {
   }
 }
 
-function createServer (expressApp) {
-  let server = (() => {
-    if (!!config.get('chromanode.enableHTTPS') === false) {
-      return http.createServer(expressApp)
-    }
-
-    let opts = {}
-    opts.key = fs.readFileSync('etc/key.pem')
-    opts.cert = fs.readFileSync('etc/cert.pem')
-    return https.createServer(opts, expressApp)
-  })()
-
-  return PUtils.promisifyAll(server)
-}
-
-function setup (app, storage, master) {
+export default function (app, storage, master) {
   // app.set('showStackError', true)
   app.set('etag', false)
 
@@ -104,9 +89,17 @@ function setup (app, storage, master) {
   app.use((req, res) => {
     res.jfail('The endpoint you are looking for does not exist!')
   })
-}
 
-export default {
-  createServer: createServer,
-  setup: setup
+  let server = (() => {
+    if (!!config.get('chromanode.enableHTTPS') === false) {
+      return http.createServer(app)
+    }
+
+    let opts = {}
+    opts.key = fs.readFileSync('etc/key.pem')
+    opts.cert = fs.readFileSync('etc/cert.pem')
+    return https.createServer(opts, app)
+  })()
+
+  return PUtils.promisifyAll(server)
 }

@@ -14,41 +14,12 @@ export default class SocketIO {
    * @param {Master} master
    */
   constructor (master) {
-    this._ios = null
+    this._networkName = config.get('chromanode.network')
+    if (this._networkName === 'regtest') {
+      this._networkName = 'testnet'
+    }
 
-    master.on('block', (payload) => {
-      // api_v1
-      this._ios.sockets.in('new-block').emit('new-block', payload.hash, payload.height)
-      this._sV1.in('new-block').emit('new-block', payload.hash, payload.height)
-
-      // api_v2
-      this._sV2.in('new-block').emit('new-block', payload)
-    })
-
-    master.on('tx', (payload) => {
-      // api_v1
-      this._ios.sockets.in('new-tx').emit('new-tx', payload.txid)
-      this._sV1.in('new-tx').emit('new-tx', payload.txid)
-
-      // api_v2
-      this._sV2.in('new-tx').emit('new-tx', payload)
-      this._sV2.in(`tx-${payload.txid}`).emit('tx', payload)
-    })
-
-    master.on('address', (payload) => {
-      // api_v1
-      this._ios.sockets.in(payload.address).emit(payload.address, payload.txid)
-      this._sV1.in(payload.address).emit(payload.address, payload.txid)
-
-      // api_v2
-      this._sV2.in(`address-${payload.address}`).emit('address', payload)
-    })
-
-    master.on('status', (payload) => {
-      // api_v1
-      // api_v2
-      this._sV2.in('status').emit('status', payload)
-    })
+    this._master = master
   }
 
   /**
@@ -74,6 +45,40 @@ export default class SocketIO {
     // api_v2
     this._sV2 = this._ios.of('/v2')
     this._sV2.on('connection', ::this._onV2Connection)
+
+    this._master.on('block', (payload) => {
+      // api_v1
+      this._ios.sockets.in('new-block').emit('new-block', payload.hash, payload.height)
+      this._sV1.in('new-block').emit('new-block', payload.hash, payload.height)
+
+      // api_v2
+      this._sV2.in('new-block').emit('new-block', payload)
+    })
+
+    this._master.on('tx', (payload) => {
+      // api_v1
+      this._ios.sockets.in('new-tx').emit('new-tx', payload.txid)
+      this._sV1.in('new-tx').emit('new-tx', payload.txid)
+
+      // api_v2
+      this._sV2.in('new-tx').emit('new-tx', payload)
+      this._sV2.in(`tx-${payload.txid}`).emit('tx', payload)
+    })
+
+    this._master.on('address', (payload) => {
+      // api_v1
+      this._ios.sockets.in(payload.address).emit(payload.address, payload.txid)
+      this._sV1.in(payload.address).emit(payload.address, payload.txid)
+
+      // api_v2
+      this._sV2.in(`address-${payload.address}`).emit('address', payload)
+    })
+
+    this._master.on('status', (payload) => {
+      // api_v1
+      // api_v2
+      this._sV2.in('status').emit('status', payload)
+    })
   }
 
   /**
@@ -90,61 +95,63 @@ export default class SocketIO {
    * @param {socket.io.Socket} socket
    */
   _onV2Connection (socket) {
-    let networkName = config.get('chromanode.network')
-    if (networkName === 'regtest') {
-      networkName = 'testnet'
+    let join = PUtils.promisify(::socket.join)
+    socket.on('subscribe', async (opts) => {
+      try {
+        let room = this._v2GetRoom(opts)
+        await join(room)
+        socket.emit('subscribed', opts, null)
+      } catch (err) {
+        logger.error(`Socket (${socket.id}) subscribe error: ${err.stack}`)
+        socket.emit('subscribed', opts, err.message || err)
+      }
+    })
+
+    let leave = PUtils.promisify(::socket.leave)
+    socket.on('unsubscribe', async (opts) => {
+      try {
+        let room = this._v2GetRoom(opts)
+        await leave(room)
+        socket.emit('unsubscribed', opts, null)
+      } catch (err) {
+        logger.error(`Socket (${socket.id}) unsubscribe error: ${err.stack}`)
+        socket.emit('unsubscribed', opts, err.message || err)
+      }
+    })
+  }
+
+  /**
+   * @param {Object} opts
+   * @return {string}
+   * @throws {Error}
+   */
+  _v2GetRoom (opts) {
+    switch (opts.type) {
+      case 'new-block':
+        return 'new-block'
+
+      case 'new-tx':
+        return 'new-tx'
+
+      case 'tx':
+        if (!/^[0-9a-fA-F]{64}$/.test(opts.txid)) {
+          throw new Error(`Wrong txid: ${opts.txid}`)
+        }
+        return 'tx-' + opts.txid
+
+      case 'address':
+        try {
+          Address.fromString(opts.address, this._networkName)
+        } catch (err) {
+          throw new Error(`Wrong address: ${opts.address} (${err.message})`)
+        }
+        return 'address-' + opts.address
+
+      case 'status':
+        return 'status'
+
+      default:
+        throw new Error('wrong type')
     }
-
-    /**
-     * @param {string} eventName
-     * @param {string} handlerName
-     */
-    function createRoomHandler (eventName, handlerName) {
-      let handler = PUtils.promisify(::socket[handlerName])
-
-      socket.on(eventName, (opts) => {
-        PUtils.try(() => {
-          let room = opts.type
-
-          // type check
-          let rooms = ['new-block', 'new-tx', 'tx', 'address', 'status']
-          if (rooms.indexOf(opts.type) === -1) {
-            throw new Error('wrong type')
-          }
-
-          // tx check
-          if (room === 'tx') {
-            if (!/^[0-9a-fA-F]{64}$/.test(opts.txid)) {
-              throw new Error('Wrong txid')
-            }
-
-            room = 'tx-' + opts.txid
-          }
-
-          // address check
-          if (room === 'address') {
-            try {
-              Address.fromString(opts.address, networkName)
-            } catch (err) {
-              throw new Error(`Wrong address (${err.message})`)
-            }
-
-            room = 'address-' + opts.address
-          }
-
-          return handler(room)
-        })
-        .catch((err) => {
-          logger.error(`Socket (${socket.id}) ${eventName} error: ${err.stack}`)
-          return err.message || err
-        })
-        .then((err) => {
-          socket.emit(`${eventName}d`, opts, err || null)
-        })
-      })
-    }
-
-    createRoomHandler('subscribe', 'join')
-    createRoomHandler('unsubscribe', 'leave')
   }
 }

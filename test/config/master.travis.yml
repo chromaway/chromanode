@@ -1,7 +1,5 @@
 chromanode:
   network: regtest # livenet | testnet
-  sync:
-    maxCachedBlocks: 3 # useful for remote bitcoind
 
 logger:
   level: verbose # verbose, info, warning, error
