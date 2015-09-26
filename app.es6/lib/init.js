@@ -1,6 +1,8 @@
 import 'source-map-support/register'
 
 import yargs from 'yargs'
+import fs from 'fs'
+import Yaml from 'js-yaml'
 import bitcore from 'bitcore'
 
 import errors from './errors'
@@ -27,6 +29,12 @@ export default async function (app) {
       describe: 'configuration file',
       nargs: 1
     })
+    .options('l', {
+      alias: 'local-config',
+      demand: false,
+      describe: 'redefine configuration file here with JSON',
+      nargs: 1
+    })
     .help('h')
     .alias('h', 'help')
     .epilog('https://github.com/chromaway/chromanode')
@@ -34,8 +42,14 @@ export default async function (app) {
     .argv
 
   try {
-    // load config & logger
-    let config = require('./config').load(argv.config)
+    // load config
+    let config = require('./config')
+    config.update(Yaml.safeLoad(fs.readFileSync(argv.config, 'utf-8')))
+    if (argv['local-config'] !== undefined) {
+      config.update(JSON.parse(argv['local-config']))
+    }
+
+    // load logger
     var logger = require('./logger')
 
     // check network

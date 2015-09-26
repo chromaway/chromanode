@@ -21,6 +21,7 @@ export default async function () {
   let expressApp = express()
   let server = createServer(expressApp, storage, master)
 
+  // TODO: allow disable socket.io (need split notification and send transactions via messages)
   let socket = new SocketIO(master)
   socket.attach(server)
 

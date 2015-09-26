@@ -1,6 +1,4 @@
 import _ from 'lodash'
-import fs from 'fs'
-import Yaml from 'js-yaml'
 
 /**
  * @class Config
@@ -14,13 +12,11 @@ class Config {
   }
 
   /**
-   * @param {string} filename
+   * @param {Object} config
    * @return {Config}
    */
-  load (filename) {
-    let rawConfig = fs.readFileSync(filename, 'utf-8')
-    let newConfig = Yaml.safeLoad(rawConfig)
-    _.merge(this._config, newConfig)
+  update (config) {
+    _.merge(this._config, config)
     return this
   }
 
