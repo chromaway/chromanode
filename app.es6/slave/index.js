@@ -13,17 +13,18 @@ import Messages from '../lib/messages'
  */
 export default async function () {
   let storage = new Storage()
-  let messages = new Messages({storage: storage})
-  let master = new Master(storage, messages)
+  let mNotifications = new Messages({storage: storage})
+  let mSendTx = new Messages({storage: storage})
+  let master = new Master(storage, mNotifications, mSendTx)
 
-  await* [storage.ready, messages.ready, master.ready]
+  await* [storage.ready, master.ready]
 
   let expressApp = express()
   let server = createServer(expressApp, storage, master)
 
-  // TODO: allow disable socket.io (need split notification and send transactions via messages)
-  let socket = new SocketIO(master)
-  socket.attach(server)
+  if (!!config.get('chromanode.enableNotifications') === true) {
+    new SocketIO(master).attach(server)
+  }
 
   await server.listen(config.get('chromanode.port'))
 

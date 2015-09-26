@@ -3,6 +3,7 @@ chromanode:
   enableHTTPS: false
   host: localhost
   port: 24446
+  enableNotifications: true
 
 logger:
   level: verbose # verbose, info, warning, error
