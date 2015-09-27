@@ -139,7 +139,7 @@ describe('Run bitcoind, master and slave', function () {
       }
     })
     await opts.bitcoind.ready
-    let generateBlocks = opts.bitcoind.generateBlocks(105)
+    let generateBlocks = opts.bitcoind.generateBlocks(110)
     opts.master = await createProcess(masterLocation, ['-c', masterConfigLocation])
     opts.slave = await createProcess(slaveLocation, ['-c', slaveConfigLocation])
 
