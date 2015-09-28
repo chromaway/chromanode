@@ -14,6 +14,7 @@ import SQL from './sql'
 
 let Address = bitcore.Address
 let Hash = bitcore.crypto.Hash
+let Base58Check = bitcore.encoding.Base58Check
 
 /**
  * @event Sync#latest
@@ -60,13 +61,14 @@ export default class Sync extends EventEmitter {
   }
 
   /**
-   * @param {Buffer} buf
+   * @param {Buffer} hashBuffer
    * @param {string} type
    * @return {string}
    */
-  _createAddress (buf, type) {
-    let address = new Address(buf, this._bitcoinNetwork, type)
-    return address.toString()
+  _createAddress (hashBuffer, type) {
+    let version = new Buffer([this._bitcoinNetwork[type]])
+    let buf = Buffer.concat([version, hashBuffer])
+    return Base58Check.encode(buf)
   }
 
   /**
@@ -144,6 +146,7 @@ export default class Sync extends EventEmitter {
    * @param {string} txid
    */
   _importDependsFrom (txid) {
+    // TODO: check! not work '(
     // check depends tx that mark as orphaned now
     let orphans = this._orphanedTx.next[txid]
     if (orphans === undefined) {
@@ -174,9 +177,10 @@ export default class Sync extends EventEmitter {
    */
   _importUnconfirmedTx (tx) {
     let txid = tx.id
-    let prevTxIds = tx.inputs.map((i) => { return i.prevTxId.toString('hex') })
+    let prevTxIds = _.uniq(
+      tx.inputs.map((input) => input.prevTxId.toString('hex')))
 
-    return this._lock.withLock(_.uniq(prevTxIds.concat(txid)), () => {
+    return this._lock.withLock(prevTxIds.concat(txid), () => {
       let stopwatch = ElapsedTime.new().start()
       return this._storage.executeTransaction(async (client) => {
         // transaction already in database?
@@ -190,7 +194,7 @@ export default class Sync extends EventEmitter {
         result = await client.queryAsync(
           SQL.select.transactions.existsMany, [prevTxIds.map((i) => { return '\\x' + i })])
         let deps = _.difference(
-          prevTxIds, result.rows.map((row) => { return row.txid.toString('hex') }))
+          prevTxIds, result.rows.map((row) => row.txid.toString('hex')))
 
         // some input not exists yet, mark as orphaned and delay
         if (deps.length > 0) {
