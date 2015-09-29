@@ -8,6 +8,7 @@ import PUtils from 'promise-useful-utils'
 
 import httpTests from './http'
 import wsTests from './ws'
+import reorgTests from './reorg'
 
 let pg = PUtils.promisifyAll(require('pg').native)
 
@@ -157,21 +158,24 @@ describe('Run bitcoind, master and slave', function () {
     // opts.slave.on('exit', (code, signal) => {})
 
     await generateBlocks
-    await new Promise((resolve, reject) => {
-      PUtils.try(async () => {
-        let latestBlockHash
-        let waitLatestBlockHash = (data) => {
-          if (latestBlockHash && latestBlockHash.test(data.toString())) {
-            opts.master.removeListener('data', waitLatestBlockHash)
-            resolve()
-          }
+
+    let waitTextItems = new Map()
+    opts.master.on('data', (data) => {
+      for (let [regexp, resolve] of waitTextItems.entries()) {
+        if (regexp.test(data)) {
+          resolve()
+          waitTextItems.delete(regexp)
         }
-        opts.master.on('data', waitLatestBlockHash)
-        latestBlockHash = new RegExp(
-          (await opts.bitcoind.generateBlocks(1))[0])
-      })
-      .catch(reject)
+      }
     })
+    opts.waitTextInMaster = (text) => {
+      return new Promise((resolve) => {
+        waitTextItems.set(new RegExp(text), resolve)
+      })
+    }
+
+    let latestBlockHash = (await opts.bitcoind.generateBlocks(1))[0]
+    await opts.waitTextInMaster(latestBlockHash)
   })
 
   after(async () => {
@@ -205,4 +209,5 @@ describe('Run bitcoind, master and slave', function () {
 
   httpTests(opts)
   wsTests(opts)
+  reorgTests(opts)
 })
