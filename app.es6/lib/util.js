@@ -36,6 +36,7 @@ class SmartLock {
   async withLock (txids, fn) {
     let lockResolve
     let lockPromise = new Promise((resolve) => { lockResolve = resolve })
+    let lockedTxIds = []
 
     try {
       while (true) {
@@ -43,6 +44,7 @@ class SmartLock {
         if (locks.length === 0) {
           for (let txid of txids) {
             this._locks[txid] = lockPromise
+            lockedTxIds.push(txid)
           }
           break
         }
@@ -56,7 +58,7 @@ class SmartLock {
 
       return await fn()
     } finally {
-      for (let txid of txids) {
+      for (let txid of lockedTxIds) {
         delete this._locks[txid]
       }
 
@@ -74,7 +76,7 @@ class SmartLock {
 
     try {
       await* _.values(this._locks)
-      return fn()
+      return await fn()
     } finally {
       this._reorgPromise = null
       lockResolve()

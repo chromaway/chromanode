@@ -8,7 +8,7 @@ import PUtils from 'promise-useful-utils'
 
 import httpTests from './http'
 import wsTests from './ws'
-import reorgTests from './reorg'
+import masterTests from './master'
 
 let pg = PUtils.promisifyAll(require('pg').native)
 
@@ -209,5 +209,5 @@ describe('Run bitcoind, master and slave', function () {
 
   httpTests(opts)
   wsTests(opts)
-  reorgTests(opts)
+  masterTests(opts)
 })
