@@ -442,10 +442,10 @@ export default class Sync extends EventEmitter {
                 let args = [latest.height - 1]
                 await* [
                   client.queryAsync(SQL.delete.blocks.fromHeight, args),
-                  client.queryAsync(SQL.transactions.makeUnconfirmed, args),
+                  client.queryAsync(SQL.update.transactions.makeUnconfirmed, args),
                   PUtils.try(async () => {
-                    await client.queryAsync(SQL.history.makeOutputsUnconfirmed, args)
-                    await client.queryAsync(SQL.history.makeInputsUnconfirmed, args)
+                    await client.queryAsync(SQL.update.history.makeOutputsUnconfirmed, args)
+                    await client.queryAsync(SQL.update.history.makeInputsUnconfirmed, args)
                   })
                 ]
 
