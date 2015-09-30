@@ -1,3 +1,5 @@
 {
+  "optional": ["runtime", "asyncToGenerator"],
+  "sourceMaps": "inline",
   "stage": 0
 }

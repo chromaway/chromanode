@@ -36,8 +36,8 @@
   "scripts": {
     "prepublish": "npm run clean && npm run compile",
     "clean": "rm -rf app",
-    "compile": "mkdir -p app && babel app.es6 -d app --optional runtime -s inline",
-    "compile:watch": "mkdir -p app && babel app.es6 -d app --optional runtime -s inline -w",
+    "compile": "mkdir -p app && babel app.es6 -d app",
+    "compile:watch": "mkdir -p app && babel app.es6 -d app -w",
     "lint": "eslint app.es6 bin test",
     "test": "find test/ -type f -name \"*.js\" | xargs mocha --compilers js:babel/register --reporter spec"
   },
