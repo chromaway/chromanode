@@ -197,8 +197,8 @@ export default class Network extends EventEmitter {
   /**
    * @return {Promise<string[]>}
    */
-  getMempoolTxs () {
-    let {result} = this._bitcoind.getRawMemPool()
+  async getMempoolTxs () {
+    let {result} = await this._bitcoind.getRawMemPool()
     return result
   }
 }
