@@ -157,7 +157,7 @@ export default async function () {
 
   sync.on('tx', (txid) => {
     let deferred = sendTxDeferreds[txid]
-    if (deferred) {
+    if (deferred !== undefined) {
       deferred.resolve()
       clearTimeout(deferred.timeoutId)
       delete sendTxDeferreds[txid]

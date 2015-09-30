@@ -50,14 +50,12 @@ export default class Sync extends EventEmitter {
     this._latest = null
     this._blockchainLatest = null
 
-    this._orphanedTx = {
-      prev: {}, // txid -> txid[]
-      next: {}  // txid -> txid[]
-    }
-
     this._lock = new util.SmartLock()
 
-    this.on('tx', ::this._importDependsFrom)
+    this._orphanedTx = {
+      deps: {}, // txid -> txid[]
+      orphans: {}  // txid -> txid[]
+    }
   }
 
   /**
@@ -142,30 +140,26 @@ export default class Sync extends EventEmitter {
     })
   }
 
-  /**
-   * @param {string} txid
-   */
-  _importDependsFrom (txid) {
-    // TODO: check! not work '(
-    // check depends tx that mark as orphaned now
-    let orphans = this._orphanedTx.next[txid]
+  _importOrphaned (txid) {
+    // are we have orphaned tx that depends from this txid?
+    let orphans = this._orphanedTx.orphans[txid]
     if (orphans === undefined) {
       return
     }
 
-    delete this._orphanedTx.next[txid]
+    delete this._orphanedTx.orphans[txid]
 
     // check every orphaned tx
     for (let orphaned of orphans) {
       // all deps resolved?
-      let deps = _.without(this._orphanedTx.prev[orphaned], txid)
+      let deps = _.without(this._orphanedTx.deps[orphaned], txid)
       if (deps.length > 0) {
-        this._orphanedTx.prev[orphaned] = deps
+        this._orphanedTx.deps[orphaned] = deps
         continue
       }
 
       // run import if all resolved transactions
-      delete this._orphanedTx.prev[orphaned]
+      delete this._orphanedTx.deps[orphaned]
       setImmediate(::this._runTxImport, orphaned)
       logger.warn(`Run import for orphaned tx: ${orphaned}`)
     }
@@ -198,9 +192,9 @@ export default class Sync extends EventEmitter {
 
         // some input not exists yet, mark as orphaned and delay
         if (deps.length > 0) {
-          this._orphanedTx.prev[txid] = deps
+          this._orphanedTx.deps[txid] = deps
           for (let dep of deps) {
-            this._orphanedTx.next[dep] = _.union(this._orphanedTx.next[dep], [txid])
+            this._orphanedTx.orphans[dep] = _.union(this._orphanedTx.orphans[dep], [txid])
           }
           logger.warn(`Orphan tx: ${txid} (deps: ${deps.join(', ')})`)
           return
@@ -249,7 +243,6 @@ export default class Sync extends EventEmitter {
         await* _.flattenDeep(
           [pImportTx, pBroadcastTx, pImportInputs, pImportOutputs])
 
-        this.emit('tx', txid)
         logger.verbose(`Import unconfirmed tx ${txid}, elapsed time: ${stopwatch.getValue()}`)
       })
       .catch((err) => {
@@ -268,6 +261,8 @@ export default class Sync extends EventEmitter {
 
       // ... and run import
       await this._importUnconfirmedTx(tx)
+      setImmediate(::this._importOrphaned, txid)
+      this.emit('tx', txid)
     } catch (err) {
       logger.error(`Tx import: ${err.stack}`)
     }
@@ -467,17 +462,15 @@ export default class Sync extends EventEmitter {
           this.emit('latest', this._latest)
 
           // notify that tx was imported
-          let {rows} = await this._storage.executeQuery(
-            SQL.select.blocks.txids, [this._latest.height])
-          let txids = rows[0].txids.toString('hex')
-          for (let i = 0, length = txids.length / 64; i < length; i += 1) {
-            this.emit('tx', txids.slice(i * 64, (i + 1) * 64))
+          for (let txid of _.pluck(block.transactions, 'id')) {
+            setImmediate(::this._importOrphaned, txid)
+            this.emit('tx', txid)
           }
         }
 
         break
       } catch (err) {
-        logger.error(`Block import: ${err.stack}`)
+        logger.error(`Block import error: ${err.stack}`)
 
         while (true) {
           try {
