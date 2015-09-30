@@ -181,7 +181,7 @@ export default class Sync extends EventEmitter {
         let result = await client.queryAsync(
           SQL.select.transactions.exists, ['\\x' + txid])
         if (result.rows[0].count !== '0') {
-          return
+          return true
         }
 
         // all inputs exists?
@@ -197,7 +197,7 @@ export default class Sync extends EventEmitter {
             this._orphanedTx.orphans[dep] = _.union(this._orphanedTx.orphans[dep], [txid])
           }
           logger.warn(`Orphan tx: ${txid} (deps: ${deps.join(', ')})`)
-          return
+          return false
         }
 
         // import transaction
@@ -244,9 +244,11 @@ export default class Sync extends EventEmitter {
           [pImportTx, pBroadcastTx, pImportInputs, pImportOutputs])
 
         logger.verbose(`Import unconfirmed tx ${txid}, elapsed time: ${stopwatch.getValue()}`)
+        return true
       })
       .catch((err) => {
         logger.error(`Import unconfirmed tx: ${err.stack}`)
+        return false
       })
     })
   }
@@ -260,9 +262,11 @@ export default class Sync extends EventEmitter {
       let tx = await this._network.getTx(txid)
 
       // ... and run import
-      await this._importUnconfirmedTx(tx)
-      setImmediate(::this._importOrphaned, txid)
-      this.emit('tx', txid)
+      let imported = await this._importUnconfirmedTx(tx)
+      if (imported) {
+        setImmediate(::this._importOrphaned, txid)
+        this.emit('tx', txid)
+      }
     } catch (err) {
       logger.error(`Tx import: ${err.stack}`)
     }
