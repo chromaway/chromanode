@@ -2,6 +2,7 @@ import _ from 'lodash'
 import { EventEmitter } from 'events'
 import { setImmediate } from 'timers'
 import bitcore from 'bitcore'
+import script2addresses from 'script2addresses'
 import ElapsedTime from 'elapsed-time'
 import makeConcurrent from 'make-concurrent'
 import PUtils from 'promise-useful-utils'
@@ -11,10 +12,6 @@ import logger from '../lib/logger'
 import { ZERO_HASH } from '../lib/const'
 import util from '../lib/util'
 import SQL from './sql'
-
-let Address = bitcore.Address
-let Hash = bitcore.crypto.Hash
-let Base58Check = bitcore.encoding.Base58Check
 
 /**
  * @event Sync#latest
@@ -59,63 +56,12 @@ export default class Sync extends EventEmitter {
   }
 
   /**
-   * @param {Buffer} hashBuffer
-   * @param {string} type
-   * @return {string}
-   */
-  _createAddress (hashBuffer, type) {
-    let version = new Buffer([this._bitcoinNetwork[type]])
-    let buf = Buffer.concat([version, hashBuffer])
-    return Base58Check.encode(buf)
-  }
-
-  /**
-   * @param {bitcore.Script} script
-   * @return {string[]}
-   */
-  _getAddresses (script) {
-    if (script.isPublicKeyHashOut()) {
-      return [
-        this._createAddress(script.chunks[2].buf, Address.PayToPublicKeyHash)
-      ]
-    }
-
-    if (script.isScriptHashOut()) {
-      return [
-        this._createAddress(script.chunks[1].buf, Address.PayToScriptHash)
-      ]
-    }
-
-    if (script.isMultisigOut()) {
-      return script.chunks.slice(1, -2).map((chunk) => {
-        let hash = Hash.sha256ripemd160(chunk.buf)
-        return this._createAddress(hash, Address.PayToPublicKeyHash)
-      })
-    }
-
-    if (script.isPublicKeyOut()) {
-      let hash = Hash.sha256ripemd160(script.chunks[0].buf)
-      return [
-        this._createAddress(hash, Address.PayToPublicKeyHash)
-      ]
-    }
-
-    return []
-  }
-
-  /**
    * @param {bitcore.Transaction.Output} output
-   * @param {string} txid
-   * @param {number} index
    * @return {string[]}
    */
-  _safeGetAddresses (output, txid, index) {
-    try {
-      return this._getAddresses(output.script)
-    } catch (err) {
-      logger.error(`On get addresses for output ${txid}:${index} ${err.stack}`)
-      return []
-    }
+  _getAddresses (output) {
+    let result = script2addresses(output.script, this._bitcoinNetwork, false)
+    return result.addresses || []
   }
 
   /**
@@ -224,7 +170,7 @@ export default class Sync extends EventEmitter {
 
         // import outputs
         let pImportOutputs = tx.outputs.map((output, index) => {
-          let addresses = this._safeGetAddresses(output, txid, index)
+          let addresses = this._getAddresses(output)
           return addresses.map((address) => {
             let pImport = client.queryAsync(SQL.insert.history.unconfirmedOutput, [
               address,
@@ -334,7 +280,7 @@ export default class Sync extends EventEmitter {
 
         // import outputs only if transaction not imported yet
         let pBroadcastAddreses = await* tx.outputs.map((output, index) => {
-          let addresses = this._safeGetAddresses(output, txid, index)
+          let addresses = this._getAddresses(output)
           return Promise.all(addresses.map(async (address) => {
             // wait output import, it's important!
             await client.queryAsync(SQL.insert.history.confirmedOutput, [
