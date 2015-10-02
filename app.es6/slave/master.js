@@ -1,6 +1,7 @@
 import _ from 'lodash'
 import { EventEmitter } from 'events'
-import readyMixin from 'ready-mixin'
+import { mixin } from 'core-decorators'
+import ReadyMixin from 'ready-mixin'
 
 import errors from '../lib/errors'
 import logger from '../lib/logger'
@@ -38,6 +39,7 @@ import SQL from './sql'
 /**
  * @class Master
  */
+@mixin(ReadyMixin)
 export default class Master extends EventEmitter {
   /**
    * @constructor
@@ -148,5 +150,3 @@ export default class Master extends EventEmitter {
     await process
   }
 }
-
-readyMixin(Master.prototype)

@@ -1,7 +1,8 @@
 import _ from 'lodash'
 import { EventEmitter } from 'events'
 import { setImmediate } from 'timers'
-import readyMixin from 'ready-mixin'
+import { mixin } from 'core-decorators'
+import ReadyMixin from 'ready-mixin'
 import bitcore from 'bitcore'
 import p2p from 'bitcore-p2p'
 import RpcClient from 'bitcoind-rpc-client'
@@ -24,6 +25,7 @@ import util from '../lib/util'
 /**
  * @class Network
  */
+@mixin(ReadyMixin)
 export default class Network extends EventEmitter {
   /**
    * @constructor
@@ -202,5 +204,3 @@ export default class Network extends EventEmitter {
     return result
   }
 }
-
-readyMixin(Network.prototype)

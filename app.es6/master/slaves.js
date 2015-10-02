@@ -1,7 +1,8 @@
 import _ from 'lodash'
 import { EventEmitter } from 'events'
 import PUtils from 'promise-useful-utils'
-import readyMixin from 'ready-mixin'
+import { mixin } from 'core-decorators'
+import ReadyMixin from 'ready-mixin'
 
 import logger from '../lib/logger'
 
@@ -14,6 +15,7 @@ import logger from '../lib/logger'
 /**
  * @class Slaves
  */
+@mixin(ReadyMixin)
 export default class Slaves extends EventEmitter {
   /**
    * @param {Messages} messages
@@ -109,5 +111,3 @@ export default class Slaves extends EventEmitter {
     return this.messages.notify('broadcaststatus', status, opts)
   }
 }
-
-readyMixin(Slaves.prototype)

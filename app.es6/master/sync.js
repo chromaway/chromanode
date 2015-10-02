@@ -342,7 +342,8 @@ export default class Sync extends EventEmitter {
   /**
    * @return {Promise}
    */
-  _runBlockImport = makeConcurrent(async () => {
+  @makeConcurrent({concurrency: 1})
+  async _runBlockImport = () {
     let stopwatch = new ElapsedTime()
     let block
 
@@ -472,7 +473,7 @@ export default class Sync extends EventEmitter {
         await PUtils.delay(5000)
       }
     }
-  }, {concurrency: 1})
+  }
 
   /**
    */

@@ -1,5 +1,6 @@
 import PUtils from 'promise-useful-utils'
-import readyMixin from 'ready-mixin'
+import { mixin } from 'core-decorators'
+import ReadyMixin from 'ready-mixin'
 
 import config from './config'
 import errors from './errors'
@@ -74,6 +75,7 @@ let SQL = {
 /**
  * @class Storage
  */
+@mixin(ReadyMixin)
 export default class Storage {
   _version = '3'
 
@@ -212,5 +214,3 @@ export default class Storage {
     })
   }
 }
-
-readyMixin(Storage.prototype)
