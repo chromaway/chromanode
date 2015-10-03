@@ -34,7 +34,7 @@ export default function (opts) {
         expect(height1 + 1).to.equal(height2)
 
         await opts.bitcoind.connect(otherBitcoind)
-        await opts.waitTextInMaster('Reorg finished')
+        await opts.waitTextInScanner('Reorg finished')
 
         let latest1 = (await opts.bitcoind.rpc.getBestBlockHash()).result
         let latest2 = (await otherBitcoind.rpc.getBestBlockHash()).result

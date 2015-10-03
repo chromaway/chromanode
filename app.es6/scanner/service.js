@@ -7,16 +7,16 @@ import ReadyMixin from 'ready-mixin'
 import logger from '../lib/logger'
 
 /**
- * @event Slaves#sendTx
+ * @event Service#sendTx
  * @param {string} id
  * @param {string} rawtx
  */
 
 /**
- * @class Slaves
+ * @class Service
  */
 @mixin(ReadyMixin)
-export default class Slaves extends EventEmitter {
+export default class Service extends EventEmitter {
   /**
    * @param {Messages} messages
    */
@@ -34,7 +34,7 @@ export default class Slaves extends EventEmitter {
     .then(() => { this._ready(null) }, (err) => { this._ready(err) })
 
     this.ready
-      .then(() => { logger.info('Slaves ready ...') })
+      .then(() => { logger.info('Service ready ...') })
   }
 
   /**

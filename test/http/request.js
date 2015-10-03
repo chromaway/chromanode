@@ -32,7 +32,7 @@ export default function (testsOpts) {
   async function customRequest (method, path, data) {
     var requestOpts = {
       method: 'GET',
-      uri: urlJoin(`http://127.0.0.1:${testsOpts.ports.slave}`, path),
+      uri: urlJoin(`http://127.0.0.1:${testsOpts.ports.service}`, path),
       timeout: 5000,
       json: true,
       zip: true

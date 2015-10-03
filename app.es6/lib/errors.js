@@ -3,9 +3,7 @@
  *  +-- Chromanode
  *       +-- InvalidBitcoindNetwork
  *       +-- InvalidNetwork
- *       +-- Master
- *       |    +-- InvalidHashPrevBlock
- *       +-- Slave
+ *       +-- Service
  *       |    +-- FromNotFound
  *       |    +-- InvalidAddresses
  *       |    +-- InvalidCount
@@ -34,15 +32,8 @@ let spec = {
     name: 'InvalidNetwork',
     message: 'Invalid network: {0}'
   }, {
-    name: 'Master',
-    message: 'Master intertal error',
-    errors: [{
-      name: 'InvalidHashPrevBlock',
-      message: 'Latest hash: {0}, imported: {1}'
-    }]
-  }, {
-    name: 'Slave',
-    message: 'Slave internal error',
+    name: 'Service',
+    message: 'Service internal error',
     errors: [
       {name: 'FromNotFound', message: ''},
       {name: 'InvalidAddresses', message: ''},

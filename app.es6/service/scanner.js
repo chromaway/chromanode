@@ -8,14 +8,14 @@ import logger from '../lib/logger'
 import SQL from './sql'
 
 /**
- * @event Master#block
+ * @event Scanner#block
  * @param {Object} payload
  * @param {string} payload.hash
  * @param {number} payload.height
  */
 
 /**
- * @event Master#tx
+ * @event Scanner#tx
  * @param {Object} payload
  * @param {string} payload.txid
  * @param {?string} payload.blockHash
@@ -23,7 +23,7 @@ import SQL from './sql'
  */
 
 /**
- * @event Master#address
+ * @event Scanner#address
  * @param {Object} payload
  * @param {string} payload.address
  * @param {string} payload.txid
@@ -32,15 +32,15 @@ import SQL from './sql'
  */
 
 /**
- * @event Master#status
+ * @event Scanner#status
  * @param {Object} status
  */
 
 /**
- * @class Master
+ * @class Scanner
  */
 @mixin(ReadyMixin)
-export default class Master extends EventEmitter {
+export default class Scanner extends EventEmitter {
   /**
    * @constructor
    * @param {Storage} storage
@@ -100,7 +100,7 @@ export default class Master extends EventEmitter {
     .then(() => { this._ready(null) }, (err) => { this._ready(err) })
 
     this.ready
-      .then(() => { logger.info('Master ready ...') })
+      .then(() => { logger.info('Scanner ready ...') })
   }
 
   /**
@@ -124,7 +124,7 @@ export default class Master extends EventEmitter {
       return defer.resolve()
     }
 
-    let err = new errors.Slave.SendTxError()
+    let err = new errors.Service.SendTxError()
     err.data = {code: payload.code, message: unescape(payload.message)}
     return defer.reject(err)
   }

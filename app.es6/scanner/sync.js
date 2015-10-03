@@ -32,14 +32,14 @@ export default class Sync extends EventEmitter {
    * @constructor
    * @param {Storage} storage
    * @param {Network} network
-   * @param {Slaves} slaves
+   * @param {Service} service
    */
-  constructor (storage, network, slaves) {
+  constructor (storage, network, service) {
     super()
 
     this._storage = storage
     this._network = network
-    this._slaves = slaves
+    this._service = service
 
     let networkName = config.get('chromanode.network')
     this._bitcoinNetwork = bitcore.Networks.get(networkName)
@@ -152,7 +152,7 @@ export default class Sync extends EventEmitter {
           '\\x' + tx.toString()
         ])
 
-        let pBroadcastTx = this._slaves.broadcastTx(txid, null, null, {client: client})
+        let pBroadcastTx = this._service.broadcastTx(txid, null, null, {client: client})
 
         // import intputs
         let pImportInputs = tx.inputs.map(async (input, index) => {
@@ -164,7 +164,7 @@ export default class Sync extends EventEmitter {
 
           return rows.map((row) => {
             let address = row.address.toString()
-            return this._slaves.broadcastAddress(address, txid, null, null, {client: client})
+            return this._service.broadcastAddress(address, txid, null, null, {client: client})
           })
         })
 
@@ -179,7 +179,7 @@ export default class Sync extends EventEmitter {
               output.satoshis,
               '\\x' + output.script.toHex()
             ])
-            let pBroadcast = this._slaves.broadcastAddress(address, txid, null, null, {client: client})
+            let pBroadcast = this._service.broadcastAddress(address, txid, null, null, {client: client})
 
             return [pImport, pBroadcast]
           })
@@ -242,12 +242,12 @@ export default class Sync extends EventEmitter {
       ])
 
       // broadcast about block
-      let pBroadcastHeader = this._slaves.broadcastBlock(block.hash, height, {client: client})
+      let pBroadcastHeader = this._service.broadcastBlock(block.hash, height, {client: client})
 
       // import transactions & outputs
       let pImportTxAndOutputs = await* block.transactions.map(async (tx, txIndex) => {
         let txid = txids[txIndex]
-        let pBroadcastTx = this._slaves.broadcastTx(txid, block.hash, height, {client: client})
+        let pBroadcastTx = this._service.broadcastTx(txid, block.hash, height, {client: client})
 
         // tx already in storage ?
         let result = await client.queryAsync(SQL.select.transactions.exists, ['\\x' + txid])
@@ -264,7 +264,7 @@ export default class Sync extends EventEmitter {
 
             return rows.map((row) => {
               let address = row.address.toString()
-              return this._slaves.broadcastAddress(address, txid, block.hash, height, {client: client})
+              return this._service.broadcastAddress(address, txid, block.hash, height, {client: client})
             })
           })
 
@@ -292,7 +292,7 @@ export default class Sync extends EventEmitter {
               height
             ])
 
-            return this._slaves.broadcastAddress(address, txid, block.hash, height, {client: client})
+            return this._service.broadcastAddress(address, txid, block.hash, height, {client: client})
           }))
         })
 
@@ -329,7 +329,7 @@ export default class Sync extends EventEmitter {
 
           await* result.rows.map((row) => {
             let address = row.address.toString()
-            return this._slaves.broadcastAddress(address, txid, block.hash, height, {client: client})
+            return this._service.broadcastAddress(address, txid, block.hash, height, {client: client})
           })
         })
       })
@@ -343,7 +343,7 @@ export default class Sync extends EventEmitter {
    * @return {Promise}
    */
   @makeConcurrent({concurrency: 1})
-  async _runBlockImport = () {
+  async _runBlockImport () {
     let stopwatch = new ElapsedTime()
     let block
 

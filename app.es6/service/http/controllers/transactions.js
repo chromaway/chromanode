@@ -17,7 +17,7 @@ v1.raw = v2.raw = (req, res) => {
       SQL.select.transactions.byTxId, [txid])
 
     if (result.rowCount === 0) {
-      throw new errors.Slave.TxNotFound()
+      throw new errors.Service.TxNotFound()
     }
 
     return {hex: result.rows[0].tx.toString('hex')}
@@ -31,7 +31,7 @@ v1.merkle = v2.merkle = function (req, res) {
       SQL.select.blocks.txids, ['\\x' + txid])
 
     if (result.rowCount === 0) {
-      throw new errors.Slave.TxNotFound()
+      throw new errors.Service.TxNotFound()
     }
 
     if (result.rows[0].height === null) {
@@ -89,7 +89,7 @@ v2.spent = function (req, res) {
       SQL.select.history.spent, [otxid, oindex])
 
     if (result.rowCount === 0) {
-      throw new errors.Slave.TxNotFound()
+      throw new errors.Service.TxNotFound()
     }
 
     if (result.rows[0].itxid === null) {
@@ -105,5 +105,5 @@ v2.spent = function (req, res) {
 }
 
 v1.send = v2.send = function (req, res) {
-  res.promise(req.master.sendTx(req.body.rawtx))
+  res.promise(req.scanner.sendTx(req.body.rawtx))
 }

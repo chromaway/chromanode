@@ -11,15 +11,15 @@ import logger from '../../lib/logger'
 export default class SocketIO {
   /**
    * @constructor
-   * @param {Master} master
+   * @param {Scanner} scanner
    */
-  constructor (master) {
+  constructor (scanner) {
     this._networkName = config.get('chromanode.network')
     if (this._networkName === 'regtest') {
       this._networkName = 'testnet'
     }
 
-    this._master = master
+    this._scanner = scanner
   }
 
   /**
@@ -46,7 +46,7 @@ export default class SocketIO {
     this._sV2 = this._ios.of('/v2')
     this._sV2.on('connection', ::this._onV2Connection)
 
-    this._master.on('block', (payload) => {
+    this._scanner.on('block', (payload) => {
       // api_v1
       this._ios.sockets.in('new-block').emit('new-block', payload.hash, payload.height)
       this._sV1.in('new-block').emit('new-block', payload.hash, payload.height)
@@ -55,7 +55,7 @@ export default class SocketIO {
       this._sV2.in('new-block').emit('new-block', payload)
     })
 
-    this._master.on('tx', (payload) => {
+    this._scanner.on('tx', (payload) => {
       // api_v1
       this._ios.sockets.in('new-tx').emit('new-tx', payload.txid)
       this._sV1.in('new-tx').emit('new-tx', payload.txid)
@@ -65,7 +65,7 @@ export default class SocketIO {
       this._sV2.in(`tx-${payload.txid}`).emit('tx', payload)
     })
 
-    this._master.on('address', (payload) => {
+    this._scanner.on('address', (payload) => {
       // api_v1
       this._ios.sockets.in(payload.address).emit(payload.address, payload.txid)
       this._sV1.in(payload.address).emit(payload.address, payload.txid)
@@ -74,7 +74,7 @@ export default class SocketIO {
       this._sV2.in(`address-${payload.address}`).emit('address', payload)
     })
 
-    this._master.on('status', (payload) => {
+    this._scanner.on('status', (payload) => {
       // api_v1
       // api_v2
       this._sV2.in('status').emit('status', payload)

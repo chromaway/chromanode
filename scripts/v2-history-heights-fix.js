@@ -12,7 +12,7 @@ let SQL = {
   }
 }
 
-let pgURL = 'postgres://kirill@localhost/chromanode_testnet'
+let pgURL = 'postgres://user:pass@host:port/database_name'
 let startHeight = 0
 
 ;(async function () {

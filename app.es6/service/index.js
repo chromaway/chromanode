@@ -4,7 +4,7 @@ import config from '../lib/config'
 import logger from '../lib/logger'
 import createServer from './http'
 import SocketIO from './ws'
-import Master from './master'
+import Scanner from './scanner'
 import Storage from '../lib/storage'
 import Messages from '../lib/messages'
 
@@ -15,18 +15,18 @@ export default async function () {
   let storage = new Storage()
   let mNotifications = new Messages({storage: storage})
   let mSendTx = new Messages({storage: storage})
-  let master = new Master(storage, mNotifications, mSendTx)
+  let scanner = new Scanner(storage, mNotifications, mSendTx)
 
-  await* [storage.ready, master.ready]
+  await* [storage.ready, scanner.ready]
 
   let expressApp = express()
-  let server = createServer(expressApp, storage, master)
+  let server = createServer(expressApp, storage, scanner)
 
   if (!!config.get('chromanode.enableNotifications') === true) {
-    new SocketIO(master).attach(server)
+    new SocketIO(scanner).attach(server)
   }
 
   await server.listen(config.get('chromanode.port'))
 
-  logger.info(`Slave server listening port ${config.get('chromanode.port')}`)
+  logger.info(`Service server listening port ${config.get('chromanode.port')}`)
 }

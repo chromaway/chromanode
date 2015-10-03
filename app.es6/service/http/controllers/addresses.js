@@ -28,7 +28,7 @@ function query (req) {
     if (query.from !== undefined) {
       from = await qutil.getHeightForPoint(client, query.from)
       if (from === null) {
-        throw new errors.Slave.FromNotFound()
+        throw new errors.Service.FromNotFound()
       }
     }
 
@@ -36,7 +36,7 @@ function query (req) {
     if (query.to !== undefined) {
       to = await qutil.getHeightForPoint(client, query.to)
       if (to === null) {
-        throw new errors.Slave.ToNotFound()
+        throw new errors.Service.ToNotFound()
       }
     }
 

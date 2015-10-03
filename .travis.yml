@@ -5,8 +5,8 @@ addons:
   postgresql: "9.4"
 before_script:
   - psql -c 'create database travis_ci_test;' -U postgres
-  - cp test/config/master.travis.yml test/config/master.yml
-  - cp test/config/slave.travis.yml test/config/slave.yml
+  - cp test/config/scanner.travis.yml test/config/scanner.yml
+  - cp test/config/service.travis.yml test/config/service.yml
 env:
   - TEST_SUITE=lint
   - TEST_SUITE=test

@@ -24,7 +24,7 @@ export default function (opts) {
     }
 
     beforeEach(async () => {
-      socket = io(`ws://127.0.0.1:${opts.ports.slave}/v2`, {
+      socket = io(`ws://127.0.0.1:${opts.ports.service}/v2`, {
         autoConnect: false,
         forceNew: true,
         forceJSONP: false,

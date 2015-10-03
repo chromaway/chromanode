@@ -30,20 +30,20 @@ express.response.promise = async function (promise) {
     let result = await promise
     this.jsend(result)
   } catch (err) {
-    if (err instanceof errors.Slave.SendTxError) {
+    if (err instanceof errors.Service.SendTxError) {
       // special case
       this.jfail({
-        type: err.name.slice(20),
+        type: err.name.slice(22),
         code: err.data.code,
         message: err.data.message
       })
       return
     }
 
-    if (err instanceof errors.Slave) {
+    if (err instanceof errors.Service) {
       // logger.info(`Invalid query: ${err.name}`)
-      // cut ErrorChromanodeSlave
-      this.jfail({type: err.name.slice(20)})
+      // cut ErrorChromanodeService
+      this.jfail({type: err.name.slice(22)})
       return
     }
 
@@ -52,7 +52,7 @@ express.response.promise = async function (promise) {
   }
 }
 
-export default function (app, storage, master) {
+export default function (app, storage, scanner) {
   // app.set('showStackError', true)
   app.set('etag', false)
 
@@ -60,7 +60,7 @@ export default function (app, storage, master) {
 
   app.all('*', (req, res, next) => {
     req.storage = storage
-    req.master = master
+    req.scanner = scanner
     next()
   })
 

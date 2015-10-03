@@ -9,7 +9,7 @@ import logger from '../lib/logger'
 import Storage from '../lib/storage'
 import Messages from '../lib/messages'
 import Network from './network'
-import Slaves from './slaves'
+import Service from './service'
 import util from '../lib/util'
 import { VERSION } from '../lib/const'
 import Sync from './sync'
@@ -43,13 +43,13 @@ export default async function () {
 
   let storage = new Storage()
   let messages = new Messages({storage: storage})
-  let slaves = new Slaves(messages)
+  let service = new Service(messages)
   let network = new Network()
-  await* _.pluck([storage, messages, slaves, network], 'ready')
+  await* _.pluck([storage, messages, service, network], 'ready')
 
   // create function for broadcasting status
   let broadcastStatus = _.debounce(() => {
-    slaves.broadcastStatus(status)
+    service.broadcastStatus(status)
   }, 500)
 
   // update bitcoind info in status every 5s
@@ -89,9 +89,9 @@ export default async function () {
   network.on('block', onNewBlock)
   await onNewBlock()
 
-  // setup listener for event sendTx from slaves
+  // setup listener for event sendTx from services
   let sendTxDeferreds = {}
-  slaves.on('sendTx', (id) => {
+  service.on('sendTx', (id) => {
     let txid
     storage.executeTransaction(async (client) => {
       let result = await client.queryAsync(SQL.update.newTx.getAndRemove, [id])
@@ -128,12 +128,12 @@ export default async function () {
       return err
     })
     .then((ret) => {
-      slaves.sendTxResponse(id, ret)
+      service.sendTxResponse(id, ret)
     })
   })
 
   // create sync process
-  let sync = new Sync(storage, network, slaves)
+  let sync = new Sync(storage, network, service)
   sync.on('latest', (latest) => {
     status.latest = latest
 

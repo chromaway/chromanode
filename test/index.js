@@ -8,7 +8,7 @@ import PUtils from 'promise-useful-utils'
 
 import httpTests from './http'
 import wsTests from './ws'
-import masterTests from './master'
+import scannerTests from './scanner'
 
 let pg = PUtils.promisifyAll(require('pg').native)
 
@@ -82,22 +82,22 @@ let killProcess = async (process) => {
   }
 }
 
-describe('Run bitcoind, master and slave', function () {
+describe('Run bitcoind, scanner and service', function () {
   this.timeout(30 * 1000)
 
   let opts = {}
 
   before(async () => {
-    let masterLocation = path.join(__dirname, '..', 'bin', 'chromanode-master.js')
-    let masterConfigLocation = path.join(__dirname, 'config', 'master.yml')
-    let masterConfig = yaml.safeLoad(fs.readFileSync(masterConfigLocation))
+    let scannerLocation = path.join(__dirname, '..', 'bin', 'scanner.js')
+    let scannerConfigLocation = path.join(__dirname, 'config', 'scanner.yml')
+    let scannerConfig = yaml.safeLoad(fs.readFileSync(scannerConfigLocation))
 
-    let slaveLocation = path.join(__dirname, '..', 'bin', 'chromanode-slave.js')
-    let slaveConfigLocation = path.join(__dirname, 'config', 'slave.yml')
-    let slaveConfig = yaml.safeLoad(fs.readFileSync(slaveConfigLocation))
+    let serviceLocation = path.join(__dirname, '..', 'bin', 'service.js')
+    let serviceConfigLocation = path.join(__dirname, 'config', 'service.yml')
+    let serviceConfig = yaml.safeLoad(fs.readFileSync(serviceConfigLocation))
 
     // clear postgresql storage
-    let [client, done] = await pg.connectAsync(masterConfig.postgresql.url)
+    let [client, done] = await pg.connectAsync(scannerConfig.postgresql.url)
     await client.queryAsync('BEGIN')
     let {rows} = await client.queryAsync(`SELECT
                                             tablename
@@ -114,12 +114,12 @@ describe('Run bitcoind, master and slave', function () {
 
     // extract ports
     opts.ports = {
-      peer: masterConfig.bitcoind.peer.port,
-      rpc: masterConfig.bitcoind.rpc.port,
-      slave: slaveConfig.chromanode.port
+      peer: scannerConfig.bitcoind.peer.port,
+      rpc: scannerConfig.bitcoind.rpc.port,
+      service: serviceConfig.chromanode.port
     }
 
-    // run bitcoind, master and slave
+    // run bitcoind, scanner and service
     opts.bitcoind = new BitcoindRegtest({
       wallet: {
         keysPoolSize: _.constant(10)
@@ -135,32 +135,32 @@ describe('Run bitcoind, master and slave', function () {
       bitcoind: {
         port: _.constant(opts.ports.peer),
         rpcport: _.constant(opts.ports.rpc),
-        rpcuser: _.constant(masterConfig.bitcoind.rpc.user),
-        rpcpassword: _.constant(masterConfig.bitcoind.rpc.pass)
+        rpcuser: _.constant(scannerConfig.bitcoind.rpc.user),
+        rpcpassword: _.constant(scannerConfig.bitcoind.rpc.pass)
       }
     })
     await opts.bitcoind.ready
     let generateBlocks = opts.bitcoind.generateBlocks(110)
-    opts.master = await createProcess(masterLocation, ['-c', masterConfigLocation])
-    opts.slave = await createProcess(slaveLocation, ['-c', slaveConfigLocation])
+    opts.scanner = await createProcess(scannerLocation, ['-c', scannerConfigLocation])
+    opts.service = await createProcess(serviceLocation, ['-c', serviceConfigLocation])
 
     // set listeners
     // opts.bitcoind.on('data', (data) => { console.warn(`Bitcoind: ${data.toString()}`) })
     opts.bitcoind.on('error', (err) => { console.warn(`Bitcoind error: ${err.stack}`) })
     // opts.bitcoind.on('exit', (code, signal) => {})
 
-    opts.master.on('data', (data) => { console.warn(`Master: ${data.toString()}`) })
-    opts.master.on('error', (err) => { console.warn(`Master error: ${err.stack}`) })
-    // opts.master.on('exit', (code, signal) => {})
+    opts.scanner.on('data', (data) => { console.warn(`Scanner: ${data.toString()}`) })
+    opts.scanner.on('error', (err) => { console.warn(`Scanner error: ${err.stack}`) })
+    // opts.scanner.on('exit', (code, signal) => {})
 
-    opts.slave.on('data', (data) => { console.warn(`Slave: ${data.toString()}`) })
-    opts.slave.on('error', (err) => { console.warn(`Slave error: ${err.stack}`) })
-    // opts.slave.on('exit', (code, signal) => {})
+    opts.service.on('data', (data) => { console.warn(`Service: ${data.toString()}`) })
+    opts.service.on('error', (err) => { console.warn(`Service error: ${err.stack}`) })
+    // opts.service.on('exit', (code, signal) => {})
 
     await generateBlocks
 
     let waitTextItems = new Map()
-    opts.master.on('data', (data) => {
+    opts.scanner.on('data', (data) => {
       for (let [regexp, resolve] of waitTextItems.entries()) {
         if (regexp.test(data)) {
           resolve()
@@ -168,14 +168,14 @@ describe('Run bitcoind, master and slave', function () {
         }
       }
     })
-    opts.waitTextInMaster = (text) => {
+    opts.waitTextInScanner = (text) => {
       return new Promise((resolve) => {
         waitTextItems.set(new RegExp(text), resolve)
       })
     }
 
     let latestBlockHash = (await opts.bitcoind.generateBlocks(1))[0]
-    await opts.waitTextInMaster(latestBlockHash)
+    await opts.waitTextInScanner(latestBlockHash)
   })
 
   after(async () => {
@@ -188,26 +188,26 @@ describe('Run bitcoind, master and slave', function () {
       }
     }
 
-    if (opts.master) {
+    if (opts.scanner) {
       try {
-        opts.master.removeAllListeners()
-        // await killProcess(opts.master)
+        opts.scanner.removeAllListeners()
+        // await killProcess(opts.scanner)
       } catch (err) {
-        console.error(`Error on master terminating: ${err.stack}`)
+        console.error(`Error on scanner terminating: ${err.stack}`)
       }
     }
 
-    if (opts.slave) {
+    if (opts.service) {
       try {
-        opts.slave.removeAllListeners()
-        await killProcess(opts.slave)
+        opts.service.removeAllListeners()
+        await killProcess(opts.service)
       } catch (err) {
-        console.error(`Error on slave terminating: ${err.stack}`)
+        console.error(`Error on service terminating: ${err.stack}`)
       }
     }
   })
 
   httpTests(opts)
   wsTests(opts)
-  masterTests(opts)
+  scannerTests(opts)
 })

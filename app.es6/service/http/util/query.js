@@ -21,20 +21,20 @@ function transformFromTo (val) {
       return num
     }
 
-    throw new errors.Slave.InvalidHeight()
+    throw new errors.Service.InvalidHeight()
   }
 
   if (val.length === 64 && bitcore.util.js.isHexa(val)) {
     return val
   }
 
-  throw new errors.Slave.InvalidHash()
+  throw new errors.Service.InvalidHash()
 }
 
 /**
  * @param {string} val
  * @return {number}
- * @throws {errors.Slave.InvalidCount}
+ * @throws {errors.Service.InvalidCount}
  */
 function transformCount (val) {
   if (val === undefined) {
@@ -46,17 +46,17 @@ function transformCount (val) {
     return num
   }
 
-  throw new errors.Slave.InvalidCount()
+  throw new errors.Service.InvalidCount()
 }
 
 /**
  * @param {string} val
  * @return {string[]}
- * @throws {errors.Slave}
+ * @throws {errors.Service}
  */
 function transformAddresses (val) {
   if (!_.isString(val)) {
-    throw new errors.Slave.InvalidAddresses()
+    throw new errors.Service.InvalidAddresses()
   }
 
   let networkName = config.get('chromanode.network')
@@ -70,7 +70,7 @@ function transformAddresses (val) {
       let addressNetwork = bitcore.Address.fromString(address).network.name
       assert.equal(addressNetwork, networkName)
     } catch (err) {
-      throw new errors.Slave.InvalidAddresses()
+      throw new errors.Service.InvalidAddresses()
     }
   }
 
@@ -80,11 +80,11 @@ function transformAddresses (val) {
 /**
  * @param {string} val
  * @return {string}
- * @throws {errors.Slave.InvalidSource}
+ * @throws {errors.Service.InvalidSource}
  */
 function transformSource (val) {
   if (val !== undefined && ['blocks', 'mempool'].indexOf(val) === -1) {
-    throw new errors.Slave.InvalidSource()
+    throw new errors.Service.InvalidSource()
   }
 
   return val
@@ -93,11 +93,11 @@ function transformSource (val) {
 /**
  * @param {string} val
  * @return {string}
- * @throws {errors.Slave.InvalidStatus}
+ * @throws {errors.Service.InvalidStatus}
  */
 function transformStatus (val) {
   if (val !== undefined && ['transactions', 'unspent'].indexOf(val) === -1) {
-    throw new errors.Slave.InvalidStatus()
+    throw new errors.Service.InvalidStatus()
   }
 
   return val
@@ -112,7 +112,7 @@ function transformTxId (val) {
     return val
   }
 
-  throw new errors.Slave.InvalidTxId()
+  throw new errors.Service.InvalidTxId()
 }
 
 /**
