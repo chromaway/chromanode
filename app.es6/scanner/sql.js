@@ -30,23 +30,29 @@ export default {
   select: {
     blocks: {
       latest: `SELECT
-                 height as height,
-                 hash as hash,
-                 header as header
+                 height AS height,
+                 hash AS hash,
+                 header AS header
                FROM
                  blocks
                ORDER BY
                  height DESC
                LIMIT 1`,
       byHeight: `SELECT
-                   height as height,
-                   hash as hash
+                   height AS height,
+                   hash AS hash
                  FROM
                    blocks
                  WHERE
                    height = $1`,
+      fromHeight: `SELECT
+                     hash AS hash
+                   FROM
+                     blocks
+                   WHERE
+                     height >= $1`,
       txids: `SELECT
-                txids as txids
+                txids AS txids
               FROM
                 blocks
               WHERE
@@ -60,13 +66,13 @@ export default {
                WHERE
                  txid = $1`,
       existsMany: `SELECT
-                     txid as txid
+                     txid AS txid
                    FROM
                      transactions
                    WHERE
                      txid = ANY($1)`,
       unconfirmed: `SELECT
-                      txid as txid
+                      txid AS txid
                     FROM
                       transactions
                     WHERE

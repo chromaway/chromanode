@@ -14,6 +14,7 @@ import logger from '../lib/logger'
 
 /**
  * @class Service
+ * @extends EventEmitter
  */
 @mixin(ReadyMixin)
 export default class Service extends EventEmitter {
@@ -109,5 +110,45 @@ export default class Service extends EventEmitter {
    */
   broadcastStatus (status, opts) {
     return this.messages.notify('broadcaststatus', status, opts)
+  }
+
+  /**
+   * @param {string} txid
+   * @param {Object} [opts]
+   * @param {pg.Client} [opts.client]
+   * @return {Promise}
+   */
+  addTx (txid, opts) {
+    return this.messages.notify('addtx', {txid: txid}, opts)
+  }
+
+  /**
+   * @param {string} txid
+   * @param {Object} [opts]
+   * @param {pg.Client} [opts.client]
+   * @return {Promise}
+   */
+  removeTx (txid, opts) {
+    return this.messages.notify('removetx', {txid: txid}, opts)
+  }
+
+  /**
+   * @param {string} hash
+   * @param {Object} [opts]
+   * @param {pg.Client} [opts.client]
+   * @return {Promise}
+   */
+  addBlock (hash, opts) {
+    return this.messages.notify('addblock', {hash: hash}, opts)
+  }
+
+  /**
+   * @param {string} hash
+   * @param {Object} [opts]
+   * @param {pg.Client} [opts.client]
+   * @return {Promise}
+   */
+  removeBlock (hash, opts) {
+    return this.messages.notify('removeblock', {hash: hash}, opts)
   }
 }

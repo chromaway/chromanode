@@ -152,8 +152,6 @@ export default class Sync extends EventEmitter {
           '\\x' + tx.toString()
         ])
 
-        let pBroadcastTx = this._service.broadcastTx(txid, null, null, {client: client})
-
         // import intputs
         let pImportInputs = tx.inputs.map(async (input, index) => {
           let {rows} = await client.queryAsync(SQL.update.history.addUnconfirmedInput, [
@@ -186,8 +184,13 @@ export default class Sync extends EventEmitter {
         })
 
         // wait all imports and broadcasts
-        await* _.flattenDeep(
-          [pImportTx, pBroadcastTx, pImportInputs, pImportOutputs])
+        await* _.flattenDeep([
+          pImportTx,
+          pImportInputs,
+          pImportOutputs,
+          this._service.broadcastTx(txid, null, null, {client: client}),
+          this._service.addTx(txid, {client: client})
+        ])
 
         logger.verbose(`Import unconfirmed tx ${txid}, elapsed time: ${stopwatch.getValue()}`)
         return true
@@ -241,13 +244,11 @@ export default class Sync extends EventEmitter {
         '\\x' + txids.join('')
       ])
 
-      // broadcast about block
-      let pBroadcastHeader = this._service.broadcastBlock(block.hash, height, {client: client})
-
       // import transactions & outputs
       let pImportTxAndOutputs = await* block.transactions.map(async (tx, txIndex) => {
         let txid = txids[txIndex]
-        let pBroadcastTx = this._service.broadcastTx(txid, block.hash, height, {client: client})
+        let pImportTx
+        let pBroadcastAddreses
 
         // tx already in storage ?
         let result = await client.queryAsync(SQL.select.transactions.exists, ['\\x' + txid])
@@ -256,7 +257,7 @@ export default class Sync extends EventEmitter {
         if (result.rows[0].count !== '0') {
           existingTx[txid] = true
 
-          let pBroadcastAddreses = PUtils.try(async () => {
+          pBroadcastAddreses = PUtils.try(async () => {
             let [, {rows}] = await* [
               client.queryAsync(SQL.update.transactions.makeConfirmed, [height, '\\x' + txid]),
               client.queryAsync(SQL.update.history.makeOutputConfirmed, [height, '\\x' + txid])
@@ -267,36 +268,39 @@ export default class Sync extends EventEmitter {
               return this._service.broadcastAddress(address, txid, block.hash, height, {client: client})
             })
           })
+        } else {
+          // import transaction
+          pImportTx = client.queryAsync(SQL.insert.transactions.confirmed, [
+            '\\x' + txid,
+            height,
+            '\\x' + tx.toString()
+          ])
 
-          return [pBroadcastTx, pBroadcastAddreses]
+          // import outputs only if transaction not imported yet
+          pBroadcastAddreses = await* tx.outputs.map((output, index) => {
+            let addresses = this._getAddresses(output)
+            return Promise.all(addresses.map(async (address) => {
+              // wait output import, it's important!
+              await client.queryAsync(SQL.insert.history.confirmedOutput, [
+                address,
+                '\\x' + txid,
+                index,
+                output.satoshis,
+                '\\x' + output.script.toHex(),
+                height
+              ])
+
+              return this._service.broadcastAddress(address, txid, block.hash, height, {client: client})
+            }))
+          })
         }
 
-        // import transaction
-        let pImportTx = client.queryAsync(SQL.insert.transactions.confirmed, [
-          '\\x' + txid,
-          height,
-          '\\x' + tx.toString()
-        ])
-
-        // import outputs only if transaction not imported yet
-        let pBroadcastAddreses = await* tx.outputs.map((output, index) => {
-          let addresses = this._getAddresses(output)
-          return Promise.all(addresses.map(async (address) => {
-            // wait output import, it's important!
-            await client.queryAsync(SQL.insert.history.confirmedOutput, [
-              address,
-              '\\x' + txid,
-              index,
-              output.satoshis,
-              '\\x' + output.script.toHex(),
-              height
-            ])
-
-            return this._service.broadcastAddress(address, txid, block.hash, height, {client: client})
-          }))
-        })
-
-        return [pBroadcastTx, pImportTx, pBroadcastAddreses]
+        return [
+          pImportTx,
+          this._service.broadcastTx(txid, block.hash, height, {client: client}),
+          this._service.addTx(txid, {client: client}),
+          pBroadcastAddreses
+        ]
       })
 
       // import inputs
@@ -334,8 +338,13 @@ export default class Sync extends EventEmitter {
         })
       })
 
-      await* _.flattenDeep(
-        [pImportHeader, pBroadcastHeader, pImportTxAndOutputs, pImportInputs])
+      await* _.flattenDeep([
+        pImportHeader,
+        pImportTxAndOutputs,
+        pImportInputs,
+        this._service.broadcastBlock(block.hash, height, {client: client}),
+        this._service.addBlock(block.hash, {client: client})
+      ])
     })
   }
 
@@ -386,14 +395,19 @@ export default class Sync extends EventEmitter {
               stopwatch.reset().start()
               this._latest = await this._storage.executeTransaction(async (client) => {
                 let args = [latest.height - 1]
-                await* [
+                let {rows} = await client.queryAsync(SQL.select.fromHeight, args)
+
+                await* _.flattenDeep([
                   client.queryAsync(SQL.delete.blocks.fromHeight, args),
                   client.queryAsync(SQL.update.transactions.makeUnconfirmed, args),
                   PUtils.try(async () => {
                     await client.queryAsync(SQL.update.history.makeOutputsUnconfirmed, args)
                     await client.queryAsync(SQL.update.history.makeInputsUnconfirmed, args)
+                  }),
+                  rows.map((row) => {
+                    return this._service.removeBlock(row.hash.toString('hex'), {client: client})
                   })
-                ]
+                ])
 
                 return await this._getLatest({client: client})
               })
@@ -456,7 +470,10 @@ export default class Sync extends EventEmitter {
               client.queryAsync(SQL.delete.transactions.unconfirmedByTxIds, [rTxIds]),
               client.queryAsync(SQL.delete.history.unconfirmedByTxIds, [rTxIds])
             ]
-            await client.queryAsync(SQL.update.history.deleteUnconfirmedInputsByTxIds, [rTxIds])
+            await* _.flattenDeep([
+              client.queryAsync(SQL.update.history.deleteUnconfirmedInputsByTxIds, [rTxIds]),
+              rTxIds.map((txid) => this._service.removeTx(txid, {client: client}))
+            ])
           })
         }
 

@@ -49,6 +49,7 @@
     "bitcore-p2p": "^0.15.1",
     "bluebird": "^2.10.1",
     "body-parser": "^1.14.0",
+    "coloredcoinjs-lib": "git://github.com/fanatid/coloredcoinjs-lib.git",
     "compression": "^1.5.2",
     "core-decorators": "^0.7.0",
     "cors": "^2.7.1",

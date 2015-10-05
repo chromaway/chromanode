@@ -1,0 +1,10 @@
+chromanode:
+  network: testnet # livenet | testnet | regtest
+
+logger:
+  level: verbose # verbose, info, warning, error
+  filename: cc-scanner.log
+
+postgresql:
+  url: postgres://user:pass@host:port/database_name
+  poolSize: 10

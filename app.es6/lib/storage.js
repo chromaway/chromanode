@@ -10,49 +10,49 @@ let pg = PUtils.promisifyAll(require('pg').native)
 
 let SQL = {
   create: {
-    tables: {
-      info: `CREATE TABLE info (
-               key CHAR(100) PRIMARY KEY,
-               value TEXT NOT NULL)`,
-      blocks: `CREATE TABLE blocks (
-                 height INTEGER PRIMARY KEY,
-                 hash BYTEA NOT NULL,
-                 header BYTEA NOT NULL,
-                 txids BYTEA NOT NULL)`,
-      transactions: `CREATE TABLE transactions (
-                       txid BYTEA PRIMARY KEY,
-                       height INTEGER,
-                       tx BYTEA NOT NULL)`,
-      history: `CREATE TABLE history (
-                  address BYTEA,
-                  otxid BYTEA,
-                  oindex INTEGER,
-                  ovalue BIGINT,
-                  oscript BYTEA,
-                  oheight INTEGER,
-                  itxid BYTEA,
-                  iheight INTEGER)`,
-      newTxs: `CREATE TABLE new_txs (
-                 id SERIAL PRIMARY KEY,
-                 hex BYTEA NOT NULL)`
-    },
-    indices: {
-      blocks: {
-        hash: `CREATE INDEX ON blocks (hash)`
-      },
-      transactions: {
-        height: `CREATE INDEX ON transactions (height)`
-      },
-      history: {
-        address: `CREATE INDEX ON history (address)`,
-        address_itxid: `CREATE INDEX ON history (address, itxid)`,
-        otxid_oindex: `CREATE INDEX ON history (otxid, oindex)`,
-        otxid: `CREATE INDEX ON history (otxid)`,
-        oheight: `CREATE INDEX ON history (oheight)`,
-        itxid: `CREATE INDEX ON history (itxid)`,
-        iheight: `CREATE INDEX ON history (iheight)`
-      }
-    }
+    tables: [
+      `CREATE TABLE info (
+         key CHAR(100) PRIMARY KEY,
+         value TEXT NOT NULL)`,
+      `CREATE TABLE blocks (
+         height INTEGER PRIMARY KEY,
+         hash BYTEA NOT NULL,
+         header BYTEA NOT NULL,
+         txids BYTEA NOT NULL)`,
+      `CREATE TABLE transactions (
+         txid BYTEA PRIMARY KEY,
+         height INTEGER,
+         tx BYTEA NOT NULL)`,
+      `CREATE TABLE history (
+         address BYTEA,
+         otxid BYTEA,
+         oindex INTEGER,
+         ovalue BIGINT,
+         oscript BYTEA,
+         oheight INTEGER,
+         itxid BYTEA,
+         iheight INTEGER)`,
+      `CREATE TABLE new_txs (
+         id SERIAL PRIMARY KEY,
+         hex BYTEA NOT NULL)`,
+      `CREATE TABLE cc_scanned_txids (
+        txid BYTEA PRIMARY KEY,
+        blockhash BYTEA,
+        height INTEGER)`
+    ],
+    indices: [
+      `CREATE INDEX ON blocks (hash)`,
+      `CREATE INDEX ON transactions (height)`,
+      `CREATE INDEX ON history (address)`,
+      `CREATE INDEX ON history (address, itxid)`,
+      `CREATE INDEX ON history (otxid, oindex)`,
+      `CREATE INDEX ON history (otxid)`,
+      `CREATE INDEX ON history (oheight)`,
+      `CREATE INDEX ON history (itxid)`,
+      `CREATE INDEX ON history (iheight)`,
+      `CREATE INDEX ON cc_scanned_txids (blockhash)`,
+      `CREATE INDEX ON cc_scanned_txids (height)`
+    ]
   },
   insert: {
     info: {
@@ -99,15 +99,21 @@ export default class Storage {
    */
   _checkEnv (client) {
     return this.executeTransaction(async (client) => {
-      let tableNames = ['info', 'blocks', 'transactions', 'history', 'new_txs']
-      let result = await client.queryAsync(SQL.select.tablesCount, [tableNames])
+      let result = await client.queryAsync(SQL.select.tablesCount, [[
+        'info',
+        'blocks',
+        'transactions',
+        'history',
+        'new_txs',
+        'cc_scanned_txids'
+      ]])
       let count = parseInt(result.rows[0].count, 10)
       logger.info(`Found ${count} tables`)
 
       if (count === 0) {
         await this._createEnv(client)
-      } else if (count !== 5) {
-        throw new errors.Storage.InconsistentTables(count, 5)
+      } else if (count !== 6) {
+        throw new errors.Storage.InconsistentTables(count, 6)
       }
 
       let [version, network] = await* [
@@ -137,31 +143,15 @@ export default class Storage {
    */
   async _createEnv (client) {
     logger.info('Creating db tables...')
-    await* [
-      client.queryAsync(SQL.create.tables.info),
-      client.queryAsync(SQL.create.tables.blocks),
-      client.queryAsync(SQL.create.tables.transactions),
-      client.queryAsync(SQL.create.tables.history),
-      client.queryAsync(SQL.create.tables.newTxs)
-    ]
+    await* SQL.create.tables.map((query) => client.queryAsync(query))
 
     logger.info('Creating db indices...')
-    await* [
-      client.queryAsync(SQL.create.indices.blocks.hash),
-      client.queryAsync(SQL.create.indices.transactions.height),
-      client.queryAsync(SQL.create.indices.history.address),
-      client.queryAsync(SQL.create.indices.history.address_itxid),
-      client.queryAsync(SQL.create.indices.history.otxid_oindex),
-      client.queryAsync(SQL.create.indices.history.oheight),
-      client.queryAsync(SQL.create.indices.history.itxid),
-      client.queryAsync(SQL.create.indices.history.iheight)
-    ]
-
-    logger.info('Insert version and network to info...')
+    await* SQL.create.indices.map((query) => client.queryAsync(query))
 
     let version = this._version
     let network = config.get('chromanode.network')
 
+    logger.info('Insert version and network to info...')
     await* [
       client.queryAsync(SQL.insert.info.row, ['version', version]),
       client.queryAsync(SQL.insert.info.row, ['network', network])
