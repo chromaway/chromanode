@@ -55,7 +55,7 @@ export default class Sync {
    */
   async _addTx (client, txid, blockhash, height) {
     let {rows} = await client.queryAsync(SQL.select.isTxScanned, [`\\x${txid}`])
-    if (rows[0].exists === 't') {
+    if (rows[0].exists === true) {
       return false
     }
 
@@ -71,8 +71,9 @@ export default class Sync {
 
     await* _.flattenDeep([
       cdefClss.map((cdefCls) => {
-        return this._cdata.getTxColorValues(tx, null, cdefCls, this.getTx, opts)
-        // TODO: broadcast about color values
+        return this._cdata.fullScanTx(tx, cdefCls, this.getTx, opts)
+        // return this._cdata.getTxColorValues(tx, null, cdefCls, this.getTx, opts)
+        // broadcast here
       }),
       client.queryAsync(query, params)
     ])
@@ -117,7 +118,7 @@ export default class Sync {
 
       let removed = await this.storage.executeTransaction(async (client) => {
         let {rows} = await client.queryAsync(SQL.select.isTxScanned, [`\\x${txId}`])
-        if (rows[0].exists === 'f') {
+        if (rows[0].exists === false) {
           return false
         }
 
@@ -126,7 +127,7 @@ export default class Sync {
         await* _.flattenDeep([
           cdefClss.map((cdefCls) => {
             return this._cdata.removeColorValues(txId, cdefCls, opts)
-            // TODO: broadcast about removed (modify cclib)
+            // broadcast here
           }),
           client.queryAsync(SQL.delete.row, [`\\x${txId}`])
         ])
@@ -147,54 +148,59 @@ export default class Sync {
    */
   @callWithLock
   async updateBlocks () {
-    while (true) {
+    let stopwatch = new ElapsedTime()
+
+    let running = true
+    while (running) {
       try {
-        let stopwatch = ElapsedTime.new().start()
-
-        // reorg check
-        while (true) {
-          stopwatch.reset().start()
-
-          let {rows} = await this.storage.executeQuery(SQL.select.ccLatestBlock)
-          if (rows.length === 0) {
-            break
+        let latest = null
+        let result = await this.storage.executeQuery(SQL.select.ccLatestBlock)
+        if (result.rows.length > 0) {
+          latest = {
+            hash: result.rows[0].blockhash.toString('hex'),
+            height: result.rows[0].height
           }
-
-          let hash = rows[0].blockhash.toString('hex')
-          let result = await this.storage.executeQuery(SQL.select.isBlockExists, [`\\x${hash}`])
-          if (result.rows[0].exists === 't') {
-            break
-          }
-
-          await this.storage.executeQuery(SQL.update.makeUnconfirmed, [`\\x${hash}`])
-
-          logger.warn(`Make reorg to ${rows[0].height - 1}, elapsed time: ${stopwatch.getValue()}`)
         }
 
-        // add blocks
-        while (true) {
-          stopwatch.reset().start()
-
-          let [cLatest, mLatest] = [
-            (await this.storage.executeQuery(SQL.select.latestBlock)).rows[0],
-            (await this.storage.executeQuery(SQL.select.ccLatestBlock)).rows[0]
-          ]
-
-          let hash = cLatest.hash.toString('hex')
-          let height = cLatest.height
-
-          if (mLatest !== undefined) {
-            if (mLatest.blockhash.toString('hex') === hash) {
+        // reorg check
+        if (latest !== null) {
+          let latest2 = _.clone(latest)
+          // searching latest block
+          while (true) {
+            // is block still exists?
+            let result = await this.storage.executeQuery(
+              SQL.select.isBlockExists, [`\\x${latest2.hash}`])
+            if (result.rows[0].exists === true) {
               break
             }
 
-            if (mLatest.height >= height) {
-              throw new Error('Need reorg')
-            }
+            // update latest2
+            latest2.height -= 1
+            result = await this.storage.executeQuery(
+              SQL.select.ccBlockHashByHeight, [latest2.height])
+            latest2.hash = result.rows[0].blockhash.toString('hex')
           }
 
+          // make reorg if not equal
+          if (latest2.hash !== latest.hash) {
+            stopwatch.reset().start()
+            await this.storage.executeQuery(
+              SQL.update.makeUnconfirmed, [latest2.height])
+            logger.warn(`Make reorg to ${latest2.height}, elapsed time: ${stopwatch.getValue()}`)
+            continue
+          }
+        }
+
+        let height = _.get(latest, 'height', -1) + 1
+        result = await this.storage.executeQuery(SQL.select.blockByHeight, [height])
+
+        // add block if exists
+        if (result.rows.length > 0) {
+          let hash = result.rows[0].hash.toString('hex')
+
+          stopwatch.reset().start()
           await this.storage.executeTransaction(async (client) => {
-            let txIds = cLatest.txids.toString('hex')
+            let txIds = result.rows[0].txids.toString('hex')
             let toUpdate = await* _.range(txIds.length / 64).map(async (i) => {
               let txId = txIds.slice(i * 64, (i + 1) * 64)
               if (!(await this._addTx(client, txId, hash, height))) {
@@ -208,27 +214,34 @@ export default class Sync {
               height
             ])
           })
-
           logger.info(`Import block ${hash}:${height}, elapsed time: ${stopwatch.getValue()}`)
         }
 
-        // update unconfirmed
-        let [ccTxIds, txIds] = await* [
-          this.storage.executeQuery(SQL.select.ccUnconfirmedTxIds),
-          this.storage.executeQuery(SQL.select.unconfirmedTxIds)
-        ]
+        // check that was latest block
+        result = await this.storage.executeQuery(SQL.select.latestBlock)
+        if (latest && latest.hash === result.rows[0].hash.toString('hex')) {
+          // update unconfirmed
+          stopwatch.reset().start()
+          let [ccTxIds, txIds] = await* [
+            this.storage.executeQuery(SQL.select.ccUnconfirmedTxIds),
+            this.storage.executeQuery(SQL.select.unconfirmedTxIds)
+          ]
 
-        ccTxIds = ccTxIds.rows.map((row) => row.txid.toString('hex'))
-        txIds = txIds.rows.map((row) => row.txid.toString('hex'))
+          ccTxIds = ccTxIds.rows.map((row) => row.txid.toString('hex'))
+          txIds = txIds.rows.map((row) => row.txid.toString('hex'))
 
-        // remove
-        for (let txId of _.difference(ccTxIds, txIds)) {
-          this.removeTx(txId)
-        }
+          // remove
+          for (let txId of _.difference(ccTxIds, txIds)) {
+            this.removeTx(txId)
+          }
 
-        // add
-        for (let txId of _.difference(txIds, ccTxIds)) {
-          this.addTx(txId)
+          // add
+          for (let txId of _.difference(txIds, ccTxIds)) {
+            this.addTx(txId)
+          }
+
+          logger.info(`Unconfirmed updated, elapsed time: ${stopwatch.getValue()}`)
+          running = false
         }
       } catch (err) {
         logger.error(`Update error: ${err.stack}`)

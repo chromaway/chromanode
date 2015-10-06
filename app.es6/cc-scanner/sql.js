@@ -11,24 +11,36 @@ export default {
   },
   select: {
     ccLatestBlock: `SELECT
-                        blockhash AS blockhash,
-                        height AS height
-                      FROM
-                        cc_scanned_txids
-                      WHERE
-                        height IS NOT NULL
-                      ORDER BY
-                        height DESC
-                      LIMIT 1`,
+                      blockhash AS blockhash,
+                      height AS height
+                    FROM
+                      cc_scanned_txids
+                    WHERE
+                      height IS NOT NULL
+                    ORDER BY
+                      height DESC
+                    LIMIT 1`,
+    ccBlockHashByHeight: `SELECT
+                            blockhash AS blockhash
+                          FROM
+                            cc_scanned_txids
+                          WHERE
+                            height = $1
+                          LIMIT 1`,
     latestBlock: `SELECT
-                    height AS height,
-                    hash AS hash,
-                    txids AS txids
+                    hash AS hash
                   FROM
                     blocks
                   ORDER BY
                     height DESC
                   LIMIT 1`,
+    blockByHeight: `SELECT
+                      hash AS hash,
+                      txids AS txids
+                    FROM
+                      blocks
+                    WHERE
+                      height = $1`,
     isBlockExists: `SELECT EXISTS (SELECT
                                      true
                                    FROM
@@ -78,7 +90,7 @@ export default {
                         blockhash = NULL,
                         height = NULL
                       WHERE
-                        blockhash = $1`,
+                        height > $1`,
     makeConfirmed: `UPDATE
                       cc_scanned_txids
                     SET
