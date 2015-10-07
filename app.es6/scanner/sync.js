@@ -395,7 +395,7 @@ export default class Sync extends EventEmitter {
               stopwatch.reset().start()
               this._latest = await this._storage.executeTransaction(async (client) => {
                 let args = [latest.height - 1]
-                let {rows} = await client.queryAsync(SQL.select.fromHeight, args)
+                let {rows} = await client.queryAsync(SQL.select.blocks.fromHeight, args)
 
                 await* _.flattenDeep([
                   client.queryAsync(SQL.delete.blocks.fromHeight, args),

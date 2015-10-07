@@ -72,8 +72,6 @@ export default class Sync {
     await* _.flattenDeep([
       cdefClss.map((cdefCls) => {
         return this._cdata.fullScanTx(tx, cdefCls, this.getTx, opts)
-        // return this._cdata.getTxColorValues(tx, null, cdefCls, this.getTx, opts)
-        // broadcast here
       }),
       client.queryAsync(query, params)
     ])
@@ -125,9 +123,22 @@ export default class Sync {
         let opts = {executeOpts: {client: client}}
 
         await* _.flattenDeep([
-          cdefClss.map((cdefCls) => {
-            return this._cdata.removeColorValues(txId, cdefCls, opts)
-            // broadcast here
+          cdefClss.map(async (cdefCls) => {
+            let params
+            switch (cdefCls.getColorCode()) {
+              case 'epobc':
+                params = [`epobc:${txId}:\d+:0`]
+              default:
+                throw new Error(`Unknow cdefCls: ${cdefCls}`)
+            }
+
+            let {rows} = await client.queryAsync(SQL.select.colorId, params)
+            if (rows.length === 0) {
+              let id = parseInt(rows[0].id, 10)
+              return await this._cdefManager.remove({id: id}, opts)
+            }
+
+            await this._cdata.removeColorValues(txId, cdefCls, opts)
           }),
           client.queryAsync(SQL.delete.row, [`\\x${txId}`])
         ])
@@ -253,13 +264,13 @@ export default class Sync {
    * @return {Promise}
    */
   async run () {
-    this._cdefstorage = new cclib.storage.definitions.PostgreSQL({url: config.get('postgresql.url')})
-    this._cdmanager = new cclib.definitions.Manager(this._cdefstorage)
+    this._cdefStorage = new cclib.storage.definitions.PostgreSQL({url: config.get('postgresql.url')})
+    this._cdataStorage = new cclib.storage.data.PostgreSQL({url: config.get('postgresql.url')})
 
-    this._cdstorage = new cclib.storage.data.PostgreSQL({url: config.get('postgresql.url')})
-    this._cdata = new cclib.ColorData(this._cdstorage, this._cdmanager)
+    this._cdefManager = new cclib.definitions.Manager(this._cdefStorage, this._cdefStorage)
+    this._cdata = new cclib.ColorData(this._cdataStorage, this._cdefManager)
 
-    await* [this._cdefstorage.ready, this._cdstorage.ready]
+    await* [this._cdefManager.ready, this._cdata.ready]
 
     // scan all new rows
     await this.updateBlocks()

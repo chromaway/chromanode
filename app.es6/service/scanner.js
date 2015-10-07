@@ -83,7 +83,7 @@ export default class Scanner extends EventEmitter {
       let listen = (messages, channel, handler) => {
         if (_.isString(handler)) {
           let eventName = handler
-          handler = (payload) => { this.emit(eventName, payload) }
+          handler = (payload) => this.emit(eventName, payload)
         }
 
         return messages.listen(channel, handler)
@@ -97,10 +97,10 @@ export default class Scanner extends EventEmitter {
         listen(this._mSendTx, 'sendtxresponse', ::this._onSendTxResponse)
       ])
     })
-    .then(() => { this._ready(null) }, (err) => { this._ready(err) })
+    .then(() => this._ready(null), (err) => this._ready(err))
 
     this.ready
-      .then(() => { logger.info('Scanner ready ...') })
+      .then(() => logger.info('Scanner ready ...'))
   }
 
   /**

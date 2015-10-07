@@ -32,10 +32,10 @@ export default class Service extends EventEmitter {
         this.emit('sendTx', payload.id)
       })
     })
-    .then(() => { this._ready(null) }, (err) => { this._ready(err) })
+    .then(() => this._ready(null), (err) => this._ready(err))
 
     this.ready
-      .then(() => { logger.info('Service ready ...') })
+      .then(() => logger.info('Service ready ...'))
   }
 
   /**

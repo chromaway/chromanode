@@ -37,10 +37,10 @@ export default class Network extends EventEmitter {
       this._initBitcoind(),
       this._initTrustedPeer()
     ])
-    .then(() => { this._ready(null) }, (err) => { this._ready(err) })
+    .then(() => this._ready(null), (err) => this._ready(err))
 
     this.ready
-      .then(() => { logger.info('Network ready ...') })
+      .then(() => logger.info('Network ready ...'))
   }
 
   /**

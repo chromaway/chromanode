@@ -26,10 +26,10 @@ export default class Messages {
       await this._storage.ready
       await this._createNewListener()
     })
-    .then(() => { this._ready(null) }, (err) => { this._ready(err) })
+    .then(() => this._ready(null), (err) => this._ready(err))
 
     this.ready
-      .then(() => { logger.info('Messages ready ...') })
+      .then(() => logger.info('Messages ready ...'))
   }
 
   /**

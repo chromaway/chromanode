@@ -81,7 +81,13 @@ export default {
                                  FROM
                                    cc_scanned_txids
                                  WHERE
-                                   txid = $1)`
+                                   txid = $1)`,
+    colorId: `SELECT
+                id AS id
+              FROM
+                cclib_definitions
+              WHERE
+                cdesc ~ $1`
   },
   update: {
     makeUnconfirmed: `UPDATE
