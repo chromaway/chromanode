@@ -1,7 +1,7 @@
 import _ from 'lodash'
 
 import errors from '../../../lib/errors'
-import SQL from '../../sql'
+import SQL from '../../../lib/sql'
 import qutil from '../util/query'
 
 let v1 = {}
@@ -51,9 +51,7 @@ function query (req) {
       params.push(to)
     }
 
-    result = await client.queryAsync(sql, params)
-
-    let rows = _.chain(result.rows)
+    let rows = _.chain((await client.queryAsync(sql, params)).rows)
     if (query.status === 'unspent') {
       rows = rows.map((row) => {
         return {
@@ -64,7 +62,7 @@ function query (req) {
           height: row.oheight
         }
       })
-      .unique((row) => { return row.txid + row.vout })
+      .unique((row) => `${row.txid}:${row.vout}`)
     } else {
       rows = rows
         .map((row) => {

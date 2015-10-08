@@ -52,26 +52,38 @@ export default class SocketIO {
       this._sV1.in('new-block').emit('new-block', payload.hash, payload.height)
 
       // api_v2
-      this._sV2.in('new-block').emit('new-block', payload)
+      let obj = {hash: payload.hash, height: payload.height}
+      this._sV2.in('new-block').emit('new-block', obj)
     })
 
     this._scanner.on('tx', (payload) => {
       // api_v1
-      this._ios.sockets.in('new-tx').emit('new-tx', payload.txid)
-      this._sV1.in('new-tx').emit('new-tx', payload.txid)
+      this._ios.sockets.in('new-tx').emit('new-tx', payload.txId)
+      this._sV1.in('new-tx').emit('new-tx', payload.txId)
 
       // api_v2
-      this._sV2.in('new-tx').emit('new-tx', payload)
-      this._sV2.in(`tx-${payload.txid}`).emit('tx', payload)
+      let obj = {
+        txid: payload.txId,
+        blockHash: payload.blockHash,
+        blockHeight: payload.blockHeight
+      }
+      this._sV2.in('new-tx').emit('new-tx', obj)
+      this._sV2.in(`tx-${payload.txId}`).emit('tx', obj)
     })
 
     this._scanner.on('address', (payload) => {
       // api_v1
-      this._ios.sockets.in(payload.address).emit(payload.address, payload.txid)
-      this._sV1.in(payload.address).emit(payload.address, payload.txid)
+      this._ios.sockets.in(payload.address).emit(payload.address, payload.txId)
+      this._sV1.in(payload.address).emit(payload.address, payload.txId)
 
       // api_v2
-      this._sV2.in(`address-${payload.address}`).emit('address', payload)
+      let obj = {
+        address: payload.address,
+        txid: payload.txId,
+        blockHash: payload.blockHash,
+        blockHeight: payload.blockHeight
+      }
+      this._sV2.in(`address-${payload.address}`).emit('address', obj)
     })
 
     this._scanner.on('status', (payload) => {
@@ -137,7 +149,7 @@ export default class SocketIO {
         if (!/^[0-9a-fA-F]{64}$/.test(opts.txid)) {
           throw new Error(`Wrong txid: ${opts.txid}`)
         }
-        return 'tx-' + opts.txid
+        return `tx-${opts.txid}`
 
       case 'address':
         try {
@@ -145,7 +157,7 @@ export default class SocketIO {
         } catch (err) {
           throw new Error(`Wrong address: ${opts.address} (${err.message})`)
         }
-        return 'address-' + opts.address
+        return `address-${opts.address}`
 
       case 'status':
         return 'status'

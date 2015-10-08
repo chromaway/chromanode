@@ -15,25 +15,25 @@ export default function (opts) {
     let latest = {}
 
     let heightCache = {}
-    async function getHeightByTxId (txid) {
-      if (heightCache[txid] === undefined) {
-        let hash = (await opts.bitcoind.rpc.getRawTransaction(txid, 1)).result.blockhash
-        heightCache[txid] = hash === undefined
+    async function getHeightByTxId (txId) {
+      if (heightCache[txId] === undefined) {
+        let hash = (await opts.bitcoind.rpc.getRawTransaction(txId, 1)).result.blockhash
+        heightCache[txId] = hash === undefined
           ? null
           : (await opts.bitcoind.rpc.getBlock(hash)).result.height
       }
 
-      return heightCache[txid]
+      return heightCache[txId]
     }
 
     let txCache = {}
-    async function getTx (txid) {
-      if (txCache[txid] === undefined) {
-        let rawtx = (await opts.bitcoind.rpc.getRawTransaction(txid)).result
-        txCache[txid] = bitcore.Transaction(rawtx)
+    async function getTx (txId) {
+      if (txCache[txId] === undefined) {
+        let rawtx = (await opts.bitcoind.rpc.getRawTransaction(txId)).result
+        txCache[txId] = bitcore.Transaction(rawtx)
       }
 
-      return txCache[txid]
+      return txCache[txId]
     }
 
     function createAddress (script) {
@@ -44,20 +44,20 @@ export default function (opts) {
     }
 
     before(async () => {
-      let txids = _.filter(await opts.bitcoind.generateTxs(10))
+      let txIds = _.filter(await opts.bitcoind.generateTxs(10))
       do {
         await PUtils.delay(500)
-        for (let txid of txids) {
+        for (let txId of txIds) {
           try {
-            await request.get('/v2/transactions/raw', {txid: txid})
-            txids = _.without(txids, txid)
+            await request.get('/v2/transactions/raw', {txid: txId})
+            txIds = _.without(txIds, txId)
           } catch (err) {
             if (!(err instanceof request.errors.StatusFail)) {
               throw err
             }
           }
         }
-      } while (txids.length > 0)
+      } while (txIds.length > 0)
 
       // select addresses
       let result = (await opts.bitcoind.rpc.getAddressesByAccount('')).result
@@ -65,17 +65,17 @@ export default function (opts) {
 
       // get transactions
       result = (await opts.bitcoind.rpc.listTransactions('*', 1e6)).result
-      txids = _.unique(_.pluck(result, 'txid'))
-      await PUtils.map(txids, async (txid) => {
-        let tx = await getTx(txid)
+      txIds = _.unique(_.pluck(result, 'txid'))
+      await PUtils.map(txIds, async (txId) => {
+        let tx = await getTx(txId)
         let oAddrs = tx.outputs.map((output) => createAddress(output.script))
         let required = _.intersection(addresses, oAddrs).length > 0
 
         if (!required) {
           for (let input of tx.inputs) {
-            let txid = input.prevTxId.toString('hex')
-            if (!(txid === ZERO_HASH && input.outputIndex === 0xFFFFFFFF)) {
-              let tx = await getTx(txid)
+            let txId = input.prevTxId.toString('hex')
+            if (!(txId === ZERO_HASH && input.outputIndex === 0xFFFFFFFF)) {
+              let tx = await getTx(txId)
               let addr = createAddress(tx.outputs[input.outputIndex].script)
               if (addresses.includes(addr)) {
                 required = true
@@ -87,8 +87,8 @@ export default function (opts) {
 
         if (required) {
           transactions.push({
-            txid: txid,
-            height: await getHeightByTxId(txid)
+            txid: txId,
+            height: await getHeightByTxId(txId)
           })
         }
       }, {concurrency: 10})

@@ -54,8 +54,8 @@ export default class Storage {
       }
 
       let [version, network] = await* [
-        client.queryAsync(SQL.select.info.valueByKey, ['version']),
-        client.queryAsync(SQL.select.info.valueByKey, ['network'])
+        client.queryAsync(SQL.select.info.value, ['version']),
+        client.queryAsync(SQL.select.info.value, ['network'])
       ]
 
       // check version

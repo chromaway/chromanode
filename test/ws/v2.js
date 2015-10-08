@@ -93,7 +93,7 @@ export default function (opts) {
     })
 
     it('new-tx & tx', async () => {
-      let txid
+      let txId
 
       await subscribe({type: 'new-tx'})
       await new Promise((resolve, reject) => {
@@ -101,7 +101,7 @@ export default function (opts) {
           socket.once('new-tx', async (payload) => {
             try {
               expect(payload).to.deep.equal({
-                txid: txid,
+                txid: txId,
                 blockHash: null,
                 blockHeight: null
               })
@@ -110,19 +110,19 @@ export default function (opts) {
               reject(err)
             }
           })
-          txid = (await opts.bitcoind.generateTxs(1))[0]
+          txId = (await opts.bitcoind.generateTxs(1))[0]
         })
         .catch(reject)
       })
 
-      await subscribe({type: 'tx', txid: txid})
+      await subscribe({type: 'tx', txid: txId})
       await new Promise((resolve, reject) => {
         PUtils.try(async () => {
           let blockHash
           socket.once('tx', async (payload) => {
             try {
               expect(payload).to.deep.equal({
-                txid: txid,
+                txid: txId,
                 blockHash: blockHash,
                 blockHeight: (await opts.bitcoind.rpc.getBlockCount()).result
               })

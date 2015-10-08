@@ -4,7 +4,7 @@ import assert from 'assert'
 
 import config from '../../../lib/config'
 import errors from '../../../lib/errors'
-import SQL from '../../sql'
+import SQL from '../../../lib/sql'
 
 /**
  * @param {string} val
@@ -123,7 +123,7 @@ function transformTxId (val) {
 async function getHeightForPoint (client, point) {
   let args = _.isNumber(point)
                ? [SQL.select.blocks.heightByHeight, [point]]
-               : [SQL.select.blocks.heightByHash, ['\\x' + point]]
+               : [SQL.select.blocks.heightByHash, [`\\x${point}`]]
 
   let result = await client.queryAsync(...args)
   if (result.rowCount === 0) {

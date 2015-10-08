@@ -3,7 +3,7 @@ import bitcore from 'bitcore'
 
 import errors from '../../../lib/errors'
 import util from '../../../lib/util'
-import SQL from '../../sql'
+import SQL from '../../../lib/sql'
 import qutil from '../util/query'
 
 let v1 = {}
@@ -12,9 +12,9 @@ export default {v1, v2}
 
 v1.raw = v2.raw = (req, res) => {
   res.promise((async () => {
-    let txid = '\\x' + qutil.transformTxId(req.query.txid)
+    let txId = `\\x${qutil.transformTxId(req.query.txid)}`
     let result = await req.storage.executeQuery(
-      SQL.select.transactions.byTxId, [txid])
+      SQL.select.transactions.byTxId, [txId])
 
     if (result.rowCount === 0) {
       throw new errors.Service.TxNotFound()
@@ -26,9 +26,9 @@ v1.raw = v2.raw = (req, res) => {
 
 v1.merkle = v2.merkle = function (req, res) {
   res.promise((async () => {
-    let txid = qutil.transformTxId(req.query.txid)
+    let txId = qutil.transformTxId(req.query.txid)
     let result = await req.storage.executeQuery(
-      SQL.select.blocks.txids, ['\\x' + txid])
+      SQL.select.blocks.txIdsByTxId, [`\\x${txId}`])
 
     if (result.rowCount === 0) {
       throw new errors.Service.TxNotFound()
@@ -39,14 +39,14 @@ v1.merkle = v2.merkle = function (req, res) {
     }
 
     let bTxIds = result.rows[0].txids.toString('hex')
-    let txids = []
+    let txIds = []
     for (let cnt = bTxIds.length / 64, idx = 0; idx < cnt; idx += 1) {
-      txids.push(bTxIds.slice(idx * 64, (idx + 1) * 64))
+      txIds.push(bTxIds.slice(idx * 64, (idx + 1) * 64))
     }
 
     let merkle = []
-    let hashes = txids.map(util.decode)
-    let targetHash = util.decode(txid)
+    let hashes = txIds.map(util.decode)
+    let targetHash = util.decode(txId)
     while (hashes.length !== 1) {
       if (hashes.length % 2 === 1) {
         hashes.push(_.last(hashes))
@@ -75,7 +75,7 @@ v1.merkle = v2.merkle = function (req, res) {
         height: result.rows[0].height,
         hash: result.rows[0].hash.toString('hex'),
         merkle: merkle,
-        index: txids.indexOf(txid)
+        index: txIds.indexOf(txId)
       }
     }
   })())
@@ -83,10 +83,10 @@ v1.merkle = v2.merkle = function (req, res) {
 
 v2.spent = function (req, res) {
   res.promise((async () => {
-    let otxid = '\\x' + qutil.transformTxId(req.query.txid)
+    let oTxId = `\\x${qutil.transformTxId(req.query.txid)}`
     let oindex = parseInt(req.query.vout, 10)
     let result = await req.storage.executeQuery(
-      SQL.select.history.spent, [otxid, oindex])
+      SQL.select.history.spent, [oTxId, oindex])
 
     if (result.rowCount === 0) {
       throw new errors.Service.TxNotFound()

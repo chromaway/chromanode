@@ -5,7 +5,7 @@ import ReadyMixin from 'ready-mixin'
 
 import errors from '../lib/errors'
 import logger from '../lib/logger'
-import SQL from './sql'
+import SQL from '../lib/sql'
 
 /**
  * @event Scanner#block
@@ -17,7 +17,7 @@ import SQL from './sql'
 /**
  * @event Scanner#tx
  * @param {Object} payload
- * @param {string} payload.txid
+ * @param {string} payload.txId
  * @param {?string} payload.blockHash
  * @param {?string} payload.blockHeight
  */
@@ -26,7 +26,7 @@ import SQL from './sql'
  * @event Scanner#address
  * @param {Object} payload
  * @param {string} payload.address
- * @param {string} payload.txid
+ * @param {string} payload.txId
  * @param {?string} payload.blockHash
  * @param {?string} payload.blockHeight
  */
@@ -137,7 +137,7 @@ export default class Scanner extends EventEmitter {
     let process
 
     await this._storage.executeTransaction(async (client) => {
-      let result = await client.queryAsync(SQL.insert.newTx.row, ['\\x' + rawtx])
+      let result = await client.queryAsync(SQL.insert.newTx.row, [`\\x${rawtx}`])
       let id = result.rows[0].id
 
       await this._mSendTx.notify('sendtx', {id: id}, {client: client})

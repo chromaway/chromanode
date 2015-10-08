@@ -11,7 +11,7 @@ import config from '../lib/config'
 import logger from '../lib/logger'
 import { ZERO_HASH } from '../lib/const'
 import util from '../lib/util'
-import SQL from './sql'
+import SQL from '../lib/sql'
 
 /**
  * @event Sync#latest
@@ -20,7 +20,7 @@ import SQL from './sql'
 
 /**
  * @event Sync#tx
- * @param {string} txid
+ * @param {string} txId
  */
 
 /**
@@ -50,8 +50,8 @@ export default class Sync extends EventEmitter {
     this._lock = new util.SmartLock()
 
     this._orphanedTx = {
-      deps: {}, // txid -> txid[]
-      orphans: {}  // txid -> txid[]
+      deps: {}, // txId -> txId[]
+      orphans: {}  // txId -> txId[]
     }
   }
 
@@ -72,7 +72,7 @@ export default class Sync extends EventEmitter {
   _getLatest (opts) {
     let execute = ::this._storage.executeTransaction
     if (_.has(opts, 'client')) {
-      execute = (fn) => { return fn(opts.client) }
+      execute = (fn) => fn(opts.client)
     }
 
     return execute(async (client) => {
@@ -86,19 +86,19 @@ export default class Sync extends EventEmitter {
     })
   }
 
-  _importOrphaned (txid) {
-    // are we have orphaned tx that depends from this txid?
-    let orphans = this._orphanedTx.orphans[txid]
+  _importOrphaned (txId) {
+    // are we have orphaned tx that depends from this txId?
+    let orphans = this._orphanedTx.orphans[txId]
     if (orphans === undefined) {
       return
     }
 
-    delete this._orphanedTx.orphans[txid]
+    delete this._orphanedTx.orphans[txId]
 
     // check every orphaned tx
     for (let orphaned of orphans) {
       // all deps resolved?
-      let deps = _.without(this._orphanedTx.deps[orphaned], txid)
+      let deps = _.without(this._orphanedTx.deps[orphaned], txId)
       if (deps.length > 0) {
         this._orphanedTx.deps[orphaned] = deps
         continue
@@ -116,53 +116,53 @@ export default class Sync extends EventEmitter {
    * @return {Promise}
    */
   _importUnconfirmedTx (tx) {
-    let txid = tx.id
+    let txId = tx.id
     let prevTxIds = _.uniq(
       tx.inputs.map((input) => input.prevTxId.toString('hex')))
 
-    return this._lock.withLock(prevTxIds.concat(txid), () => {
+    return this._lock.withLock(prevTxIds.concat(txId), () => {
       let stopwatch = ElapsedTime.new().start()
       return this._storage.executeTransaction(async (client) => {
         // transaction already in database?
         let result = await client.queryAsync(
-          SQL.select.transactions.exists, ['\\x' + txid])
-        if (result.rows[0].count !== '0') {
+          SQL.select.transactions.exists, [`\\x${txId}`])
+        if (result.rows[0].exists === true) {
           return true
         }
 
         // all inputs exists?
         result = await client.queryAsync(
-          SQL.select.transactions.existsMany, [prevTxIds.map((i) => { return '\\x' + i })])
+          SQL.select.transactions.existsMany, [prevTxIds.map((i) => `\\x${i}`)])
         let deps = _.difference(
           prevTxIds, result.rows.map((row) => row.txid.toString('hex')))
 
         // some input not exists yet, mark as orphaned and delay
         if (deps.length > 0) {
-          this._orphanedTx.deps[txid] = deps
+          this._orphanedTx.deps[txId] = deps
           for (let dep of deps) {
-            this._orphanedTx.orphans[dep] = _.union(this._orphanedTx.orphans[dep], [txid])
+            this._orphanedTx.orphans[dep] = _.union(this._orphanedTx.orphans[dep], [txId])
           }
-          logger.warn(`Orphan tx: ${txid} (deps: ${deps.join(', ')})`)
+          logger.warn(`Orphan tx: ${txId} (deps: ${deps.join(', ')})`)
           return false
         }
 
         // import transaction
         let pImportTx = client.queryAsync(SQL.insert.transactions.unconfirmed, [
-          '\\x' + txid,
-          '\\x' + tx.toString()
+          `\\x${txId}`,
+          `\\x${tx.toString()}`
         ])
 
         // import intputs
         let pImportInputs = tx.inputs.map(async (input, index) => {
           let {rows} = await client.queryAsync(SQL.update.history.addUnconfirmedInput, [
-            '\\x' + txid,
-            '\\x' + input.prevTxId.toString('hex'),
+            `\\x${txId}`,
+            `\\x${input.prevTxId.toString('hex')}`,
             input.outputIndex
           ])
 
           return rows.map((row) => {
             let address = row.address.toString()
-            return this._service.broadcastAddress(address, txid, null, null, {client: client})
+            return this._service.broadcastAddress(address, txId, null, null, {client: client})
           })
         })
 
@@ -172,12 +172,12 @@ export default class Sync extends EventEmitter {
           return addresses.map((address) => {
             let pImport = client.queryAsync(SQL.insert.history.unconfirmedOutput, [
               address,
-              '\\x' + txid,
+              `\\x${txId}`,
               index,
               output.satoshis,
-              '\\x' + output.script.toHex()
+              `\\x${output.script.toHex()}`
             ])
-            let pBroadcast = this._service.broadcastAddress(address, txid, null, null, {client: client})
+            let pBroadcast = this._service.broadcastAddress(address, txId, null, null, {client: client})
 
             return [pImport, pBroadcast]
           })
@@ -188,11 +188,11 @@ export default class Sync extends EventEmitter {
           pImportTx,
           pImportInputs,
           pImportOutputs,
-          this._service.broadcastTx(txid, null, null, {client: client}),
-          this._service.addTx(txid, {client: client})
+          this._service.broadcastTx(txId, null, null, {client: client}),
+          this._service.addTx(txId, {client: client})
         ])
 
-        logger.verbose(`Import unconfirmed tx ${txid}, elapsed time: ${stopwatch.getValue()}`)
+        logger.verbose(`Import unconfirmed tx ${txId}, elapsed time: ${stopwatch.getValue()}`)
         return true
       })
       .catch((err) => {
@@ -203,18 +203,18 @@ export default class Sync extends EventEmitter {
   }
 
   /**
-   * @param {string} txid
+   * @param {string} txId
    */
-  async _runTxImport (txid) {
+  async _runTxImport (txId) {
     try {
       // get tx from bitcoind
-      let tx = await this._network.getTx(txid)
+      let tx = await this._network.getTx(txId)
 
       // ... and run import
       let imported = await this._importUnconfirmedTx(tx)
       if (imported) {
-        setImmediate(::this._importOrphaned, txid)
-        this.emit('tx', txid)
+        setImmediate(::this._importOrphaned, txId)
+        this.emit('tx', txId)
       }
     } catch (err) {
       logger.error(`Tx import: ${err.stack}`)
@@ -228,52 +228,52 @@ export default class Sync extends EventEmitter {
    * @return {Promise}
    */
   _importBlock (block, height, client) {
-    let txids = _.pluck(block.transactions, 'id')
+    let txIds = _.pluck(block.transactions, 'id')
     let existingTx = {}
 
     let allTxIds = _.uniq(_.flatten(block.transactions.map((tx) => {
       return tx.inputs.map((i) => i.prevTxId.toString('hex'))
-    }).concat(txids)))
+    }).concat(txIds)))
 
     return this._lock.withLock(allTxIds, async () => {
       // import header
       let pImportHeader = client.queryAsync(SQL.insert.blocks.row, [
         height,
-        '\\x' + block.hash,
-        '\\x' + block.header.toString(),
-        '\\x' + txids.join('')
+        `\\x${block.hash}`,
+        `\\x${block.header.toString()}`,
+        `\\x${txIds.join('')}`
       ])
 
       // import transactions & outputs
       let pImportTxAndOutputs = await* block.transactions.map(async (tx, txIndex) => {
-        let txid = txids[txIndex]
+        let txId = txIds[txIndex]
         let pImportTx
         let pBroadcastAddreses
 
         // tx already in storage ?
-        let result = await client.queryAsync(SQL.select.transactions.exists, ['\\x' + txid])
+        let result = await client.queryAsync(SQL.select.transactions.exists, [`\\x${txId}`])
 
         // if already exist, mark output as confirmed and broadcast addresses
-        if (result.rows[0].count !== '0') {
-          existingTx[txid] = true
+        if (result.rows[0].exists === true) {
+          existingTx[txId] = true
 
           pBroadcastAddreses = PUtils.try(async () => {
             let [, {rows}] = await* [
-              client.queryAsync(SQL.update.transactions.makeConfirmed, [height, '\\x' + txid]),
-              client.queryAsync(SQL.update.history.makeOutputConfirmed, [height, '\\x' + txid])
+              client.queryAsync(SQL.update.transactions.makeConfirmed, [height, `\\x${txId}`]),
+              client.queryAsync(SQL.update.history.makeOutputConfirmed, [height, `\\x${txId}`])
             ]
 
             return rows.map((row) => {
               let address = row.address.toString()
-              return this._service.broadcastAddress(address, txid, block.hash, height, {client: client})
+              return this._service.broadcastAddress(address, txId, block.hash, height, {client: client})
             })
           })
         } else {
           // import transaction
           pImportTx = client.queryAsync(SQL.insert.transactions.confirmed, [
-            '\\x' + txid,
+            `\\x${txId}`,
             height,
-            '\\x' + tx.toString()
+            `\\x${tx.toString()}`
           ])
 
           // import outputs only if transaction not imported yet
@@ -283,29 +283,29 @@ export default class Sync extends EventEmitter {
               // wait output import, it's important!
               await client.queryAsync(SQL.insert.history.confirmedOutput, [
                 address,
-                '\\x' + txid,
+                `\\x${txId}`,
                 index,
                 output.satoshis,
-                '\\x' + output.script.toHex(),
+                `\\x${output.script.toHex()}`,
                 height
               ])
 
-              return this._service.broadcastAddress(address, txid, block.hash, height, {client: client})
+              return this._service.broadcastAddress(address, txId, block.hash, height, {client: client})
             }))
           })
         }
 
         return [
           pImportTx,
-          this._service.broadcastTx(txid, block.hash, height, {client: client}),
-          this._service.addTx(txid, {client: client}),
+          this._service.broadcastTx(txId, block.hash, height, {client: client}),
+          this._service.addTx(txId, {client: client}),
           pBroadcastAddreses
         ]
       })
 
       // import inputs
       let pImportInputs = block.transactions.map((tx, txIndex) => {
-        let txid = txids[txIndex]
+        let txId = txIds[txIndex]
         return tx.inputs.map(async (input, index) => {
           // skip coinbase
           let prevTxId = input.prevTxId.toString('hex')
@@ -316,24 +316,24 @@ export default class Sync extends EventEmitter {
           }
 
           let result
-          if (existingTx[txid] === true) {
+          if (existingTx[txId] === true) {
             result = await client.queryAsync(SQL.update.history.makeInputConfirmed, [
               height,
-              '\\x' + prevTxId,
+              `\\x${prevTxId}`,
               input.outputIndex
             ])
           } else {
             result = await client.queryAsync(SQL.update.history.addConfirmedInput, [
-              '\\x' + txid,
+              `\\x${txId}`,
               height,
-              '\\x' + prevTxId,
+              `\\x${prevTxId}`,
               input.outputIndex
             ])
           }
 
           await* result.rows.map((row) => {
             let address = row.address.toString()
-            return this._service.broadcastAddress(address, txid, block.hash, height, {client: client})
+            return this._service.broadcastAddress(address, txId, block.hash, height, {client: client})
           })
         })
       })
@@ -427,9 +427,9 @@ export default class Sync extends EventEmitter {
           this.emit('latest', this._latest)
 
           // notify that tx was imported
-          for (let txid of _.pluck(block.transactions, 'id')) {
-            setImmediate(::this._importOrphaned, txid)
-            this.emit('tx', txid)
+          for (let txId of _.pluck(block.transactions, 'id')) {
+            setImmediate(::this._importOrphaned, txId)
+            this.emit('tx', txId)
           }
         }
 
@@ -459,12 +459,12 @@ export default class Sync extends EventEmitter {
           this._storage.executeQuery(SQL.select.transactions.unconfirmed)
         ]
 
-        sTxIds = sTxIds.rows.map((row) => { return row.txid.toString('hex') })
+        sTxIds = sTxIds.rows.map((row) => row.txid.toString('hex'))
 
         // remove tx that not in mempool but in our storage
         let rTxIds = _.difference(sTxIds, nTxIds)
         if (rTxIds.length > 0) {
-          rTxIds = rTxIds.map((txid) => { return '\\x' + txid })
+          rTxIds = rTxIds.map((txId) => `\\x${txId}`)
           await this._storage.executeTransaction(async (client) => {
             await* [
               client.queryAsync(SQL.delete.transactions.unconfirmedByTxIds, [rTxIds]),
@@ -472,14 +472,14 @@ export default class Sync extends EventEmitter {
             ]
             await* _.flattenDeep([
               client.queryAsync(SQL.update.history.deleteUnconfirmedInputsByTxIds, [rTxIds]),
-              rTxIds.map((txid) => this._service.removeTx(txid, {client: client}))
+              rTxIds.map((txId) => this._service.removeTx(txId, {client: client}))
             ])
           })
         }
 
         // add skipped tx in our storage
-        for (let txid of _.difference(nTxIds, sTxIds)) {
-          setImmediate(::this._runTxImport, txid)
+        for (let txId of _.difference(nTxIds, sTxIds)) {
+          setImmediate(::this._runTxImport, txId)
         }
 
         logger.info(`Update mempool finished, elapsed time: ${stopwatch.getValue()}`)

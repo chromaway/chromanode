@@ -13,7 +13,7 @@ import Service from './service'
 import util from '../lib/util'
 import { VERSION } from '../lib/const'
 import Sync from './sync'
-import SQL from './sql'
+import SQL from '../lib/sql'
 
 let sha256sha256 = bitcore.crypto.Hash.sha256sha256
 
@@ -92,15 +92,15 @@ export default async function () {
   // setup listener for event sendTx from services
   let sendTxDeferreds = {}
   service.on('sendTx', (id) => {
-    let txid
+    let txId
     storage.executeTransaction(async (client) => {
-      let result = await client.queryAsync(SQL.update.newTx.getAndRemove, [id])
+      let result = await client.queryAsync(SQL.delete.newTx.byId, [id])
       let rawTx = result.rows[0].hex.toString('hex')
-      txid = util.encode(sha256sha256(new Buffer(rawTx, 'hex')))
-      logger.verbose(`sendTx: ${txid} (${rawTx})`)
+      txId = util.encode(sha256sha256(new Buffer(rawTx, 'hex')))
+      logger.verbose(`sendTx: ${txId} (${rawTx})`)
 
       let addedToStorage = new Promise((resolve, reject) => {
-        sendTxDeferreds[txid] = {
+        sendTxDeferreds[txId] = {
           resolve: resolve,
           timeoutId: setTimeout(reject, 1800000) // 30 min.
         }
@@ -110,15 +110,15 @@ export default async function () {
 
       await addedToStorage
 
-      logger.verbose(`sendTx: success (${txid})`)
+      logger.verbose(`sendTx: success (${txId})`)
       return null
     })
     .catch((err) => {
-      logger.error(`sendTx: (${txid}) ${err.stack}`)
+      logger.error(`sendTx: (${txId}) ${err.stack}`)
 
-      if (txid && sendTxDeferreds[txid]) {
-        clearTimeout(sendTxDeferreds[txid].timeoutId)
-        delete sendTxDeferreds[txid]
+      if (txId && sendTxDeferreds[txId]) {
+        clearTimeout(sendTxDeferreds[txId].timeoutId)
+        delete sendTxDeferreds[txId]
       }
 
       if (err instanceof Error) {
@@ -155,12 +155,12 @@ export default async function () {
     broadcastStatus()
   })
 
-  sync.on('tx', (txid) => {
-    let deferred = sendTxDeferreds[txid]
+  sync.on('tx', (txId) => {
+    let deferred = sendTxDeferreds[txId]
     if (deferred !== undefined) {
       deferred.resolve()
       clearTimeout(deferred.timeoutId)
-      delete sendTxDeferreds[txid]
+      delete sendTxDeferreds[txId]
     }
   })
 }

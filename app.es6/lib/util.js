@@ -29,22 +29,22 @@ class SmartLock {
   }
 
   /**
-   * @param {Array.<string>} txids
+   * @param {Array.<string>} txIds
    * @param {function} fn
    * @return {Promise}
    */
-  async withLock (txids, fn) {
+  async withLock (txIds, fn) {
     let lockResolve
-    let lockPromise = new Promise((resolve) => { lockResolve = resolve })
+    let lockPromise = new Promise((resolve) => lockResolve = resolve)
     let lockedTxIds = []
 
     try {
       while (true) {
-        let locks = _.filter(txids.map((txid) => this._locks[txid]))
+        let locks = _.filter(txIds.map((txId) => this._locks[txId]))
         if (locks.length === 0) {
-          for (let txid of txids) {
-            this._locks[txid] = lockPromise
-            lockedTxIds.push(txid)
+          for (let txId of txIds) {
+            this._locks[txId] = lockPromise
+            lockedTxIds.push(txId)
           }
           break
         }
@@ -58,8 +58,8 @@ class SmartLock {
 
       return await fn()
     } finally {
-      for (let txid of lockedTxIds) {
-        delete this._locks[txid]
+      for (let txId of lockedTxIds) {
+        delete this._locks[txId]
       }
 
       lockResolve()
@@ -72,7 +72,7 @@ class SmartLock {
    */
   async reorgLock (fn) {
     let lockResolve
-    this._reorgPromise = new Promise((resolve) => { lockResolve = resolve })
+    this._reorgPromise = new Promise((resolve) => lockResolve = resolve)
 
     try {
       await* _.values(this._locks)

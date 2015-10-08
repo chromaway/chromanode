@@ -19,7 +19,7 @@ import util from '../lib/util'
 
 /**
  * @event Network#tx
- * @param {string} txid
+ * @param {string} txId
  */
 
 /**
@@ -179,11 +179,11 @@ export default class Network extends EventEmitter {
   }
 
   /**
-   * @param {string} txid
+   * @param {string} txId
    * @return {Promise<bitcore.Transaction>}
    */
-  async getTx (txid) {
-    let {result} = await this._bitcoind.getRawTransaction(txid)
+  async getTx (txId) {
+    let {result} = await this._bitcoind.getRawTransaction(txId)
     let rawtx = new Buffer(result, 'hex')
     return new bitcore.Transaction(rawtx)
   }

@@ -1,7 +1,7 @@
 import _ from 'lodash'
 
 import errors from '../../../lib/errors'
-import SQL from '../../sql'
+import SQL from '../../../lib/sql'
 import qutil from '../util/query'
 
 let v1 = {}
@@ -9,13 +9,12 @@ let v2 = {}
 export default {v1, v2}
 
 async function latest (req) {
-  let result = await req.storage.executeQuery(SQL.select.blocks.latest)
-  let row = result.rows[0]
+  let latest = (await req.storage.executeQuery(SQL.select.blocks.latest)).rows[0]
 
   return {
-    height: row.height,
-    hash: row.hash.toString('hex'),
-    header: row.header.toString('hex')
+    height: latest.height,
+    hash: latest.hash.toString('hex'),
+    header: latest.header.toString('hex')
   }
 }
 
@@ -75,5 +74,5 @@ function query (req, res, shift) {
   }))
 }
 
-v1.query = (req, res) => { query(req, res, -1) }
-v2.query = (req, res) => { query(req, res, 0) }
+v1.query = (req, res) => query(req, res, -1)
+v2.query = (req, res) => query(req, res, 0)

@@ -69,16 +69,16 @@ export default class Service extends EventEmitter {
   }
 
   /**
-   * @param {string} txid
+   * @param {string} txId
    * @param {?string} blockHash
    * @param {?number} blockHeight
    * @param {Object} [opts]
    * @param {pg.Client} [opts.client]
    * @return {Promise}
    */
-  broadcastTx (txid, blockHash, blockHeight, opts) {
+  broadcastTx (txId, blockHash, blockHeight, opts) {
     return this.messages.notify('broadcasttx', {
-      txid: txid,
+      txId: txId,
       blockHash: blockHash,
       blockHeight: blockHeight
     }, opts)
@@ -86,17 +86,17 @@ export default class Service extends EventEmitter {
 
   /**
    * @param {string} address
-   * @param {string} txid
+   * @param {string} txId
    * @param {?string} blockHash
    * @param {?string} blockHeight
    * @param {Object} [opts]
    * @param {pg.Client} [opts.client]
    * @return {Promise}
    */
-  broadcastAddress (address, txid, blockHash, blockHeight, opts) {
+  broadcastAddress (address, txId, blockHash, blockHeight, opts) {
     return this.messages.notify('broadcastaddress', {
       address: address,
-      txid: txid,
+      txId: txId,
       blockHash: blockHash,
       blockHeight: blockHeight
     }, opts)
@@ -113,23 +113,23 @@ export default class Service extends EventEmitter {
   }
 
   /**
-   * @param {string} txid
+   * @param {string} txId
    * @param {Object} [opts]
    * @param {pg.Client} [opts.client]
    * @return {Promise}
    */
-  addTx (txid, opts) {
-    return this.messages.notify('addtx', {txid: txid}, opts)
+  addTx (txId, opts) {
+    return this.messages.notify('addtx', {txId: txId}, opts)
   }
 
   /**
-   * @param {string} txid
+   * @param {string} txId
    * @param {Object} [opts]
    * @param {pg.Client} [opts.client]
    * @return {Promise}
    */
-  removeTx (txid, opts) {
-    return this.messages.notify('removetx', {txid: txid}, opts)
+  removeTx (txId, opts) {
+    return this.messages.notify('removetx', {txId: txId}, opts)
   }
 
   /**

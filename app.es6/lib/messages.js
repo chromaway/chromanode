@@ -63,9 +63,9 @@ export default class Messages {
         })
 
         // hack for getting all channels
-        PUtils.map(Object.keys(this._events._events), (channel) => {
+        Promise.all(Object.keys(this._events._events).map((channel) => {
           return this._listener.queryAsync(`LISTEN ${channel}`)
-        })
+        }))
         .then(resolve, reject)
 
         // holding client
@@ -95,7 +95,7 @@ export default class Messages {
   async notify (channel, payload, opts) {
     let execute = ::this._storage.executeTransaction
     if (_.has(opts, 'client')) {
-      execute = async (fn) => { return fn(opts.client) }
+      execute = async (fn) => fn(opts.client)
     }
 
     await execute((client) => {
