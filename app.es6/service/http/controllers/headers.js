@@ -8,7 +8,7 @@ let v1 = {}
 let v2 = {}
 export default {v1, v2}
 
-async function latest (req) {
+async function getLatest (req) {
   let latest = (await req.storage.executeQuery(SQL.select.blocks.latest)).rows[0]
 
   return {
@@ -20,7 +20,7 @@ async function latest (req) {
 
 v1.latest = (req, res) => {
   res.promise((async () => {
-    let latest = await latest(req)
+    let latest = await getLatest(req)
     return {
       height: latest.height,
       blockid: latest.hash,
@@ -30,7 +30,7 @@ v1.latest = (req, res) => {
 }
 
 v2.latest = (req, res) => {
-  res.promise(latest(req))
+  res.promise(getLatest(req))
 }
 
 function query (req, res, shift) {
