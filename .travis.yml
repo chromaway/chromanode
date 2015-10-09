@@ -7,6 +7,7 @@ addons:
 before_script:
   - psql -c 'create database travis_ci_test;' -U postgres
   - cp test/config/scanner.travis.yml test/config/scanner.yml
+  - cp test/config/cc-scanner.travis.yml test/config/cc-scanner.yml
   - cp test/config/service.travis.yml test/config/service.yml
 env:
   - TEST_SUITE=lint

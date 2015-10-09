@@ -134,7 +134,7 @@ export default class Sync {
             }
 
             let {rows} = await client.queryAsync(SQL.select.ccDefinitions.colorId, params)
-            if (rows.length === 0) {
+            if (rows.length !== 0) {
               let id = parseInt(rows[0].id, 10)
               return await this._cdefManager.remove({id: id}, opts)
             }

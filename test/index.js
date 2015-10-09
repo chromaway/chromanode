@@ -92,6 +92,10 @@ describe('Run bitcoind, scanner and service', function () {
     let scannerConfigLocation = path.join(__dirname, 'config', 'scanner.yml')
     let scannerConfig = yaml.safeLoad(fs.readFileSync(scannerConfigLocation))
 
+    let ccScannerLocation = path.join(__dirname, '..', 'bin', 'cc-scanner.js')
+    let ccScannerConfigLocation = path.join(__dirname, 'config', 'cc-scanner.yml')
+    let ccScannerConfig = yaml.safeLoad(fs.readFileSync(ccScannerConfigLocation))
+
     let serviceLocation = path.join(__dirname, '..', 'bin', 'service.js')
     let serviceConfigLocation = path.join(__dirname, 'config', 'service.yml')
     let serviceConfig = yaml.safeLoad(fs.readFileSync(serviceConfigLocation))
@@ -107,7 +111,7 @@ describe('Run bitcoind, scanner and service', function () {
                                             schemaname = 'public'
                                          `)
     for (let row of rows) {
-      await client.queryAsync(`DROP TABLE ${row.tablename} cascade`)
+      await client.queryAsync(`DROP TABLE ${row.tablename} CASCADE`)
     }
     await client.queryAsync('COMMIT')
     done()
@@ -142,6 +146,7 @@ describe('Run bitcoind, scanner and service', function () {
     await opts.bitcoind.ready
     let generateBlocks = opts.bitcoind.generateBlocks(110)
     opts.scanner = await createProcess(scannerLocation, ['-c', scannerConfigLocation])
+    opts.ccScanner = await createProcess(ccScannerLocation, ['-c', ccScannerConfigLocation])
     opts.service = await createProcess(serviceLocation, ['-c', serviceConfigLocation])
 
     // set listeners
@@ -152,6 +157,10 @@ describe('Run bitcoind, scanner and service', function () {
     opts.scanner.on('data', (data) => { console.warn(`Scanner: ${data.toString()}`) })
     opts.scanner.on('error', (err) => { console.warn(`Scanner error: ${err.stack}`) })
     // opts.scanner.on('exit', (code, signal) => {})
+
+    opts.ccScanner.on('data', (data) => { console.warn(`CCScanner: ${data.toString()}`) })
+    opts.ccScanner.on('error', (err) => { console.warn(`CCScanner error: ${err.stack}`) })
+    // opts.ccScanner.on('exit', (code, signal) => {})
 
     opts.service.on('data', (data) => { console.warn(`Service: ${data.toString()}`) })
     opts.service.on('error', (err) => { console.warn(`Service error: ${err.stack}`) })
@@ -194,6 +203,15 @@ describe('Run bitcoind, scanner and service', function () {
         // await killProcess(opts.scanner)
       } catch (err) {
         console.error(`Error on scanner terminating: ${err.stack}`)
+      }
+    }
+
+    if (opts.ccScanner) {
+      try {
+        opts.ccScanner.removeAllListeners()
+        await killProcess(opts.ccScanner)
+      } catch (err) {
+        console.error(`Error on ccScanner terminating: ${err.stack}`)
       }
     }
 
