@@ -9,7 +9,7 @@ import logger from '../lib/logger'
 /**
  * @event Service#sendTx
  * @param {string} id
- * @param {string} rawtx
+ * @param {string} rawTx
  */
 
 /**

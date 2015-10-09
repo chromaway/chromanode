@@ -130,14 +130,14 @@ export default class Scanner extends EventEmitter {
   }
 
   /**
-   * @param {string} rawtx
+   * @param {string} txHex
    * @return {Promise}
    */
-  async sendTx (rawtx) {
+  async sendTx (txHex) {
     let process
 
     await this._storage.executeTransaction(async (client) => {
-      let result = await client.queryAsync(SQL.insert.newTx.row, [`\\x${rawtx}`])
+      let result = await client.queryAsync(SQL.insert.newTx.row, [`\\x${txHex}`])
       let id = result.rows[0].id
 
       await this._mSendTx.notify('sendtx', {id: id}, {client: client})

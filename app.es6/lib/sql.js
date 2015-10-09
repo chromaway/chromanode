@@ -24,7 +24,7 @@ export default {
          iheight INTEGER)`,
       `CREATE TABLE new_txs (
          id SERIAL PRIMARY KEY,
-         hex BYTEA NOT NULL)`,
+         tx BYTEA NOT NULL)`,
       `CREATE TABLE cc_scanned_txids (
         txid BYTEA PRIMARY KEY,
         blockhash BYTEA,
@@ -75,7 +75,7 @@ export default {
                             ($1, $2, $3, $4, $5)`
     },
     newTx: {
-      row: `INSERT INTO new_txs (hex) VALUES ($1) RETURNING id`
+      row: `INSERT INTO new_txs (tx) VALUES ($1) RETURNING id`
     },
     ccScannedTxIds: {
       unconfirmed: `INSERT INTO cc_scanned_txids
@@ -284,13 +284,25 @@ export default {
                     WHERE
                       height IS NULL`
     },
-    cclibDefinitions: {
+    ccDefinitions: {
       colorId: `SELECT
                   id AS id
                 FROM
                   cclib_definitions
                 WHERE
                   cdesc ~ $1`
+    },
+    ccData: {
+      coinsByDesc: `SELECT
+                      cclib_data.txid AS txid,
+                      cclib_data.oidx AS oidx,
+                      cclib_data.value AS value
+                    FROM
+                      cclib_definitions
+                    INNER JOIN
+                      cclib_data ON cclib_definitions.id = cclib_data.color_id
+                    WHERE
+                      cclib_definitions.cdesc = $1`
     }
   },
   update: {
@@ -392,7 +404,7 @@ export default {
       unconfirmedByTxIds: `DELETE FROM history WHERE otxid = ANY($1)`
     },
     newTx: {
-      byId: `DELETE FROM new_txs WHERE id = $1 RETURNING hex`
+      byId: `DELETE FROM new_txs WHERE id = $1 RETURNING tx`
     },
     ccScannedTxIds: {
       byTxId: `DELETE FROM cc_scanned_txids WHERE txid = $1`

@@ -133,7 +133,7 @@ export default class Sync {
                 throw new Error(`Unknow cdefCls: ${cdefCls}`)
             }
 
-            let {rows} = await client.queryAsync(SQL.select.cclibDefinitions.colorId, params)
+            let {rows} = await client.queryAsync(SQL.select.ccDefinitions.colorId, params)
             if (rows.length === 0) {
               let id = parseInt(rows[0].id, 10)
               return await this._cdefManager.remove({id: id}, opts)

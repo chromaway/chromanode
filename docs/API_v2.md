@@ -19,6 +19,9 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
     * [send](#send)
   * [addresses](#addresses)
     * [query](#query)
+  * [Colored coins](#colored-coins)
+    * [getAllColoredCoins](#getallcoloredcoins)
+    * [getTxColorValues](#gettxcolorvalues)
 
 ### Status
 
@@ -299,7 +302,7 @@ That is, given txid and vout find txid and height.
         "value": 5000000000,
         "script": "76a914c3d093c756dc4f8dd817b503c64ecb802776213488ac",
         "height": 130241
-      }, ... {
+      }, {
         "txid": "ddd1b0bfefcac0163d1b9298a520d4b90b0bffe8947caf0989ffa6da0f536a99",
         "vout": 0,
         "value": 330000,
@@ -321,6 +324,79 @@ That is, given txid and vout find txid and height.
     {"type": "InvalidSource"}
     {"type": "InvalidStatus"}
     {"type": "ToNotFound"}
+
+### Colored coins
+
+#### getAllColoredCoins
+
+  **url**
+
+    /v2/cc/getAllColoredCoins
+
+  **query**
+
+| param | description              |
+|:------|:-------------------------|
+| color | color description string |
+
+    curl http://localhost:3001/v2/cc/getAllColoredCoins --header "Content-Type:application/json" -d '{"color": "..."}'
+
+  **result**
+
+    {
+      "coins": [{
+        "txId": "1746b8a0843b9105d2cad568940cae641d7470e6a2b2494a0c453ef26d21be54",
+        "outIndex": 0,
+        "colorValue": 1500
+      }, {
+        "txId": "1e35b285bcb2afbe8ed918dd6abf79bf0a394e4412919d461ea1b6f48f498045",
+        "outIndex": 1,
+        "colorValue": 99990000
+      }]
+    }
+
+  **errors**
+
+    {"type": "InvalidColor"}
+
+#### getTxColorValues
+
+  **url**
+
+    /v2/cc/getTxColorValues
+
+  **query**
+
+| param       | description                                                                    |
+|:------------|:-------------------------------------------------------------------------------|
+| txId        | transaction id                                                                 |
+| outIndex    | output index, may be omitted                                                   |
+| outIndices  | output indices, may be ommited (preferred than outIndex, all index by default) |
+| colorKernel | color kernel code, may be ommited (epobc by default)                           |
+
+    curl http://localhost:3001/v2/cc/getTxColorValues --header "Content-Type:application/json" -d '{"txId": "..."}'
+
+  **result**
+
+    {
+      "colorValues": [{
+        color: "epobc:83e96d768c744e78f486e99b5a85f57e319ffef9890b130a914aacbb70ae7563:0:0",
+        value: 90
+      }, {
+        color: "epobc:83e96d768c744e78f486e99b5a85f57e319ffef9890b130a914aacbb70ae7563:0:0",
+        value: 10
+      },
+      null,
+      null
+      ]
+    }
+
+  **errors**
+
+    {"type": "InvalidColorKernel"}
+    {"type": "InvalidOutIndices"}
+    {"type": "MultipleColorsOutIndex"}
+    {"type": "TxNotFound"}
 
 ## Notifications:
 
@@ -415,13 +491,17 @@ socket.on('status', function (status) {
 
   * FromNotFound
   * InvalidAddresses
+  * InvalidColor
+  * InvalidColorKernel
   * InvalidCount
   * InvalidHash
   * InvalidHeight
+  * InvalidOutIndices
   * InvalidRequestedCount
   * InvalidTxId
   * InvalidSource
   * InvalidStatus
+  * MultipleColorsOutIndex
   * SendTxError
   * ToNotFound
   * TxNotFound

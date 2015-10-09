@@ -43,7 +43,7 @@ express.response.promise = async function (promise) {
     if (err instanceof errors.Service) {
       // logger.info(`Invalid query: ${err.name}`)
       // cut ErrorChromanodeService
-      this.jfail({type: err.name.slice(22)})
+      this.jfail({type: err.name.slice(22), message: err.message})
       return
     }
 
@@ -64,7 +64,7 @@ export default function (app, storage, scanner) {
     next()
   })
 
-  app.use(cors())
+  app.use(cors({origin: true, credentials: true}))
   app.use(compression())
   app.use(bodyParser.json())
   app.use(bodyParser.urlencoded({extended: true}))

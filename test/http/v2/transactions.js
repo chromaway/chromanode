@@ -7,14 +7,12 @@ export default function (opts) {
   let request = require('../request')(opts)
 
   async function notFoundTest (url) {
+    let txId = crypto.Random.getRandomBuffer(32).toString('hex')
     try {
-      await request.get(url, {
-        txid: crypto.Random.getRandomBuffer(32).toString('hex'),
-        vout: _.random(0, 2)
-      })
+      await request.get(url, {txid: txId, vout: _.random(0, 2)})
     } catch (err) {
       expect(err).to.be.instanceof(request.errors.StatusFail)
-      expect(err.data).to.deep.equal({type: 'TxNotFound'})
+      expect(err.data).to.deep.equal({type: 'TxNotFound', message: txId})
     }
   }
 

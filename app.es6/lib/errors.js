@@ -6,13 +6,17 @@
  *       +-- Service
  *       |    +-- FromNotFound
  *       |    +-- InvalidAddresses
+ *       |    +-- InvalidColor
+ *       |    +-- InvalidColorKernel
  *       |    +-- InvalidCount
  *       |    +-- InvalidHash
  *       |    +-- InvalidHeight
+ *       |    +-- InvalidOutIndices
  *       |    +-- InvalidRequestedCount
  *       |    +-- InvalidTxId
  *       |    +-- InvalidSource
  *       |    +-- InvalidStatus
+ *       |    +-- MultipleColorsOutIndex
  *       |    +-- SendTxError
  *       |    +-- ToNotFound
  *       |    +-- TxNotFound
@@ -35,18 +39,22 @@ let spec = {
     name: 'Service',
     message: 'Service internal error',
     errors: [
-      {name: 'FromNotFound', message: ''},
-      {name: 'InvalidAddresses', message: ''},
-      {name: 'InvalidCount', message: ''},
-      {name: 'InvalidHash', message: ''},
-      {name: 'InvalidHeight', message: ''},
-      {name: 'InvalidRequestedCount', message: ''},
-      {name: 'InvalidTxId', message: ''},
-      {name: 'InvalidSource', message: ''},
-      {name: 'InvalidStatus', message: ''},
-      {name: 'SendTxError', message: ''},
-      {name: 'ToNotFound', message: ''},
-      {name: 'TxNotFound', message: ''}
+      {name: 'FromNotFound', message: '{0}'},
+      {name: 'InvalidAddresses', message: '{0}'},
+      {name: 'InvalidColor', message: '{0}'},
+      {name: 'InvalidColorKernel', message: '{0}'},
+      {name: 'InvalidCount', message: '{0}'},
+      {name: 'InvalidHash', message: '{0}'},
+      {name: 'InvalidHeight', message: '{0}'},
+      {name: 'InvalidOutIndices', message: '{0}'},
+      {name: 'InvalidRequestedCount', message: '{0}'},
+      {name: 'InvalidTxId', message: '{0}'},
+      {name: 'InvalidSource', message: '{0}'},
+      {name: 'InvalidStatus', message: '{0}'},
+      {name: 'MultipleColorsOutIndex', message: '{0}'},
+      {name: 'SendTxError', message: '{0}'},
+      {name: 'ToNotFound', message: '{0}'},
+      {name: 'TxNotFound', message: '{0}'}
     ]
   }, {
     name: 'Storage',

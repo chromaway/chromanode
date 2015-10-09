@@ -184,16 +184,16 @@ export default class Network extends EventEmitter {
    */
   async getTx (txId) {
     let {result} = await this._bitcoind.getRawTransaction(txId)
-    let rawtx = new Buffer(result, 'hex')
-    return new bitcore.Transaction(rawtx)
+    let rawTx = new Buffer(result, 'hex')
+    return new bitcore.Transaction(rawTx)
   }
 
   /**
-   * @param {string} rawtx
+   * @param {string} txHex
    * @return {Promise}
    */
-  async sendTx (rawtx) {
-    await this._bitcoind.sendRawTransaction(rawtx)
+  async sendTx (txHex) {
+    await this._bitcoind.sendRawTransaction(txHex)
   }
 
   /**

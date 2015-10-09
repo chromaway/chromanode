@@ -45,7 +45,7 @@ function query (req, res, shift) {
     if (query.from !== undefined) {
       from = await qutil.getHeightForPoint(client, query.from)
       if (from === null) {
-        throw new errors.Service.FromNotFound()
+        throw new errors.Service.FromNotFound(query.from)
       }
     }
 
@@ -53,13 +53,13 @@ function query (req, res, shift) {
     if (query.to !== undefined) {
       to = await qutil.getHeightForPoint(client, query.to)
       if (to === null) {
-        throw new errors.Service.ToNotFound()
+        throw new errors.Service.ToNotFound(query.to)
       }
     }
 
     let count = to - from
     if (count <= 0 || count > 2016) {
-      throw new errors.Service.InvalidRequestedCount()
+      throw new errors.Service.InvalidRequestedCount(count)
     }
 
     let {rows} = await client.queryAsync(

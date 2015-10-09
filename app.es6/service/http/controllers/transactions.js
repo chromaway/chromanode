@@ -5,6 +5,7 @@ import errors from '../../../lib/errors'
 import util from '../../../lib/util'
 import SQL from '../../../lib/sql'
 import qutil from '../util/query'
+import { getTx } from '../util/tx'
 
 let v1 = {}
 let v2 = {}
@@ -12,15 +13,10 @@ export default {v1, v2}
 
 v1.raw = v2.raw = (req, res) => {
   res.promise((async () => {
-    let txId = `\\x${qutil.transformTxId(req.query.txid)}`
-    let result = await req.storage.executeQuery(
-      SQL.select.transactions.byTxId, [txId])
+    let txId = qutil.transformTxId(req.query.txid)
+    let rawTx = await getTx(req.storage, txId)
 
-    if (result.rowCount === 0) {
-      throw new errors.Service.TxNotFound()
-    }
-
-    return {hex: result.rows[0].tx.toString('hex')}
+    return {hex: rawTx.toString('hex')}
   })())
 }
 
@@ -31,7 +27,7 @@ v1.merkle = v2.merkle = function (req, res) {
       SQL.select.blocks.txIdsByTxId, [`\\x${txId}`])
 
     if (result.rowCount === 0) {
-      throw new errors.Service.TxNotFound()
+      throw new errors.Service.TxNotFound(txId)
     }
 
     if (result.rows[0].height === null) {
@@ -83,13 +79,13 @@ v1.merkle = v2.merkle = function (req, res) {
 
 v2.spent = function (req, res) {
   res.promise((async () => {
-    let oTxId = `\\x${qutil.transformTxId(req.query.txid)}`
+    let oTxId = qutil.transformTxId(req.query.txid)
     let oindex = parseInt(req.query.vout, 10)
     let result = await req.storage.executeQuery(
-      SQL.select.history.spent, [oTxId, oindex])
+      SQL.select.history.spent, [`\\x${oTxId}`, oindex])
 
     if (result.rowCount === 0) {
-      throw new errors.Service.TxNotFound()
+      throw new errors.Service.TxNotFound(oTxId)
     }
 
     if (result.rows[0].itxid === null) {

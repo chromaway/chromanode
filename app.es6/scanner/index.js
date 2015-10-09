@@ -94,10 +94,10 @@ export default async function () {
   service.on('sendTx', (id) => {
     let txId
     storage.executeTransaction(async (client) => {
-      let result = await client.queryAsync(SQL.delete.newTx.byId, [id])
-      let rawTx = result.rows[0].hex.toString('hex')
-      txId = util.encode(sha256sha256(new Buffer(rawTx, 'hex')))
-      logger.verbose(`sendTx: ${txId} (${rawTx})`)
+      let {rows} = await client.queryAsync(SQL.delete.newTx.byId, [id])
+      txId = util.encode(sha256sha256(rows[0].tx))
+      let txHex = rows[0].tx.toString('hex')
+      logger.verbose(`sendTx: ${txId} (${txHex})`)
 
       let addedToStorage = new Promise((resolve, reject) => {
         sendTxDeferreds[txId] = {
@@ -106,7 +106,7 @@ export default async function () {
         }
       })
 
-      await network.sendTx(rawTx)
+      await network.sendTx(txHex)
 
       await addedToStorage
 

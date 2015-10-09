@@ -4,6 +4,7 @@ import addresses from '../controllers/addresses'
 import headers from '../controllers/headers'
 import node from '../controllers/node'
 import transactions from '../controllers/transactions'
+import cc from '../controllers/cc'
 
 export default {
   createRouter: () => {
@@ -24,6 +25,10 @@ export default {
 
     // address routes
     router.get('/addresses/query', addresses.v2.query)
+
+    // colored coins
+    router.post('/cc/getAllColoredCoins', cc.v2.getAllColoredCoins)
+    router.post('/cc/getTxColorValues', cc.v2.getTxColorValues)
 
     return router
   }

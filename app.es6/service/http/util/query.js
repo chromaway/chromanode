@@ -21,14 +21,14 @@ function transformFromTo (val) {
       return num
     }
 
-    throw new errors.Service.InvalidHeight()
+    throw new errors.Service.InvalidHeight(num)
   }
 
   if (val.length === 64 && bitcore.util.js.isHexa(val)) {
     return val
   }
 
-  throw new errors.Service.InvalidHash()
+  throw new errors.Service.InvalidHash(val)
 }
 
 /**
@@ -46,7 +46,7 @@ function transformCount (val) {
     return num
   }
 
-  throw new errors.Service.InvalidCount()
+  throw new errors.Service.InvalidCount(num)
 }
 
 /**
@@ -56,7 +56,7 @@ function transformCount (val) {
  */
 function transformAddresses (val) {
   if (!_.isString(val)) {
-    throw new errors.Service.InvalidAddresses()
+    throw new errors.Service.InvalidAddresses(val)
   }
 
   let networkName = config.get('chromanode.network')
@@ -70,7 +70,7 @@ function transformAddresses (val) {
       let addressNetwork = bitcore.Address.fromString(address).network.name
       assert.equal(addressNetwork, networkName)
     } catch (err) {
-      throw new errors.Service.InvalidAddresses()
+      throw new errors.Service.InvalidAddresses(val)
     }
   }
 
@@ -84,7 +84,7 @@ function transformAddresses (val) {
  */
 function transformSource (val) {
   if (val !== undefined && ['blocks', 'mempool'].indexOf(val) === -1) {
-    throw new errors.Service.InvalidSource()
+    throw new errors.Service.InvalidSource(val)
   }
 
   return val
@@ -97,22 +97,22 @@ function transformSource (val) {
  */
 function transformStatus (val) {
   if (val !== undefined && ['transactions', 'unspent'].indexOf(val) === -1) {
-    throw new errors.Service.InvalidStatus()
+    throw new errors.Service.InvalidStatus(val)
   }
 
   return val
 }
 
 /**
- * @param {string} val
+ * @param {string} txId
  * @return {string}
  */
-function transformTxId (val) {
-  if (!!val && val.length === 64 && bitcore.util.js.isHexa(val)) {
-    return val
+function transformTxId (txId) {
+  if (!!txId && txId.length === 64 && bitcore.util.js.isHexa(txId)) {
+    return txId
   }
 
-  throw new errors.Service.InvalidTxId()
+  throw new errors.Service.InvalidTxId(txId)
 }
 
 /**

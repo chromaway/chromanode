@@ -14,7 +14,7 @@ let pg = PUtils.promisifyAll(require('pg').native)
  */
 @mixin(ReadyMixin)
 export default class Storage {
-  _version = '3'
+  _version = '4'
 
   /**
    * @constructor
