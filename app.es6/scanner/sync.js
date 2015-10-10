@@ -463,16 +463,17 @@ export default class Sync extends EventEmitter {
 
         // remove tx that not in mempool but in our storage
         let rTxIds = _.difference(sTxIds, nTxIds)
-        if (rTxIds.length > 0) {
-          rTxIds = rTxIds.map((txId) => `\\x${txId}`)
+        for (let start = 0; start < rTxIds.length; start += 1000) {
+          let txIds = rTxIds.slice(start, start + 1000)
+          let params = [txIds.map((txId) => `\\x${txId}`)]
           await this._storage.executeTransaction(async (client) => {
             await* [
-              client.queryAsync(SQL.delete.transactions.unconfirmedByTxIds, [rTxIds]),
-              client.queryAsync(SQL.delete.history.unconfirmedByTxIds, [rTxIds])
+              client.queryAsync(SQL.delete.transactions.unconfirmedByTxIds, params),
+              client.queryAsync(SQL.delete.history.unconfirmedByTxIds, params)
             ]
             await* _.flattenDeep([
-              client.queryAsync(SQL.update.history.deleteUnconfirmedInputsByTxIds, [rTxIds]),
-              rTxIds.map((txId) => this._service.removeTx(txId, {client: client}))
+              client.queryAsync(SQL.update.history.deleteUnconfirmedInputsByTxIds, params),
+              txIds.map((txId) => this._service.removeTx(txId, {client: client}))
             ])
           })
         }
