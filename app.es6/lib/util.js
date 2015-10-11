@@ -17,6 +17,48 @@ function encode (s) {
 }
 
 /**
+ * @param {bitcore.Transaction[]} txs
+ * @return {bitcore.Transaction[]}
+ */
+function toposort (txs) {
+  let indexByTxId = _.zipObject(txs.map((tx, index) => [tx.id, index]))
+  let existingTx = _.zipObject(_.keys(indexByTxId).map((txId) => [txId, true]))
+  let isSortedByIndex = new Array(txs.length).fill(false)
+  let result = []
+
+  /**
+   * @param {number} index
+   * @param {number} topIndex
+   */
+  function sort (index, topIndex) {
+    if (isSortedByIndex[index] === true) {
+      return
+    }
+
+    for (let input of txs[index].inputs) {
+      let prevTxId = input.prevTxId.toString('hex')
+      if (existingTx[prevTxId] !== undefined) {
+        let prevIndex = indexByTxId[prevTxId]
+        if (prevIndex === topIndex) {
+          throw new Error('Graph is cyclical')
+        }
+
+        sort(prevIndex, topIndex)
+      }
+    }
+
+    isSortedByIndex[index] = true
+    result.push(txs[index])
+  }
+
+  for (let index = 0; index < txs.length; index += 1) {
+    sort(index, index)
+  }
+
+  return result
+}
+
+/**
  * @class SmartLock
  */
 class SmartLock {
@@ -87,5 +129,6 @@ class SmartLock {
 export default {
   decode: decode,
   encode: encode,
+  toposort: toposort,
   SmartLock: SmartLock
 }

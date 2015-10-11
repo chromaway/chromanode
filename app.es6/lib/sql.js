@@ -174,6 +174,12 @@ export default {
                  transactions
                WHERE
                  txid = $1`,
+      byTxIds: `SELECT
+                  tx AS tx
+                FROM
+                  transactions
+                WHERE
+                  txid = ANY($1)`,
       exists: `SELECT EXISTS (SELECT
                                 true
                               FROM

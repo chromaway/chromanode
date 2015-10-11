@@ -349,10 +349,54 @@ export default class Sync extends EventEmitter {
   }
 
   /**
+   * @param {string[]} txIds
+   * @return {Promise<string[]>}
+   */
+  async _updateBitcoindMempool (txIds) {
+    let {rows} = await this._storage.executeQuery(
+      SQL.select.transactions.byTxIds, [txIds.map((txId) => `\\x${txId}`)])
+
+    let txs = util.toposort(rows.map((row) => bitcore.Transaction(row.tx)))
+    let notAddedTxIds = []
+
+    for (let tx of txs) {
+      try {
+        await this._network.sendTx(tx.toString())
+      } catch (err) {
+        notAddedTxIds.push(tx.id)
+      }
+    }
+
+    return notAddedTxIds
+  }
+
+  /**
+   * @param {string[]} rTxIds
+   * @return {Promise}
+   */
+  async _removeUnconfirmedTxIds (rTxIds) {
+    for (let start = 0; start < rTxIds.length; start += 250) {
+      let txIds = rTxIds.slice(start, start + 250)
+      let params = [txIds.map((txId) => `\\x${txId}`)]
+      await this._storage.executeTransaction(async (client) => {
+        await* [
+          client.queryAsync(SQL.delete.transactions.unconfirmedByTxIds, params),
+          client.queryAsync(SQL.delete.history.unconfirmedByTxIds, params)
+        ]
+        await* _.flattenDeep([
+          client.queryAsync(SQL.update.history.deleteUnconfirmedInputsByTxIds, params),
+          txIds.map((txId) => this._service.removeTx(txId, {client: client}))
+        ])
+      })
+    }
+  }
+
+  /**
+   * @param {boolean} [updateBitcoindMempool=false]
    * @return {Promise}
    */
   @makeConcurrent({concurrency: 1})
-  async _runBlockImport () {
+  async _runBlockImport (updateBitcoindMempool = false) {
     let stopwatch = new ElapsedTime()
     let block
 
@@ -463,19 +507,11 @@ export default class Sync extends EventEmitter {
 
         // remove tx that not in mempool but in our storage
         let rTxIds = _.difference(sTxIds, nTxIds)
-        for (let start = 0; start < rTxIds.length; start += 1000) {
-          let txIds = rTxIds.slice(start, start + 1000)
-          let params = [txIds.map((txId) => `\\x${txId}`)]
-          await this._storage.executeTransaction(async (client) => {
-            await* [
-              client.queryAsync(SQL.delete.transactions.unconfirmedByTxIds, params),
-              client.queryAsync(SQL.delete.history.unconfirmedByTxIds, params)
-            ]
-            await* _.flattenDeep([
-              client.queryAsync(SQL.update.history.deleteUnconfirmedInputsByTxIds, params),
-              txIds.map((txId) => this._service.removeTx(txId, {client: client}))
-            ])
-          })
+        if (rTxIds.length > 0 && updateBitcoindMempool) {
+          rTxIds = await this._updateBitcoindMempool(rTxIds)
+        }
+        if (rTxIds.length > 0) {
+          await this._removeUnconfirmedTxIds(rTxIds)
         }
 
         // add skipped tx in our storage
@@ -504,13 +540,13 @@ export default class Sync extends EventEmitter {
     logger.info(`Got ${this._latest.height + 1} blocks in current db, out of ${this._blockchainLatest.height + 1} block at bitcoind`)
 
     // make sure that we have latest block
-    await this._runBlockImport()
+    await this._runBlockImport(true)
 
     // set handlers
     this._network.on('tx', ::this._runTxImport)
     this._network.on('block', ::this._runBlockImport)
 
     // and run sync again
-    await this._runBlockImport()
+    await this._runBlockImport(true)
   }
 }
