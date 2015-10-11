@@ -91,10 +91,12 @@ export default async function () {
 
   // setup listener for event sendTx from services
   let sendTxDeferreds = {}
-  service.on('sendTx', (id) => {
+  service.on('sendTx', async (id) => {
     let txId
-    storage.executeTransaction(async (client) => {
-      let {rows} = await client.queryAsync(SQL.delete.newTx.byId, [id])
+    let _err = null
+
+    try {
+      let {rows} = await storage.executeQuery(SQL.delete.newTx.byId, [id])
       txId = util.encode(sha256sha256(rows[0].tx))
       let txHex = rows[0].tx.toString('hex')
       logger.verbose(`sendTx: ${txId} (${txHex})`)
@@ -111,9 +113,7 @@ export default async function () {
       await addedToStorage
 
       logger.verbose(`sendTx: success (${txId})`)
-      return null
-    })
-    .catch((err) => {
+    } catch (err) {
       logger.error(`sendTx: (${txId}) ${err.stack}`)
 
       if (txId && sendTxDeferreds[txId]) {
@@ -121,15 +121,10 @@ export default async function () {
         delete sendTxDeferreds[txId]
       }
 
-      if (err instanceof Error) {
-        return {code: null, message: err.message}
-      }
+      _err = {code: null, message: err.message}
+    }
 
-      return err
-    })
-    .then((ret) => {
-      service.sendTxResponse(id, ret)
-    })
+    await service.sendTxResponse(id, _err)
   })
 
   // create sync process

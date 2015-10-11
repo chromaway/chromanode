@@ -94,7 +94,7 @@ describe('Run bitcoind, scanner and service', function () {
 
     let ccScannerLocation = path.join(__dirname, '..', 'bin', 'cc-scanner.js')
     let ccScannerConfigLocation = path.join(__dirname, 'config', 'cc-scanner.yml')
-    let ccScannerConfig = yaml.safeLoad(fs.readFileSync(ccScannerConfigLocation))
+    // let ccScannerConfig = yaml.safeLoad(fs.readFileSync(ccScannerConfigLocation))
 
     let serviceLocation = path.join(__dirname, '..', 'bin', 'service.js')
     let serviceConfigLocation = path.join(__dirname, 'config', 'service.yml')
