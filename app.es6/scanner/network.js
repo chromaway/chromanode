@@ -73,6 +73,24 @@ export default class Network extends EventEmitter {
   }
 
   /**
+   */
+  _tryConnectToTrusted () {
+    let onCallback = (err) => {
+      this._peer.removeListener('error', onCallback)
+      this._peer.removeListener('connect', onCallback)
+
+      if (err) {
+        logger.error(`Error on connecting to bitcoind: ${err.stack}`)
+        // error also emit disconnect, that call _tryConnectToTrusted
+      }
+    }
+
+    this._peer.once('error', onCallback)
+    this._peer.once('connect', onCallback)
+    this._peer.connect()
+  }
+
+  /**
    * @return {Promise}
    */
   _initTrustedPeer () {
@@ -82,8 +100,6 @@ export default class Network extends EventEmitter {
       port: config.get('bitcoind.peer.port'),
       network: config.get('chromanode.network')
     })
-
-    setImmediate(::this._peer.connect)
 
     // inv event
     this._peer.on('inv', (message) => {
@@ -116,6 +132,7 @@ export default class Network extends EventEmitter {
     // disconnect event
     this._peer.on('disconnect', () => {
       logger.info(`Disconnected from peer ${this._peer.host}:${this._peer.port}`)
+      setTimeout(::this._tryConnectToTrusted, 5000)
     })
 
     // ready event
@@ -125,8 +142,23 @@ export default class Network extends EventEmitter {
     })
 
     // waiting peer ready
-    return new Promise((resolve) => {
-      this._peer.once('ready', resolve)
+    return new Promise((resolve, reject) => {
+      let onCallback = (err) => {
+        this._peer.removeListener('error', onCallback)
+        this._peer.removeListener('ready', onCallback)
+
+        if (err) {
+          return reject(err)
+        }
+
+        resolve()
+      }
+
+      this._peer.once('error', onCallback)
+      this._peer.once('ready', onCallback)
+
+      // try connect
+      this._tryConnectToTrusted()
     })
   }
 
