@@ -122,7 +122,9 @@ export default {
                    WHERE
                      height >= $1`,
       txIdsByHeight: `SELECT
+                        height AS height,
                         hash AS hash,
+                        header AS header,
                         txids AS txids
                       FROM
                         blocks
@@ -271,7 +273,8 @@ export default {
                       height DESC
                     LIMIT 1`,
       blockHash: `SELECT
-                    blockhash AS blockhash
+                    blockhash AS blockhash,
+                    height AS height
                   FROM
                     cc_scanned_txids
                   WHERE

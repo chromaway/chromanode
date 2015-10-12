@@ -419,8 +419,9 @@ export default class Sync extends EventEmitter {
           let latest = this._latest
           while (true) {
             stopwatch.reset().start()
-            block = await this._network.getBlock(latest.height + 1)
-            logger.verbose(`Downloading block ${latest.height + 1}, elapsed time: ${stopwatch.getValue()}`)
+            let blockHeight = Math.min(latest.height + 1, this._blockchainLatest.height)
+            block = await this._network.getBlock(blockHeight)
+            logger.verbose(`Downloading block ${blockHeight}, elapsed time: ${stopwatch.getValue()}`)
 
             // found latest that we need
             if (latest.hash === util.encode(block.header.prevHash)) {
@@ -438,15 +439,14 @@ export default class Sync extends EventEmitter {
             await this._lock.reorgLock(async () => {
               stopwatch.reset().start()
               this._latest = await this._storage.executeTransaction(async (client) => {
-                let args = [latest.height - 1]
-                let {rows} = await client.queryAsync(SQL.select.blocks.fromHeight, args)
+                let {rows} = await client.queryAsync(SQL.select.blocks.fromHeight, [latest.height])
 
                 await* _.flattenDeep([
-                  client.queryAsync(SQL.delete.blocks.fromHeight, args),
-                  client.queryAsync(SQL.update.transactions.makeUnconfirmed, args),
+                  client.queryAsync(SQL.delete.blocks.fromHeight, [latest.height]),
+                  client.queryAsync(SQL.update.transactions.makeUnconfirmed, [latest.height]),
                   PUtils.try(async () => {
-                    await client.queryAsync(SQL.update.history.makeOutputsUnconfirmed, args)
-                    await client.queryAsync(SQL.update.history.makeInputsUnconfirmed, args)
+                    await client.queryAsync(SQL.update.history.makeOutputsUnconfirmed, [latest.height])
+                    await client.queryAsync(SQL.update.history.makeInputsUnconfirmed, [latest.height])
                   }),
                   rows.map((row) => {
                     return this._service.removeBlock(row.hash.toString('hex'), {client: client})

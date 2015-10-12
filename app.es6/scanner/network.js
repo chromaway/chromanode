@@ -1,6 +1,5 @@
 import _ from 'lodash'
 import { EventEmitter } from 'events'
-import { setImmediate } from 'timers'
 import { mixin } from 'core-decorators'
 import ReadyMixin from 'ready-mixin'
 import bitcore from 'bitcore'

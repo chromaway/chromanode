@@ -8,6 +8,7 @@ import ElapsedTime from 'elapsed-time'
 import config from '../lib/config'
 import logger from '../lib/logger'
 import SQL from '../lib/sql'
+import util from '../lib/util'
 
 const cdefClss = cclib.definitions.Manager.getColorDefinitionClasses()
 
@@ -165,98 +166,95 @@ export default class Sync {
     let running = true
     while (running) {
       try {
-        let latest = null
-        let result = await this.storage.executeQuery(SQL.select.ccScannedTxIds.latestBlock)
-        if (result.rows.length > 0) {
-          latest = {
-            hash: result.rows[0].blockhash.toString('hex'),
-            height: result.rows[0].height
-          }
-        }
-
-        // reorg check
-        if (latest !== null) {
-          let latest2 = _.clone(latest)
-          // searching latest block
-          while (true) {
-            // is block still exists?
-            let result = await this.storage.executeQuery(
-              SQL.select.blocks.exists, [`\\x${latest2.hash}`])
-            if (result.rows[0].exists === true) {
-              break
+        await this.storage.executeTransaction(async (client) => {
+          let latest = null
+          let result = await client.queryAsync(SQL.select.ccScannedTxIds.latestBlock)
+          if (result.rows.length > 0) {
+            latest = {
+              hash: result.rows[0].blockhash.toString('hex'),
+              height: result.rows[0].height
             }
 
-            // update latest2
-            latest2.height -= 1
-            result = await this.storage.executeQuery(
-              SQL.select.ccScannedTxIds.blockHash, [latest2.height])
-            latest2.hash = result.rows[0].blockhash.toString('hex')
-          }
+            result = await client.queryAsync(SQL.select.blocks.latest)
+            if (latest.hash === result.rows[0].hash.toString('hex')) {
+              running = false
+              return
+            }
 
-          // make reorg if not equal
-          if (latest2.hash !== latest.hash) {
-            stopwatch.reset().start()
-            await this.storage.executeQuery(
-              SQL.update.ccScannedTxIds.makeUnconfirmed, [latest2.height])
-            logger.warn(`Make reorg to ${latest2.height}, elapsed time: ${stopwatch.getValue()}`)
-            continue
-          }
-        }
-
-        let height = _.get(latest, 'height', -1) + 1
-        result = await this.storage.executeQuery(SQL.select.blocks.txIdsByHeight, [height])
-
-        // add block if exists
-        if (result.rows.length > 0) {
-          let hash = result.rows[0].hash.toString('hex')
-
-          stopwatch.reset().start()
-          await this.storage.executeTransaction(async (client) => {
-            let txIds = result.rows[0].txids.toString('hex')
-            let toUpdate = await* _.range(txIds.length / 64).map(async (i) => {
-              let txId = txIds.slice(i * 64, (i + 1) * 64)
-              if (!(await this._addTx(client, txId, hash, height))) {
-                return txId
+            let latest2 = latest
+            while (true) {
+              let height = Math.min(latest2.height + 1, result.rows[0].height)
+              result = await client.queryAsync(SQL.select.blocks.txIdsByHeight, [height])
+              let header = bitcore.Block.BlockHeader(result.rows[0].header)
+              if (latest2.hash === util.encode(header.prevHash)) {
+                break
               }
-            })
 
-            await client.queryAsync(SQL.update.ccScannedTxIds.makeConfirmed, [
-              _.filter(toUpdate).map((txId) => `\\x${txId}`),
-              `\\x${hash}`,
-              height
-            ])
-          })
-          logger.info(`Import block ${hash}:${height}, elapsed time: ${stopwatch.getValue()}`)
-        }
+              result = await client.queryAsync(SQL.select.ccScannedTxIds.blockHash, [height - 1])
+              latest2 = {
+                hash: result.rows[0].blockhash.toString('hex'),
+                height: result.rows[0].height
+              }
+            }
 
-        // check that was latest block
-        result = await this.storage.executeQuery(SQL.select.blocks.latest)
-        if (latest && latest.hash === result.rows[0].hash.toString('hex')) {
-          // update unconfirmed
+            if (latest2.hash !== latest.hash) {
+              stopwatch.reset().start()
+              await client.queryAsync(
+                SQL.update.ccScannedTxIds.makeUnconfirmed, [latest2.height])
+              logger.warn(`Make reorg to ${latest2.height}, elapsed time: ${stopwatch.getValue()}`)
+            }
+          }
+
           stopwatch.reset().start()
-          let [ccTxIds, txIds] = await* [
-            this.storage.executeQuery(SQL.select.ccScannedTxIds.unconfirmed),
-            this.storage.executeQuery(SQL.select.transactions.unconfirmed)
-          ]
+          let hash = result.rows[0].hash.toString('hex')
+          let height = result.rows[0].height
+          let txIds = result.rows[0].txids.toString('hex')
+          let toUpdate = await* _.range(txIds.length / 64).map(async (i) => {
+            let txId = txIds.slice(i * 64, (i + 1) * 64)
+            if (!(await this._addTx(client, txId, hash, height))) {
+              return txId
+            }
+          })
 
-          ccTxIds = ccTxIds.rows.map((row) => row.txid.toString('hex'))
-          txIds = txIds.rows.map((row) => row.txid.toString('hex'))
-
-          // remove
-          for (let txId of _.difference(ccTxIds, txIds)) {
-            this.removeTx(txId)
-          }
-
-          // add
-          for (let txId of _.difference(txIds, ccTxIds)) {
-            this.addTx(txId)
-          }
-
-          logger.info(`Unconfirmed updated, elapsed time: ${stopwatch.getValue()}`)
-          running = false
-        }
+          await client.queryAsync(SQL.update.ccScannedTxIds.makeConfirmed, [
+            _.filter(toUpdate).map((txId) => `\\x${txId}`),
+            `\\x${hash}`,
+            height
+          ])
+          logger.info(`Import block ${hash}:${height}, elapsed time: ${stopwatch.getValue()}`)
+        })
       } catch (err) {
         logger.error(`Update error: ${err.stack}`)
+      }
+    }
+
+    // update unconfirmed
+    while (true) {
+      try {
+        stopwatch.reset().start()
+        let [ccTxIds, txIds] = await* [
+          this.storage.executeQuery(SQL.select.ccScannedTxIds.unconfirmed),
+          this.storage.executeQuery(SQL.select.transactions.unconfirmed)
+        ]
+
+        ccTxIds = ccTxIds.rows.map((row) => row.txid.toString('hex'))
+        txIds = txIds.rows.map((row) => row.txid.toString('hex'))
+
+        // remove
+        for (let txId of _.difference(ccTxIds, txIds)) {
+          this.removeTx(txId)
+        }
+
+        // add
+        for (let txId of _.difference(txIds, ccTxIds)) {
+          this.addTx(txId)
+        }
+
+        logger.info(`Unconfirmed updated, elapsed time: ${stopwatch.getValue()}`)
+
+        break
+      } catch (err) {
+        logger.error(`Update (unconfirmed) error: ${err.stack}`)
       }
     }
   }
