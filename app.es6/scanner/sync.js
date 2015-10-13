@@ -350,54 +350,6 @@ export default class Sync extends EventEmitter {
   }
 
   /**
-   * @param {string[]} txIds
-   * @return {Promise<string[]>}
-   */
-  async _updateBitcoindMempool (txIds) {
-    let {rows} = await this._storage.executeQuery(
-      SQL.select.transactions.byTxIds, [txIds.map((txId) => `\\x${txId}`)])
-
-    let txs = util.toposort(rows.map((row) => bitcore.Transaction(row.tx)))
-    let notAddedTxIds = []
-
-    for (let tx of txs) {
-      try {
-        await this._network.sendTx(tx.toString())
-      } catch (err) {
-        notAddedTxIds.push(tx.id)
-      }
-    }
-
-    return notAddedTxIds
-  }
-
-  /**
-   * @param {string[]} rTxIds
-   * @return {Promise}
-   */
-  async _removeUnconfirmedTxIds (rTxIds) {
-    for (let start = 0; start < rTxIds.length; start += 250) {
-      let txIds = rTxIds.slice(start, start + 250)
-      await this._storage.executeTransaction(async (client) => {
-        while (txIds.length > 0) {
-          let params = [txIds.map((txId) => `\\x${txId}`)]
-          await* [
-            client.queryAsync(SQL.delete.transactions.unconfirmedByTxIds, params),
-            client.queryAsync(SQL.delete.history.unconfirmedByTxIds, params)
-          ]
-          await* _.flattenDeep([
-            client.queryAsync(SQL.update.history.deleteUnconfirmedInputsByTxIds, params),
-            txIds.map((txId) => this._service.removeTx(txId, false, {client: client}))
-          ])
-
-          let {rows} = await client.queryAsync(SQL.select.history.dependUnconfirmedTxIds, params)
-          txIds = rows.map((row) => row.txid.toString('hex'))
-        }
-      })
-    }
-  }
-
-  /**
    * @param {boolean} [updateBitcoindMempool=false]
    * @return {Promise}
    */
@@ -499,6 +451,17 @@ export default class Sync extends EventEmitter {
       }
     }
 
+    this._runMempoolUpdate(updateBitcoindMempool)
+  }
+
+  /**
+   * @param {boolean} [updateBitcoindMempool=false]
+   * @return {Promise}
+   */
+  @makeConcurrent({concurrency: 1})
+  async _runMempoolUpdate (updateBitcoindMempool) {
+    let stopwatch = new ElapsedTime()
+
     while (true) {
       // sync with bitcoind mempool
       try {
@@ -514,10 +477,41 @@ export default class Sync extends EventEmitter {
         // remove tx that not in mempool but in our storage
         let rTxIds = _.difference(sTxIds, nTxIds)
         if (rTxIds.length > 0 && updateBitcoindMempool) {
-          rTxIds = await this._updateBitcoindMempool(rTxIds)
+          let {rows} = await this._storage.executeQuery(
+            SQL.select.transactions.byTxIds, [rTxIds.map((txId) => `\\x${txId}`)])
+
+          rTxIds = []
+
+          let txs = util.toposort(rows.map((row) => bitcore.Transaction(row.tx)))
+          for (let tx of txs) {
+            try {
+              await this._network.sendTx(tx.toString())
+            } catch (err) {
+              rTxIds.push(tx.id)
+            }
+          }
         }
+
         if (rTxIds.length > 0) {
-          await this._removeUnconfirmedTxIds(rTxIds)
+          for (let start = 0; start < rTxIds.length; start += 250) {
+            let txIds = rTxIds.slice(start, start + 250)
+            await this._storage.executeTransaction(async (client) => {
+              while (txIds.length > 0) {
+                let params = [txIds.map((txId) => `\\x${txId}`)]
+                await* [
+                  client.queryAsync(SQL.delete.transactions.unconfirmedByTxIds, params),
+                  client.queryAsync(SQL.delete.history.unconfirmedByTxIds, params)
+                ]
+                await* _.flattenDeep([
+                  client.queryAsync(SQL.update.history.deleteUnconfirmedInputsByTxIds, params),
+                  txIds.map((txId) => this._service.removeTx(txId, false, {client: client}))
+                ])
+
+                let {rows} = await client.queryAsync(SQL.select.history.dependUnconfirmedTxIds, params)
+                txIds = rows.map((row) => row.txid.toString('hex'))
+              }
+            })
+          }
         }
 
         // add skipped tx in our storage
@@ -549,6 +543,7 @@ export default class Sync extends EventEmitter {
     await this._runBlockImport(true)
 
     // set handlers
+    this._network.on('connect', () => this._runMempoolUpdate(true))
     this._network.on('tx', ::this._runTxImport)
     this._network.on('block', ::this._runBlockImport)
 

@@ -12,6 +12,10 @@ import logger from '../lib/logger'
 import util from '../lib/util'
 
 /**
+ * @event Network#connect
+ */
+
+/**
  * @event Network#block
  * @param {string} hash
  */
@@ -139,6 +143,7 @@ export default class Network extends EventEmitter {
     this._peer.on('ready', () => {
       logger.info(
         `Peer ${this._peer.host}:${this._peer.port} is ready (version: ${this._peer.version}, subversion: ${this._peer.subversion}, bestHeight: ${this._peer.bestHeight})`)
+      this.emit('connect')
     })
 
     // waiting peer ready
