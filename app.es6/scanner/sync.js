@@ -189,7 +189,7 @@ export default class Sync extends EventEmitter {
           pImportInputs,
           pImportOutputs,
           this._service.broadcastTx(txId, null, null, {client: client}),
-          this._service.addTx(txId, {client: client})
+          this._service.addTx(txId, false, {client: client})
         ])
 
         logger.verbose(`Import unconfirmed tx ${txId}, elapsed time: ${stopwatch.getValue()}`)
@@ -299,7 +299,7 @@ export default class Sync extends EventEmitter {
         return [
           pImportTx,
           this._service.broadcastTx(txId, block.hash, height, {client: client}),
-          this._service.addTx(txId, {client: client}),
+          this._service.addTx(txId, true, {client: client}),
           pBroadcastAddreses
         ]
       })
@@ -387,7 +387,7 @@ export default class Sync extends EventEmitter {
           ]
           await* _.flattenDeep([
             client.queryAsync(SQL.update.history.deleteUnconfirmedInputsByTxIds, params),
-            txIds.map((txId) => this._service.removeTx(txId, {client: client}))
+            txIds.map((txId) => this._service.removeTx(txId, false, {client: client}))
           ])
 
           let {rows} = await client.queryAsync(SQL.select.history.dependUnconfirmedTxIds, params)

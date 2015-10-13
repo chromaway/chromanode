@@ -124,12 +124,30 @@ export default class Service extends EventEmitter {
 
   /**
    * @param {string} txId
+   * @param {boolean} isConfirmed
    * @param {Object} [opts]
    * @param {pg.Client} [opts.client]
    * @return {Promise}
    */
-  removeTx (txId, opts) {
-    return this.messages.notify('removetx', {txId: txId}, opts)
+  addTx (txId, isConfirmed, opts) {
+    return this.messages.notify('addtx', {
+      txId: txId,
+      unconfirmed: !isConfirmed
+    }, opts)
+  }
+
+  /**
+   * @param {string} txId
+   * @param {boolean} isConfirmed
+   * @param {Object} [opts]
+   * @param {pg.Client} [opts.client]
+   * @return {Promise}
+   */
+  removeTx (txId, isConfirmed, opts) {
+    return this.messages.notify('removetx', {
+      txId: txId,
+      unconfirmed: !isConfirmed
+    }, opts)
   }
 
   /**

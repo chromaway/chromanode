@@ -278,8 +278,16 @@ export default class Sync {
 
     // subscribe for tx/block events
     await* [
-      this.messages.listen('addtx', (obj) => this.addTx(obj.txId)),
-      this.messages.listen('removetx', (obj) => this.removeTx(obj.txId)),
+      this.messages.listen('addtx', (obj) => {
+        if (obj.unconfirmed) {
+          this.addTx(obj.txId)
+        }
+      }),
+      this.messages.listen('removetx', (obj) => {
+        if (obj.unconfirmed) {
+          this.removeTx(obj.txId)
+        }
+      }),
       this.messages.listen('addblock', ::this.updateBlocks),
       this.messages.listen('removeblock', ::this.updateBlocks)
     ]
