@@ -203,6 +203,8 @@ export default class Sync {
                 SQL.update.ccScannedTxIds.makeUnconfirmed, [latest2.height])
               logger.warn(`Make reorg to ${latest2.height}, elapsed time: ${stopwatch.getValue()}`)
             }
+          } else {
+            result = await client.queryAsync(SQL.select.blocks.txIdsByHeight, [0])
           }
 
           stopwatch.reset().start()
