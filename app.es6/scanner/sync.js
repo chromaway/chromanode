@@ -13,6 +13,13 @@ import { ZERO_HASH } from '../lib/const'
 import util from '../lib/util'
 import SQL from '../lib/sql'
 
+function callWithLock (target, name, descriptor) {
+  let fn = target[`${name}WithoutLock`] = descriptor.value
+  descriptor.value = async function () {
+    return this._withLock(() => fn.apply(this, arguments))
+  }
+}
+
 /**
  * @event Sync#latest
  * @param {{hash: string, height: number}} latest
@@ -54,6 +61,11 @@ export default class Sync extends EventEmitter {
       orphans: {}  // txId -> txId[]
     }
   }
+
+  /**
+   */
+  @makeConcurrent({concurrency: 1})
+  _withLock (fn) { return fn() }
 
   /**
    * @param {bitcore.Transaction.Output} output
@@ -353,7 +365,7 @@ export default class Sync extends EventEmitter {
    * @param {boolean} [updateBitcoindMempool=false]
    * @return {Promise}
    */
-  @makeConcurrent({concurrency: 1})
+  @callWithLock
   async _runBlockImport (updateBitcoindMempool = false) {
     let stopwatch = new ElapsedTime()
     let block
@@ -394,7 +406,7 @@ export default class Sync extends EventEmitter {
 
           // was reorg found?
           if (latest.hash !== this._latest.hash) {
-            await this._lock.reorgLock(async () => {
+            await this._lock.exclusiveLock(async () => {
               stopwatch.reset().start()
               this._latest = await this._storage.executeTransaction(async (client) => {
                 let {rows} = await client.queryAsync(SQL.select.blocks.fromHeight, [latest.height])
@@ -451,14 +463,14 @@ export default class Sync extends EventEmitter {
       }
     }
 
-    this._runMempoolUpdate(updateBitcoindMempool)
+    await this._runMempoolUpdateWithoutLock(updateBitcoindMempool)
   }
 
   /**
    * @param {boolean} [updateBitcoindMempool=false]
    * @return {Promise}
    */
-  @makeConcurrent({concurrency: 1})
+  @callWithLock
   async _runMempoolUpdate (updateBitcoindMempool) {
     let stopwatch = new ElapsedTime()
 
@@ -474,7 +486,6 @@ export default class Sync extends EventEmitter {
 
         sTxIds = sTxIds.rows.map((row) => row.txid.toString('hex'))
 
-        // remove tx that not in mempool but in our storage
         let rTxIds = _.difference(sTxIds, nTxIds)
         if (rTxIds.length > 0 && updateBitcoindMempool) {
           let {rows} = await this._storage.executeQuery(
@@ -483,7 +494,8 @@ export default class Sync extends EventEmitter {
           rTxIds = []
 
           let txs = util.toposort(rows.map((row) => bitcore.Transaction(row.tx)))
-          for (let tx of txs) {
+          while (txs.length > 0) {
+            let tx = txs.pop()
             try {
               await this._network.sendTx(tx.toString())
             } catch (err) {
@@ -492,26 +504,32 @@ export default class Sync extends EventEmitter {
           }
         }
 
+        // remove tx that not in mempool but in our storage
         if (rTxIds.length > 0) {
-          for (let start = 0; start < rTxIds.length; start += 250) {
-            let txIds = rTxIds.slice(start, start + 250)
-            await this._storage.executeTransaction(async (client) => {
-              while (txIds.length > 0) {
-                let params = [txIds.map((txId) => `\\x${txId}`)]
-                await* [
-                  client.queryAsync(SQL.delete.transactions.unconfirmedByTxIds, params),
-                  client.queryAsync(SQL.delete.history.unconfirmedByTxIds, params)
-                ]
-                await* _.flattenDeep([
-                  client.queryAsync(SQL.update.history.deleteUnconfirmedInputsByTxIds, params),
-                  txIds.map((txId) => this._service.removeTx(txId, false, {client: client}))
-                ])
+          await this._lock.exclusiveLock(async () => {
+            for (let start = 0; start < rTxIds.length; start += 250) {
+              let txIds = rTxIds.slice(start, start + 250)
+              await this._storage.executeTransaction(async (client) => {
+                while (txIds.length > 0) {
+                  let result = await client.queryAsync(
+                    SQL.delete.transactions.unconfirmedByTxIds, [txIds.map((txId) => `\\x${txId}`)])
+                  if (result.rows.length === 0) {
+                    return
+                  }
 
-                let {rows} = await client.queryAsync(SQL.select.history.dependUnconfirmedTxIds, params)
-                txIds = rows.map((row) => row.txid.toString('hex'))
-              }
-            })
-          }
+                  let removedTxIds = result.rows.map((row) => row.txid.toString('hex'))
+                  let params = [removedTxIds.map((txId) => `\\x${txId}`)]
+
+                  await client.queryAsync(SQL.delete.history.unconfirmedByTxIds, params)
+                  await client.queryAsync(SQL.update.history.deleteUnconfirmedInputsByTxIds, params)
+                  await* removedTxIds.map((txId) => this._service.removeTx(txId, false, {client: client}))
+
+                  result = await client.queryAsync(SQL.select.history.dependUnconfirmedTxIds, params)
+                  txIds = result.rows.map((row) => row.txid.toString('hex'))
+                }
+              })
+            }
+          })
         }
 
         // add skipped tx in our storage

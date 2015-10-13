@@ -391,6 +391,7 @@ export default {
                                        SET
                                          itxid = NULL
                                        WHERE
+                                         iheight IS NULL AND
                                          itxid = ANY($1)`
     },
     ccScannedTxIds: {
@@ -415,10 +416,18 @@ export default {
       fromHeight: `DELETE FROM blocks WHERE height > $1`
     },
     transactions: {
-      unconfirmedByTxIds: `DELETE FROM transactions WHERE txid = ANY($1)`
+      unconfirmedByTxIds: `DELETE FROM
+                             transactions
+                           WHERE
+                             height IS NULL AND
+                             txid = ANY($1) RETURNING txid`
     },
     history: {
-      unconfirmedByTxIds: `DELETE FROM history WHERE otxid = ANY($1)`
+      unconfirmedByTxIds: `DELETE FROM
+                             history
+                           WHERE
+                             oheight IS NULL AND
+                             otxid = ANY($1)`
     },
     newTx: {
       byId: `DELETE FROM new_txs WHERE id = $1 RETURNING tx`

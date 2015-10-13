@@ -67,7 +67,7 @@ class SmartLock {
    */
   constructor () {
     this._locks = {}
-    this._reorgPromise = null
+    this._exclusivePromise = null
   }
 
   /**
@@ -88,14 +88,15 @@ class SmartLock {
             this._locks[txId] = lockPromise
             lockedTxIds.push(txId)
           }
+
           break
         }
 
         await* locks
       }
 
-      if (this._reorgPromise !== null) {
-        await this._reorgPromise
+      if (this._exclusivePromise !== null) {
+        await this._exclusivePromise
       }
 
       return await fn()
@@ -112,15 +113,15 @@ class SmartLock {
    * @param {function} fn
    * @return {Promise}
    */
-  async reorgLock (fn) {
+  async exclusiveLock (fn) {
     let lockResolve
-    this._reorgPromise = new Promise((resolve) => lockResolve = resolve)
+    this._exclusivePromise = new Promise((resolve) => lockResolve = resolve)
 
     try {
       await* _.values(this._locks)
       return await fn()
     } finally {
-      this._reorgPromise = null
+      this._exclusivePromise = null
       lockResolve()
     }
   }
