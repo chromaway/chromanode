@@ -52,7 +52,8 @@ export default class Network extends EventEmitter {
       port: config.get('bitcoind.rpc.port'),
       user: config.get('bitcoind.rpc.user'),
       pass: config.get('bitcoind.rpc.pass'),
-      ssl: config.get('bitcoind.rpc.protocol') === 'https'
+      ssl: config.get('bitcoind.rpc.protocol') === 'https',
+      concurrency: 128
     })
 
     // request info
