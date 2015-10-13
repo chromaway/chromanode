@@ -259,7 +259,15 @@ export default {
                 history
               WHERE
                 otxid = $1 AND
-                oindex = $2`
+                oindex = $2`,
+      dependUnconfirmedTxIds: `SELECT
+                                 itxid AS txid
+                               FROM
+                                 history
+                               WHERE
+                                 itxid IS NOT NULL AND
+                                 iheight IS NULL AND
+                                 otxid = ANY($1)`
     },
     ccScannedTxIds: {
       latestBlock: `SELECT

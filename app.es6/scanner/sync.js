@@ -378,16 +378,21 @@ export default class Sync extends EventEmitter {
   async _removeUnconfirmedTxIds (rTxIds) {
     for (let start = 0; start < rTxIds.length; start += 250) {
       let txIds = rTxIds.slice(start, start + 250)
-      let params = [txIds.map((txId) => `\\x${txId}`)]
       await this._storage.executeTransaction(async (client) => {
-        await* [
-          client.queryAsync(SQL.delete.transactions.unconfirmedByTxIds, params),
-          client.queryAsync(SQL.delete.history.unconfirmedByTxIds, params)
-        ]
-        await* _.flattenDeep([
-          client.queryAsync(SQL.update.history.deleteUnconfirmedInputsByTxIds, params),
-          txIds.map((txId) => this._service.removeTx(txId, {client: client}))
-        ])
+        while (txIds.length > 0) {
+          let params = [txIds.map((txId) => `\\x${txId}`)]
+          await* [
+            client.queryAsync(SQL.delete.transactions.unconfirmedByTxIds, params),
+            client.queryAsync(SQL.delete.history.unconfirmedByTxIds, params)
+          ]
+          await* _.flattenDeep([
+            client.queryAsync(SQL.update.history.deleteUnconfirmedInputsByTxIds, params),
+            txIds.map((txId) => this._service.removeTx(txId, {client: client}))
+          ])
+
+          let {rows} = await client.queryAsync(SQL.select.history.dependUnconfirmedTxIds, params)
+          txIds = rows.map((row) => row.txid.toString('hex'))
+        }
       })
     }
   }
