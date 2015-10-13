@@ -205,6 +205,7 @@ export default class Sync extends EventEmitter {
   /**
    * @param {string} txId
    */
+  @makeConcurrent({concurrency: 10}) // Or we get Allocation failed when importing huge mempool
   async _runTxImport (txId) {
     try {
       // get tx from bitcoind
