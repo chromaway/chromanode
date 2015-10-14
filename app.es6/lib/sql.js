@@ -269,6 +269,9 @@ export default {
                                  iheight IS NULL AND
                                  otxid = ANY($1)`
     },
+    newTxs: {
+      all: `SELECT id FROM new_txs`
+    },
     ccScannedTxIds: {
       latestBlock: `SELECT
                       blockhash AS blockhash,

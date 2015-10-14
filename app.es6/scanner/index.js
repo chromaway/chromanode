@@ -40,6 +40,7 @@ export default async function () {
       }
     }
   }
+  let sendTxDeferreds = {}
 
   let storage = new Storage()
   let messages = new Messages({storage: storage})
@@ -89,9 +90,42 @@ export default async function () {
   network.on('block', onNewBlock)
   await onNewBlock()
 
+  // create sync process
+  let sync = new Sync(storage, network, service)
+  sync.on('latest', (latest) => {
+    status.latest = latest
+
+    let value = latest.height / status.bitcoind.latest.height
+    let fixedValue = value.toFixed(4)
+    if (status.progress !== fixedValue) {
+      logger.warn(`Sync progress: ${value.toFixed(6)} (${latest.height} of ${status.bitcoind.latest.height})`)
+      status.progress = fixedValue
+      broadcastStatus()
+    }
+  })
+
+  await sync.run()
+  // drop old listeners (for latest event that out info to console)
+  sync.removeAllListeners()
+
+  // broadcast status on latest
+  sync.on('latest', (latest) => {
+    status.latest = latest
+    broadcastStatus()
+  })
+
+  // resolve deferred object for sending tx
+  sync.on('tx', (txId) => {
+    let deferred = sendTxDeferreds[txId]
+    if (deferred !== undefined) {
+      deferred.resolve()
+      clearTimeout(deferred.timeoutId)
+      delete sendTxDeferreds[txId]
+    }
+  })
+
   // setup listener for event sendTx from services
-  let sendTxDeferreds = {}
-  service.on('sendTx', async (id) => {
+  let onSendTx = async (id) => {
     let txId
     let _err = null
 
@@ -125,37 +159,12 @@ export default async function () {
     }
 
     await service.sendTxResponse(id, _err)
-  })
+  }
+  service.on('sendTx', onSendTx)
 
-  // create sync process
-  let sync = new Sync(storage, network, service)
-  sync.on('latest', (latest) => {
-    status.latest = latest
-
-    let value = latest.height / status.bitcoind.latest.height
-    let fixedValue = value.toFixed(4)
-    if (status.progress !== fixedValue) {
-      logger.warn(`Sync progress: ${value.toFixed(6)} (${latest.height} of ${status.bitcoind.latest.height})`)
-      status.progress = fixedValue
-      broadcastStatus()
-    }
-  })
-
-  await sync.run()
-
-  sync.removeAllListeners()
-
-  sync.on('latest', (latest) => {
-    status.latest = latest
-    broadcastStatus()
-  })
-
-  sync.on('tx', (txId) => {
-    let deferred = sendTxDeferreds[txId]
-    if (deferred !== undefined) {
-      deferred.resolve()
-      clearTimeout(deferred.timeoutId)
-      delete sendTxDeferreds[txId]
-    }
-  })
+  // get all waiting ids for sending transacitons
+  let {rows} = await storage.executeQuery(SQL.select.newTxs.all)
+  for (let row of rows) {
+    onSendTx(row.id)
+  }
 }
