@@ -181,27 +181,31 @@ export default class Sync {
               return
             }
 
-            let latest2 = latest
+            let hash = latest.hash
+            let height = latest.height
+            if (height >= result.rows[0].height) {
+              height = result.rows[0].height - 1
+              let {rows} = await client.queryAsync(SQL.select.ccScannedTxIds.blockHash, [height])
+              hash = rows[0].blockhash.toString('hex')
+            }
+
             while (true) {
-              let height = Math.min(latest2.height + 1, result.rows[0].height)
-              result = await client.queryAsync(SQL.select.blocks.txIdsByHeight, [height])
+              result = await client.queryAsync(SQL.select.blocks.txIdsByHeight, [height + 1])
               let header = bitcore.Block.BlockHeader(result.rows[0].header)
-              if (latest2.hash === util.encode(header.prevHash)) {
+              if (hash === util.encode(header.prevHash)) {
                 break
               }
 
-              result = await client.queryAsync(SQL.select.ccScannedTxIds.blockHash, [height - 1])
-              latest2 = {
-                hash: result.rows[0].blockhash.toString('hex'),
-                height: result.rows[0].height
-              }
+              height -= 1
+              let {rows} = await client.queryAsync(SQL.select.ccScannedTxIds.blockHash, [height])
+              hash = rows[0].blockhash.toString('hex')
             }
 
-            if (latest2.hash !== latest.hash) {
+            if (hash !== latest.hash) {
               stopwatch.reset().start()
               await client.queryAsync(
-                SQL.update.ccScannedTxIds.makeUnconfirmed, [latest2.height])
-              logger.warn(`Make reorg to ${latest2.height}, elapsed time: ${stopwatch.getValue()}`)
+                SQL.update.ccScannedTxIds.makeUnconfirmed, [height])
+              logger.warn(`Make reorg to ${height}, elapsed time: ${stopwatch.getValue()}`)
             }
           } else {
             result = await client.queryAsync(SQL.select.blocks.txIdsByHeight, [0])
