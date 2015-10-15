@@ -56,13 +56,13 @@ function query (req) {
       rows = rows.map((row) => {
         return {
           txid: row.otxid.toString('hex'),
-          vout: row.oindex,
+          vount: row.oindex,
           value: parseInt(row.ovalue, 10),
           script: row.oscript.toString('hex'),
           height: row.oheight
         }
       })
-      .unique((row) => `${row.txid}:${row.vout}`)
+      .unique((row) => `${row.txid}:${row.vount}`)
     } else {
       rows = rows
         .map((row) => {

@@ -105,7 +105,7 @@ export default function (opts) {
             if (txOut.result !== null) {
               unspent.push({
                 txid: row.txid,
-                vout: index,
+                vount: index,
                 value: output.satoshis,
                 script: output.script.toHex(),
                 height: row.height
@@ -114,7 +114,7 @@ export default function (opts) {
           }
         }
       }, {concurrency: 10})
-      unspent = _.sortByAll(unspent, 'height', 'txid', 'vout')
+      unspent = _.sortByAll(unspent, 'height', 'txid', 'vount')
 
       // get latest
       latest = {
@@ -145,7 +145,7 @@ export default function (opts) {
       expect(result).to.be.an('Object')
 
       let sortedResult = {
-        unspent: _.sortByAll(result.unspent, 'height', 'txid', 'vout'),
+        unspent: _.sortByAll(result.unspent, 'height', 'txid', 'vount'),
         latest: result.latest
       }
       expect(sortedResult).to.deep.equal({unspent: unspent, latest: latest})
