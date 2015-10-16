@@ -409,17 +409,23 @@ export default class Sync extends EventEmitter {
             await this._lock.exclusiveLock(async () => {
               stopwatch.reset().start()
               this._latest = await this._storage.executeTransaction(async (client) => {
-                let {rows} = await client.queryAsync(SQL.select.blocks.fromHeight, [latest.height])
+                let blocks = await client.queryAsync(SQL.delete.blocks.fromHeight, [latest.height])
+                let txs = await client.queryAsync(SQL.update.transactions.makeUnconfirmed, [latest.height])
+                let hist1 = await client.queryAsync(SQL.update.history.makeOutputsUnconfirmed, [latest.height])
+                let hist2 = await client.queryAsync(SQL.update.history.makeInputsUnconfirmed, [latest.height])
 
                 await* _.flattenDeep([
-                  client.queryAsync(SQL.delete.blocks.fromHeight, [latest.height]),
-                  client.queryAsync(SQL.update.transactions.makeUnconfirmed, [latest.height]),
-                  PUtils.try(async () => {
-                    await client.queryAsync(SQL.update.history.makeOutputsUnconfirmed, [latest.height])
-                    await client.queryAsync(SQL.update.history.makeInputsUnconfirmed, [latest.height])
+                  blocks.rows.map((row) => {
+                    return this._service.removeBlock(
+                      row.hash.toString('hex'), {client: client})
                   }),
-                  rows.map((row) => {
-                    return this._service.removeBlock(row.hash.toString('hex'), {client: client})
+                  txs.rows.map((row) => {
+                    return this._service.broadcastTx(
+                      row.txid.toString('hex'), null, null, {client: client})
+                  }),
+                  hist1.rows.concat(hist2.rows).map((row) => {
+                    return this._service.broadcastAddress(
+                      row.address.toString(), row.txid.toString('hex'), null, null, {client: client})
                   })
                 ])
 

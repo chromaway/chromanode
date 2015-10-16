@@ -115,12 +115,6 @@ export default {
                    blocks
                  WHERE
                    height = $1`,
-      fromHeight: `SELECT
-                     hash AS hash
-                   FROM
-                     blocks
-                   WHERE
-                     height >= $1`,
       txIdsByHeight: `SELECT
                         height AS height,
                         hash AS hash,
@@ -341,7 +335,9 @@ export default {
                         SET
                           height = NULL
                         WHERE
-                          height > $1`
+                          height > $1
+                        RETURNING
+                          txid`
     },
     history: {
       addConfirmedInput: `UPDATE
@@ -376,7 +372,10 @@ export default {
                                SET
                                  oheight = NULL
                                WHERE
-                                 oheight > $1`,
+                                 oheight > $1
+                               RETURNING
+                                 address AS address,
+                                 otxid AS txid`,
       makeInputConfirmed: `UPDATE
                              history
                            SET
@@ -391,7 +390,10 @@ export default {
                               SET
                                 iheight = NULL
                               WHERE
-                                iheight > $1`,
+                                iheight > $1
+                              RETURNING
+                                address AS address,
+                                itxid AS txid`,
       deleteUnconfirmedInputsByTxIds: `UPDATE
                                          history
                                        SET
@@ -419,14 +421,16 @@ export default {
   },
   delete: {
     blocks: {
-      fromHeight: `DELETE FROM blocks WHERE height > $1`
+      fromHeight: `DELETE FROM blocks WHERE height > $1 RETURNING hash`
     },
     transactions: {
       unconfirmedByTxIds: `DELETE FROM
                              transactions
                            WHERE
                              height IS NULL AND
-                             txid = ANY($1) RETURNING txid`
+                             txid = ANY($1)
+                           RETURNING
+                             txid`
     },
     history: {
       unconfirmedByTxIds: `DELETE FROM
