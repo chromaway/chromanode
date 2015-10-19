@@ -304,8 +304,8 @@ PeerSync.prototype._updateMempool = function () {
       return row.txid.toString('hex')
     })
 
-    var toRemove = _.partial(_.without, mTxIds).apply(null, nTxIds)
-    var toAdd = _.partial(_.without, nTxIds).apply(null, mTxIds)
+    var toRemove = _.difference(mTxIds, nTxIds)
+    var toAdd = _.difference(nTxIds, mTxIds)
 
     return Promise.try(function () {
       if (toRemove.length === 0) {
