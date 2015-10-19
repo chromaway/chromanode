@@ -316,11 +316,14 @@ export default {
       coinsByDesc: `SELECT
                       cclib_data.txid AS txid,
                       cclib_data.oidx AS oidx,
-                      cclib_data.value AS value
+                      cclib_data.value AS value,
+                      cc_scanned_txids.height AS height
                     FROM
                       cclib_definitions
                     INNER JOIN
                       cclib_data ON cclib_definitions.id = cclib_data.color_id
+                    INNER JOIN
+                      cc_scanned_txids ON cc_scanned_txids.txid = decode(cclib_data.txid, 'HEX')
                     WHERE
                       cclib_definitions.cdesc = $1`
     }
