@@ -127,14 +127,17 @@ export default function (opts) {
           coins: [{
             txId: gTx.id,
             outIndex: 0,
+            height: null,
             colorValue: 500000
           }, {
             txId: tTx.id,
             outIndex: 0,
+            height: null,
             colorValue: 100000
           }, {
             txId: tTx.id,
             outIndex: 1,
+            height: null,
             colorValue: 400000
           }]
         })

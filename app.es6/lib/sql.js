@@ -323,7 +323,7 @@ export default {
                     INNER JOIN
                       cclib_data ON cclib_definitions.id = cclib_data.color_id
                     INNER JOIN
-                      cc_scanned_txids ON cc_scanned_txids.txid = decode(cclib_data.txid, 'HEX')
+                      cc_scanned_txids ON cc_scanned_txids.txid = decode(cclib_data.txid, 'hex')
                     WHERE
                       cclib_definitions.cdesc = $1`
     }

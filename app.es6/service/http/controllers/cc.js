@@ -28,7 +28,7 @@ v2.getAllColoredCoins = (req, res) => {
         return {
           txId: row.txid.toString('hex'),
           outIndex: row.oidx,
-          height:row.height,
+          height: row.height,
           colorValue: JSON.parse(row.value)
         }
       })

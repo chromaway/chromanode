@@ -114,16 +114,6 @@ export default class Service extends EventEmitter {
 
   /**
    * @param {string} txId
-   * @param {Object} [opts]
-   * @param {pg.Client} [opts.client]
-   * @return {Promise}
-   */
-  addTx (txId, opts) {
-    return this.messages.notify('addtx', {txId: txId}, opts)
-  }
-
-  /**
-   * @param {string} txId
    * @param {boolean} isConfirmed
    * @param {Object} [opts]
    * @param {pg.Client} [opts.client]
