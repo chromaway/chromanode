@@ -526,12 +526,11 @@ export default class Sync extends EventEmitter {
                   let removedTxIds = result.rows.map((row) => row.txid.toString('hex'))
                   let params = [removedTxIds.map((txId) => `\\x${txId}`)]
 
-                  await client.queryAsync(SQL.delete.history.unconfirmedByTxIds, params)
+                  result = await client.queryAsync(SQL.delete.history.unconfirmedByTxIds, params)
+                  txIds = _.filter(result.rows, 'txid').map((row) => row.txid.toString('hex'))
+
                   await client.queryAsync(SQL.update.history.deleteUnconfirmedInputsByTxIds, params)
                   await* removedTxIds.map((txId) => this._service.removeTx(txId, false, {client: client}))
-
-                  result = await client.queryAsync(SQL.select.history.dependUnconfirmedTxIds, params)
-                  txIds = result.rows.map((row) => row.txid.toString('hex'))
                 }
               })
             }

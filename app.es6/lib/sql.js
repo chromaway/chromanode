@@ -253,15 +253,7 @@ export default {
                 history
               WHERE
                 otxid = $1 AND
-                oindex = $2`,
-      dependUnconfirmedTxIds: `SELECT
-                                 itxid AS txid
-                               FROM
-                                 history
-                               WHERE
-                                 itxid IS NOT NULL AND
-                                 iheight IS NULL AND
-                                 otxid = ANY($1)`
+                oindex = $2`
     },
     newTxs: {
       all: `SELECT id FROM new_txs`
@@ -437,7 +429,9 @@ export default {
                              history
                            WHERE
                              oheight IS NULL AND
-                             otxid = ANY($1)`
+                             otxid = ANY($1)
+                           RETURNING
+                             itxid AS itxid`
     },
     newTx: {
       byId: `DELETE FROM new_txs WHERE id = $1 RETURNING tx`
