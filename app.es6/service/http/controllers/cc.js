@@ -64,10 +64,10 @@ v2.getTxColorValues = (req, res) => {
     }
 
     let tx = await getTxFn(req.body.txId)
-    let result = await cdata.getTxColorValues(tx, outIndices, cdefCls, getTxFn)
+    let result = await cdata.getOutColorValues(tx, outIndices, cdefCls, getTxFn)
 
     let outColorValues = new Array(tx.outputs.length).fill(null)
-    for (let outColorValues2 of result.outputs.values()) {
+    for (let outColorValues2 of result.values()) {
       for (let [outIndex, colorValue] of outColorValues2.entries()) {
         if (colorValue !== null) {
           // output have multiple colors
