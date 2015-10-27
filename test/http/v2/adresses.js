@@ -1,6 +1,6 @@
 import _ from 'lodash'
 import { expect } from 'chai'
-import bitcore from 'bitcore'
+import bitcore from 'bitcore-lib'
 import PUtils from 'promise-useful-utils'
 
 const ZERO_HASH = new Array(65).join('0')

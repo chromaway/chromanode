@@ -2,7 +2,7 @@ import _ from 'lodash'
 import { setImmediate } from 'timers'
 import makeConcurrent from 'make-concurrent'
 import PUtils from 'promise-useful-utils'
-import bitcore from 'bitcore'
+import bitcore from 'bitcore-lib'
 
 import config from '../lib/config'
 import logger from '../lib/logger'

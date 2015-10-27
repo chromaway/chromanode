@@ -1,5 +1,5 @@
 import _ from 'lodash'
-import bitcore from 'bitcore'
+import bitcore from 'bitcore-lib'
 import assert from 'assert'
 
 import config from '../../../lib/config'

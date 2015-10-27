@@ -1,5 +1,5 @@
 import _ from 'lodash'
-import bitcore from 'bitcore'
+import bitcore from 'bitcore-lib'
 
 import errors from '../../../lib/errors'
 import util from '../../../lib/util'

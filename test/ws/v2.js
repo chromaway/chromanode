@@ -1,7 +1,7 @@
 import _ from 'lodash'
 import { expect } from 'chai'
 import io from 'socket.io-client'
-import bitcore from 'bitcore'
+import bitcore from 'bitcore-lib'
 import PUtils from 'promise-useful-utils'
 
 export default function (opts) {

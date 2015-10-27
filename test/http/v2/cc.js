@@ -1,6 +1,6 @@
 import _ from 'lodash'
 import { expect } from 'chai'
-import bitcore from 'bitcore'
+import bitcore from 'bitcore-lib'
 import cclib from 'coloredcoinjs-lib'
 import PUtils from 'promise-useful-utils'
 

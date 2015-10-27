@@ -1,6 +1,6 @@
 import _ from 'lodash'
 import { expect } from 'chai'
-import bitcore from 'bitcore'
+import bitcore from 'bitcore-lib'
 import p2p from 'bitcore-p2p'
 
 export default function (opts) {

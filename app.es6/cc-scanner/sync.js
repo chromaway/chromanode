@@ -1,7 +1,7 @@
 import _ from 'lodash'
 import makeConcurrent from 'make-concurrent'
 import { autobind } from 'core-decorators'
-import bitcore from 'bitcore'
+import bitcore from 'bitcore-lib'
 import cclib from 'coloredcoinjs-lib'
 import ElapsedTime from 'elapsed-time'
 

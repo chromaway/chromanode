@@ -3,7 +3,7 @@ import 'source-map-support/register'
 import yargs from 'yargs'
 import fs from 'fs'
 import Yaml from 'js-yaml'
-import bitcore from 'bitcore'
+import bitcore from 'bitcore-lib'
 
 import errors from './errors'
 

@@ -2,7 +2,7 @@ import _ from 'lodash'
 import { EventEmitter } from 'events'
 import { mixin } from 'core-decorators'
 import ReadyMixin from 'ready-mixin'
-import bitcore from 'bitcore'
+import bitcore from 'bitcore-lib'
 import p2p from 'bitcore-p2p'
 import RpcClient from 'bitcoind-rpc-client'
 

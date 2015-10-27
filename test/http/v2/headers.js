@@ -1,6 +1,6 @@
 import _ from 'lodash'
 import { expect } from 'chai'
-import bitcore from 'bitcore'
+import bitcore from 'bitcore-lib'
 
 export default function (opts) {
   let request = require('../request')(opts)

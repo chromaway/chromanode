@@ -1,5 +1,5 @@
 import IO from 'socket.io'
-import { Address } from 'bitcore'
+import { Address } from 'bitcore-lib'
 import PUtils from 'promise-useful-utils'
 
 import config from '../../lib/config'

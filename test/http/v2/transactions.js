@@ -1,6 +1,6 @@
 import _ from 'lodash'
 import { expect } from 'chai'
-import { crypto, Transaction } from 'bitcore'
+import { crypto, Transaction } from 'bitcore-lib'
 import PUtils from 'promise-useful-utils'
 
 export default function (opts) {

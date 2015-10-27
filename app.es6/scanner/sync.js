@@ -1,7 +1,7 @@
 import _ from 'lodash'
 import { EventEmitter } from 'events'
 import { setImmediate } from 'timers'
-import bitcore from 'bitcore'
+import bitcore from 'bitcore-lib'
 import script2addresses from 'script2addresses'
 import ElapsedTime from 'elapsed-time'
 import makeConcurrent from 'make-concurrent'
@@ -72,8 +72,12 @@ export default class Sync extends EventEmitter {
    * @return {string[]}
    */
   _getAddresses (output) {
-    let result = script2addresses(output.script, this._bitcoinNetwork, false)
-    return result.addresses || []
+    if (output.script === null) {
+      return []
+    }
+
+    let result = script2addresses(output.script.toBuffer(), this._bitcoinNetwork, false)
+    return result.addresses
   }
 
   /**
