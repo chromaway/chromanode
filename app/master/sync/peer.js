@@ -96,7 +96,7 @@ PeerSync.prototype._importBlock = function (block, height, client) {
         .then(function (results) {
           var promises = _.chain(results[1].rows)
             .pluck('address')
-            .invoke('toString', 'hex')
+            .invoke('toString')
             .map(function (address) {
               return self._slaves.broadcastAddress(
                 address, txid, block.hash, height, {client: client})
@@ -167,7 +167,7 @@ PeerSync.prototype._importBlock = function (block, height, client) {
         .then(function (result) {
           var promises = _.chain(result.rows)
             .pluck('address')
-            .invoke('toString', 'hex')
+            .invoke('toString')
             .map(function (address) {
               return self._slaves.broadcastAddress(
                 address, txid, block.hash, height, {client: client})
@@ -265,7 +265,7 @@ PeerSync.prototype._importUnconfirmedTx = function (tx) {
         .then(function (result) {
           var promises = _.chain(result.rows)
             .pluck('address')
-            .invoke('toString', 'hex')
+            .invoke('toString')
             .map(function (address) {
               return self._slaves.broadcastAddress(
                 address, txid, null, null, {client: client})
