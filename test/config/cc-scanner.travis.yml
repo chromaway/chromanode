@@ -1,0 +1,10 @@
+chromanode:
+  network: regtest # livenet | testnet | regtest
+
+logger:
+  level: verbose # verbose, info, warning, error
+  filename:
+
+postgresql:
+  url: postgres://postgres@localhost/travis_ci_test
+  poolSize: 10

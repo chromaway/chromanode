@@ -3,9 +3,4 @@ config
 node_modules
 test/config
 
-!config/master.yml
-!config/slave.yml
-!test/config/master.travis.yml
-!test/config/slave.travis.yml
-
 npm-debug.log

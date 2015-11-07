@@ -1,15 +1,29 @@
 sudo: false
 language: node_js
 node_js:
-  - "4"
+  - 4
+  - 5
 addons:
-  postgresql: "9.4"
+  postgresql: 9.4
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      - g++-4.8
+env:
+  global:
+    - CXX=g++-4.8
+  matrix:
+    - TEST_SUITE=lint
+    - TEST_SUITE=test
+matrix:
+  exclude:
+    - node_js: 5
+      env: TEST_SUITE=lint
 before_script:
   - psql -c 'create database travis_ci_test;' -U postgres
   - cp test/config/scanner.travis.yml test/config/scanner.yml
   - cp test/config/cc-scanner.travis.yml test/config/cc-scanner.yml
   - cp test/config/service.travis.yml test/config/service.yml
-env:
-  - TEST_SUITE=lint
-  - TEST_SUITE=test
-script: "npm run-script $TEST_SUITE"
+  - npm run compile
+script: npm run-script $TEST_SUITE
