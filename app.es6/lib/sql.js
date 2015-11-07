@@ -311,6 +311,7 @@ export default {
                     INNER JOIN
                       cc_scanned_txids ON cc_scanned_txids.txid = decode(cclib_data.txid, 'hex')
                     WHERE
+                      cclib_data.value != 'null' AND
                       cclib_definitions.cdesc = $1`
     }
   },
