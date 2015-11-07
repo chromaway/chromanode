@@ -55,7 +55,7 @@ export default async function (app) {
     // check network
     let networkName = config.get('chromanode.network')
     if (bitcore.Networks.get(networkName) === undefined) {
-      throw new errors.InvalidNetwork(name)
+      throw new errors.InvalidNetwork(networkName)
     }
 
     // run app
