@@ -13,6 +13,8 @@
 
 ## Installation
 
+  *Master* is under development, if you want use stable please checkout to one of the stable branches. (v1.0.0, v2.0, etc..)
+
   Clone repository:
 
     $ git clone https://github.com/chromaway/chromanode.git && cd chromanode
