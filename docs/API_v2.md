@@ -373,6 +373,7 @@ That is, given txid and vout find txid and height.
 | outIndex    | output index, may be omitted                                                   |
 | outIndices  | output indices, may be ommited (preferred than outIndex, all index by default) |
 | colorKernel | color kernel code, may be ommited (epobc by default)                           |
+| inputs      | include color values for inputs                                                |
 
     curl http://localhost:3001/v2/cc/getTxColorValues --header "Content-Type:application/json" -d '{"txId": "..."}'
 

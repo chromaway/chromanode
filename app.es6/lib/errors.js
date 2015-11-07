@@ -16,6 +16,7 @@
  *       |    +-- InvalidTxId
  *       |    +-- InvalidSource
  *       |    +-- InvalidStatus
+ *       |    +-- MultipleColors
  *       |    +-- MultipleColorsOutIndex
  *       |    +-- SendTxError
  *       |    +-- ToNotFound
@@ -51,7 +52,7 @@ let spec = {
       {name: 'InvalidTxId', message: '{0}'},
       {name: 'InvalidSource', message: '{0}'},
       {name: 'InvalidStatus', message: '{0}'},
-      {name: 'MultipleColorsOutIndex', message: '{0}'},
+      {name: 'MultipleColors', message: '{0}'},
       {name: 'SendTxError', message: '{0}'},
       {name: 'ToNotFound', message: '{0}'},
       {name: 'TxNotFound', message: '{0}'}

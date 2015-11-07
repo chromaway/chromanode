@@ -170,14 +170,24 @@ export default function (opts) {
         })
       })
 
-      it('use outIndex', async () => {
-        let result = await request.post('/v2/cc/getTxColorValues', {txId: tTx.id, outIndex: 0})
+      it('use outIndex with inputs is true', async () => {
+        let result = await request.post('/v2/cc/getTxColorValues', {
+          txId: tTx.id,
+          outIndex: 0,
+          inputs: true
+        })
         expect(result).to.deep.equal({
           colorValues: [{
             color: `epobc:${gTx.id}:0:0`,
             value: 100000
           },
           null,
+          null
+          ],
+          inputColorValues: [{
+            color: `epobc:${gTx.id}:0:0`,
+            value: 500000
+          },
           null
           ]
         })

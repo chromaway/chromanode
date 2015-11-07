@@ -38,6 +38,11 @@ v2.getAllColoredCoins = (req, res) => {
 
 v2.getTxColorValues = (req, res) => {
   res.promise((async () => {
+    let includeInputs = req.body.inputs
+    if (includeInputs === undefined) {
+      includeInputs = false
+    }
+
     let outIndices = req.body.outIndices
     if (outIndices === undefined && req.body.outIndex !== undefined) {
       outIndices = [req.body.outIndex]
@@ -64,33 +69,54 @@ v2.getTxColorValues = (req, res) => {
     }
 
     let tx = await getTxFn(req.body.txId)
-    let result = await cdata.getOutColorValues(tx, outIndices, cdefCls, getTxFn)
+    let result
+    if (includeInputs) {
+      result = await cdata.getTxColorValues(tx, outIndices, cdefCls, getTxFn)
+    } else {
+      result = {
+        outputs: await cdata.getOutColorValues(tx, outIndices, cdefCls, getTxFn)
+      }
+    }
 
-    let outColorValues = new Array(tx.outputs.length).fill(null)
-    for (let outColorValues2 of result.values()) {
-      for (let [outIndex, colorValue] of outColorValues2.entries()) {
+    var response = {
+      colorValues: new Array(tx.outputs.length).fill(null)
+    }
+
+    for (let colorValues of result.outputs.values()) {
+      for (let [outIndex, colorValue] of colorValues.entries()) {
         if (colorValue !== null) {
           // output have multiple colors
-          if (outColorValues[outIndex] !== null) {
-            throw new errors.Service.MultipleColorsOutIndex(`${colorValue.toString()} and ${outColorValues[outIndex].toString()}`)
+          if (response.colorValues[outIndex] !== null) {
+            throw new errors.Service.MultipleColor(`${colorValue.toString()} and ${response.colorValues[outIndex].toString()}`)
           }
 
-          outColorValues[outIndex] = colorValue
+          response.colorValues[outIndex] = {
+            color: colorValue.getColorDefinition().getDesc(),
+            value: colorValue.getValue()
+          }
         }
       }
     }
 
-    return {
-      colorValues: outColorValues.map((cv) => {
-        if (cv === null) {
-          return null
-        }
+    if (includeInputs) {
+      response.inputColorValues = new Array(tx.inputs.length).fill(null)
 
-        return {
-          color: cv.getColorDefinition().getDesc(),
-          value: cv.getValue()
+      for (let colorValues of result.inputs.values()) {
+        for (let [index, colorValue] of colorValues.entries()) {
+          if (colorValue !== null) {
+            if (response.inputColorValues[index] !== null) {
+              throw new errors.Service.MultipleColor(`${colorValue.toString()} and ${response.inputColorValues[index].toString()}`)
+            }
+
+            response.inputColorValues[index] = {
+              color: colorValue.getColorDefinition().getDesc(),
+              value: colorValue.getValue()
+            }
+          }
         }
-      })
+      }
     }
+
+    return response
   })())
 }
