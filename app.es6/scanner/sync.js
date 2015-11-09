@@ -122,7 +122,7 @@ export default class Sync extends EventEmitter {
 
       // run import if all resolved transactions
       delete this._orphanedTx.deps[orphaned]
-      setImmediate(::this._runTxImport, orphaned)
+      setImmediate(() => this._runTxImports([orphaned]))
       logger.warn(`Run import for orphaned tx: ${orphaned}`)
     }
   }
@@ -219,23 +219,47 @@ export default class Sync extends EventEmitter {
   }
 
   /**
-   * @param {string} txId
+   * @param {string[]} txIds
    */
-  @makeConcurrent({concurrency: 10}) // Or we get Allocation failed when importing huge mempool
-  async _runTxImport (txId) {
-    try {
-      // get tx from bitcoind
-      let tx = await this._network.getTx(txId)
+  _runTxImports (txIds) {
+    let self = this
+    let concurrency = 10
+    let done = 0
 
-      // ... and run import
-      let imported = await this._importUnconfirmedTx(tx)
-      if (imported) {
-        setImmediate(::this._importOrphaned, txId)
-        this.emit('tx', txId)
+    return new Promise((resolve) => {
+      async function next (index) {
+        if (index >= txIds.length) {
+          if (done === txIds.length) {
+            resolve()
+          }
+
+          return
+        }
+
+        let txId = txIds[index]
+        try {
+          // get tx from bitcoind
+          let tx = await self._network.getTx(txId)
+
+          // ... and run import
+          let imported = await self._importUnconfirmedTx(tx)
+          if (imported) {
+            setImmediate(::self._importOrphaned, txId)
+            self.emit('tx', txId)
+          }
+        } catch (err) {
+          logger.error(`Tx import (${txId}): ${err.stack}`)
+        }
+
+        done += 1
+        next(index + concurrency)
       }
-    } catch (err) {
-      logger.error(`Tx import: ${err.stack}`)
-    }
+
+      for (let i = 0; i < concurrency; ++i) { next(i) }
+    })
+    .catch(err => {
+      logger.error(`_runTxImports (txIds.length is ${txIds.length}): ${err.stack}`)
+    })
   }
 
   /**
@@ -542,9 +566,7 @@ export default class Sync extends EventEmitter {
         }
 
         // add skipped tx in our storage
-        for (let txId of _.difference(nTxIds, sTxIds)) {
-          setImmediate(::this._runTxImport, txId)
-        }
+        this._runTxImports(_.difference(nTxIds, sTxIds))
 
         logger.info(`Update mempool finished, elapsed time: ${stopwatch.getValue()}`)
 
@@ -571,7 +593,7 @@ export default class Sync extends EventEmitter {
 
     // set handlers
     this._network.on('connect', () => this._runMempoolUpdate(true))
-    this._network.on('tx', ::this._runTxImport)
+    this._network.on('tx', txId => this._runTxImports([txId]))
     this._network.on('block', ::this._runBlockImport)
 
     // and run sync again
