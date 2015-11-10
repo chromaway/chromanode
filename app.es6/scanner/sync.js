@@ -433,14 +433,16 @@ export default class Sync extends EventEmitter {
           }
 
           // was reorg found?
-          if (latest.hash !== this._latest.hash) {
+          let reorgProcess = latest.hash !== this._latest.hash
+          while (latest.hash !== this._latest.hash) {
+            let height = Math.max(latest.height, this._latest.height - 1) // or Allocation failed on large reorgs
             await this._lock.exclusiveLock(async () => {
               stopwatch.reset().start()
               this._latest = await this._storage.executeTransaction(async (client) => {
-                let blocks = await client.queryAsync(SQL.delete.blocks.fromHeight, [latest.height])
-                let txs = await client.queryAsync(SQL.update.transactions.makeUnconfirmed, [latest.height])
-                let hist1 = await client.queryAsync(SQL.update.history.makeOutputsUnconfirmed, [latest.height])
-                let hist2 = await client.queryAsync(SQL.update.history.makeInputsUnconfirmed, [latest.height])
+                let blocks = await client.queryAsync(SQL.delete.blocks.fromHeight, [height])
+                let txs = await client.queryAsync(SQL.update.transactions.makeUnconfirmed, [height])
+                let hist1 = await client.queryAsync(SQL.update.history.makeOutputsUnconfirmed, [height])
+                let hist2 = await client.queryAsync(SQL.update.history.makeInputsUnconfirmed, [height])
 
                 await* _.flattenDeep([
                   blocks.rows.map((row) => {
@@ -459,8 +461,11 @@ export default class Sync extends EventEmitter {
 
                 return await this._getLatest({client: client})
               })
-              logger.warn(`Reorg finished (back to ${latest.height - 1}), elapsed time: ${stopwatch.getValue()}`)
+              logger.warn(`Make reorg step (back to ${height - 1}), elapsed time: ${stopwatch.getValue()}`)
             })
+          }
+          if (reorgProcess) {
+            logger.warn(`Reorg finished (back to ${latest.height}), elapsed time: ${stopwatch.getValue()}`)
           }
 
           // import block
