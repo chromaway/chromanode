@@ -86,73 +86,77 @@ export default class Sync {
   withLock (fn) { return fn() }
 
   /**
-   * @param {string} txId
+   * @param {string[]} txIds
    * @return {Promise}
    */
   @callWithLock
-  async addTx (txId) {
-    try {
-      let stopwatch = ElapsedTime.new().start()
+  async addTxs (txIds) {
+    for (let txId of txIds) {
+      try {
+        let stopwatch = ElapsedTime.new().start()
 
-      let added = await this.storage.executeTransaction((client) => {
-        return this._addTx(client, txId)
-      })
+        let added = await this.storage.executeTransaction((client) => {
+          return this._addTx(client, txId)
+        })
 
-      if (added) {
-        logger.verbose(`Add unconfirmed tx ${txId}, elapsed time: ${stopwatch.getValue()}`)
+        if (added) {
+          logger.verbose(`Add unconfirmed tx ${txId}, elapsed time: ${stopwatch.getValue()}`)
+        }
+      } catch (err) {
+        logger.error(`Error on adding unconfirmed tx ${txId}: ${err.stack}`)
       }
-    } catch (err) {
-      logger.error(`Error on adding unconfirmed tx ${txId}: ${err.stack}`)
     }
   }
 
   /**
-   * @param {string} txId
+   * @param {string[]} txIds
    * @return {Promise}
    */
   @callWithLock
-  async removeTx (txId) {
-    try {
-      let stopwatch = ElapsedTime.new().start()
+  async removeTxs (txIds) {
+    for (let txId of txIds) {
+      try {
+        let stopwatch = ElapsedTime.new().start()
 
-      let removed = await this.storage.executeTransaction(async (client) => {
-        let {rows} = await client.queryAsync(SQL.select.ccScannedTxIds.isTxScanned, [`\\x${txId}`])
-        if (rows[0].exists === false) {
-          return false
+        let removed = await this.storage.executeTransaction(async (client) => {
+          let {rows} = await client.queryAsync(SQL.select.ccScannedTxIds.isTxScanned, [`\\x${txId}`])
+          if (rows[0].exists === false) {
+            return false
+          }
+
+          let opts = {executeOpts: {client: client}}
+
+          await* _.flattenDeep([
+            cdefClss.map(async (cdefCls) => {
+              let params
+              switch (cdefCls.getColorCode()) {
+                case 'epobc':
+                  params = [`epobc:${txId}:\d+:0`]
+                  break
+                default:
+                  throw new Error(`Unknow cdefCls: ${cdefCls}`)
+              }
+
+              let {rows} = await client.queryAsync(SQL.select.ccDefinitions.colorId, params)
+              if (rows.length !== 0) {
+                let id = parseInt(rows[0].id, 10)
+                return await this._cdefManager.remove({id: id}, opts)
+              }
+
+              await this._cdata.removeColorValues(txId, cdefCls, opts)
+            }),
+            client.queryAsync(SQL.delete.ccScannedTxIds.byTxId, [`\\x${txId}`])
+          ])
+
+          return true
+        })
+
+        if (removed) {
+          logger.verbose(`Remove tx ${txId}, elapsed time: ${stopwatch.getValue()}`)
         }
-
-        let opts = {executeOpts: {client: client}}
-
-        await* _.flattenDeep([
-          cdefClss.map(async (cdefCls) => {
-            let params
-            switch (cdefCls.getColorCode()) {
-              case 'epobc':
-                params = [`epobc:${txId}:\d+:0`]
-                break
-              default:
-                throw new Error(`Unknow cdefCls: ${cdefCls}`)
-            }
-
-            let {rows} = await client.queryAsync(SQL.select.ccDefinitions.colorId, params)
-            if (rows.length !== 0) {
-              let id = parseInt(rows[0].id, 10)
-              return await this._cdefManager.remove({id: id}, opts)
-            }
-
-            await this._cdata.removeColorValues(txId, cdefCls, opts)
-          }),
-          client.queryAsync(SQL.delete.ccScannedTxIds.byTxId, [`\\x${txId}`])
-        ])
-
-        return true
-      })
-
-      if (removed) {
-        logger.verbose(`Remove tx ${txId}, elapsed time: ${stopwatch.getValue()}`)
+      } catch (err) {
+        logger.error(`Error on removing tx ${txId}: ${err.stack}`)
       }
-    } catch (err) {
-      logger.error(`Error on removing tx ${txId}: ${err.stack}`)
     }
   }
 
@@ -247,14 +251,10 @@ export default class Sync {
         txIds = txIds.rows.map((row) => row.txid.toString('hex'))
 
         // remove
-        for (let txId of _.difference(ccTxIds, txIds)) {
-          this.removeTx(txId)
-        }
+        this.removeTxs(_.difference(ccTxIds, txIds))
 
         // add
-        for (let txId of _.difference(txIds, ccTxIds)) {
-          this.addTx(txId)
-        }
+        this.addTxs(_.difference(txIds, ccTxIds))
 
         logger.info(`Unconfirmed updated, elapsed time: ${stopwatch.getValue()}`)
 
@@ -284,12 +284,12 @@ export default class Sync {
     await* [
       this.messages.listen('addtx', (obj) => {
         if (obj.unconfirmed) {
-          this.addTx(obj.txId)
+          this.addTxs([obj.txId])
         }
       }),
       this.messages.listen('removetx', (obj) => {
         if (obj.unconfirmed) {
-          this.removeTx(obj.txId)
+          this.removeTxs([obj.txId])
         }
       }),
       this.messages.listen('addblock', ::this.updateBlocks),
