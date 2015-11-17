@@ -15,13 +15,13 @@ function transformFromTo (val) {
     return val
   }
 
-  let num = parseInt(val, 10)
-  if (!_.isNaN(num) && val.length < 7) {
-    if (num >= 0 && num < 1e7) {
+  if (val.length <= 9) {
+    let num = parseInt(val, 10)
+    if (_.isFinite(num) && num < 500000000) { // like nLockTime
       return num
     }
 
-    throw new errors.Service.InvalidHeight(num)
+    throw new errors.Service.InvalidHeight(val)
   }
 
   if (val.length === 64 && bitcore.util.js.isHexa(val)) {
