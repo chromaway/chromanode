@@ -36,9 +36,21 @@ v2.latest = (req, res) => {
 function query (req, res, shift) {
   res.promise(req.storage.executeTransaction(async (client) => {
     let query = {
+      id: qutil.transformFromTo(req.query.id),
       from: qutil.transformFromTo(req.query.from),
       to: qutil.transformFromTo(req.query.to),
       count: qutil.transformCount(req.query.count)
+    }
+
+    if (query.id !== undefined) {
+      let height = await qutil.getHeightForPoint(client, query.id)
+      if (height === null) {
+        throw new errors.Service.HeaderNotFound(height)
+      }
+
+      let {rows} = await client.queryAsync(
+        SQL.select.blocks.headers, [height - 1, height])
+      return {from: height, count: 1, headers: rows[0].header.toString('hex')}
     }
 
     let from = -1
