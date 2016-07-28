@@ -5,6 +5,7 @@
  *       +-- InvalidNetwork
  *       +-- Service
  *       |    +-- FromNotFound
+ *       |    +-- HeaderNotFound
  *       |    +-- InvalidAddresses
  *       |    +-- InvalidColor
  *       |    +-- InvalidColorKernel
@@ -41,6 +42,7 @@ let spec = {
     message: 'Service internal error',
     errors: [
       {name: 'FromNotFound', message: '{0}'},
+      {name: 'HeaderNotFound', message: '{0}'},
       {name: 'InvalidAddresses', message: '{0}'},
       {name: 'InvalidColor', message: '{0}'},
       {name: 'InvalidColorKernel', message: '{0}'},

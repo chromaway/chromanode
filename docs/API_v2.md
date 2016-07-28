@@ -83,18 +83,16 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
 
 | param | description                                                       |
 |:------|:------------------------------------------------------------------|
+| id    | get header with given id                                          |
 | from  | hash or height, may be ommited (include zero header in this case) |
 | to    | hash or height, may be omitted (preferred than count)             |
 | count | number, may be omitted                                            |
 
     // get 1 header by height
-    /v2/headers/query?from=150232&count=1
-
-    // alternative request, also get 1 header
-    /v2/headers/query?from=150232&to=150233
+    /v2/headers/query?id=150232
 
     // get header by hash
-    /v2/headers/query?from=00000000f872dcf...cb828d3c561e9012&count=1
+    /v2/headers/query?id=00000000f872dcf...cb828d3c561e9012
 
     // get first chunk (count omitted, because query return maximum 2016 headers)
     /v2/headers/query?
@@ -110,6 +108,7 @@ Chromanode uses [socket.io](https://github.com/Automattic/socket.io) for notific
   **errors**
 
     {"type": "FromNotFound"}
+    {"type": "HeaderNotFound"}
     {"type": "InvalidCount"}
     {"type": "InvalidHash"}
     {"type": "InvalidHeight"}
@@ -491,6 +490,7 @@ socket.on('status', function (status) {
 ## Errors
 
   * FromNotFound
+  * HeaderNotFound
   * InvalidAddresses
   * InvalidColor
   * InvalidColorKernel

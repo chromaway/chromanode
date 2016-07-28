@@ -55,6 +55,20 @@ export default function (opts) {
         })
       })
 
+      it('by id', async () => {
+        let expected = {
+          from: 2,
+          count: 1,
+          headers: await getHeader(2)
+        }
+
+        let hash2 = (await opts.bitcoind.rpc.getBlockHash(2)).result
+
+        let result = await request.get(
+          '/v2/headers/query', {id: hash2})
+        expect(result).to.deep.equal(expected)
+      })
+
       it('half-open interval', async () => {
         let expected = {
           from: 2,
