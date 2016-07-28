@@ -106,7 +106,8 @@ export default class Storage {
       done()
       return result
     } catch (err) {
-      client.end()
+      logger.error("Closing DB connection due to an error.")
+      done(true)
       throw err
     }
   }
@@ -132,6 +133,7 @@ export default class Storage {
       try {
         var result = await fn(client)
       } catch (err) {
+        logger.error("Rolling back transaction due to an error")
         await client.queryAsync('ROLLBACK')
         throw err
       }
