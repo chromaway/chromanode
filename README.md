@@ -3,7 +3,7 @@
 [![build status](https://img.shields.io/travis/chromaway/chromanode.svg?branch=master&style=flat-square)](http://travis-ci.org/chromaway/chromanode)
 [![js-standard-style](https://img.shields.io/badge/code%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/feross/standard)
 
-*Chromanode* is open source bitcoin blockchain API (http and websocket support) writeen on JavaScript and uses PostgreSQL for storage.
+*Chromanode* is open source bitcoin blockchain API (http and websocket support) writen on JavaScript and uses PostgreSQL for storage.
 
 ## Requirements
 
