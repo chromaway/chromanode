@@ -131,6 +131,7 @@ export default class Sync extends EventEmitter {
    * @param {bitcore.Transaction} tx
    * @return {Promise}
    */
+  @makeConcurrent({concurrency: 1})
   _importUnconfirmedTx (tx) {
     let txId = tx.id
     let prevTxIds = _.uniq(
@@ -223,7 +224,7 @@ export default class Sync extends EventEmitter {
    */
   _runTxImports (txIds) {
     let self = this
-    let concurrency = 10
+    let concurrency = 1
     let done = 0
 
     return new Promise((resolve) => {
