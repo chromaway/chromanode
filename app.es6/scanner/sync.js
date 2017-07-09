@@ -455,8 +455,12 @@ export default class Sync extends EventEmitter {
                       row.txid.toString('hex'), null, null, {client: client})
                   }),
                   hist1.rows.concat(hist2.rows).map((row) => {
+                    if (row.address && row.txid)
                     return this._service.broadcastAddress(
                       row.address.toString(), row.txid.toString('hex'), null, null, {client: client})
+                    else {
+                      logger.warn("No address for " + row.txid);
+                    }
                   })
                 ])
 
