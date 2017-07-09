@@ -392,7 +392,6 @@ export default {
                                        SET
                                          itxid = NULL
                                        WHERE
-                                         iheight IS NULL AND
                                          itxid = ANY($1)`
     },
     ccScannedTxIds: {
@@ -429,7 +428,6 @@ export default {
       unconfirmedByTxIds: `DELETE FROM
                              history
                            WHERE
-                             oheight IS NULL AND
                              otxid = ANY($1)
                            RETURNING
                              itxid AS itxid`
