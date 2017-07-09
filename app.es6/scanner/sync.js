@@ -528,16 +528,22 @@ export default class Sync extends EventEmitter {
           this._storage.executeQuery(SQL.select.transactions.unconfirmed)
         ]
 
-        sTxIds = sTxIds.rows.map((row) => row.txid.toString('hex'))
+       sTxIds = sTxIds.rows.map((row) => row.txid.toString('hex'))
+
+        logger.info(`Update mempool: got ${nTxIds.length} bitcoind transactions, ${sTxIds.length} db transactions`)
 
         let rTxIds = _.difference(sTxIds, nTxIds)
         if (rTxIds.length > 0 && updateBitcoindMempool) {
+
+          logger.info(`Fetching ${rTxIds.length} transactions to add them to bitcoind`);
           let {rows} = await this._storage.executeQuery(
             SQL.select.transactions.byTxIds, [rTxIds.map((txId) => `\\x${txId}`)])
 
           rTxIds = []
 
+          logger.info(`Sorting them`);
           let txs = util.toposort(rows.map((row) => bitcore.Transaction(row.tx)))
+          logger.info('Sorted, submitting to bitcoind...');
           while (txs.length > 0) {
             let tx = txs.pop()
             try {
