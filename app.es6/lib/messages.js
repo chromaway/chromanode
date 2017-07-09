@@ -99,7 +99,7 @@ export default class Messages {
     }
 
     await execute((client) => {
-      return client.queryAsync(`NOTIFY ${channel}, \'${JSON.stringify(payload)}\'`)
+      return client.queryAsync("SELECT pg_notify($1, $2)", [channel, JSON.stringify(payload)])
     })
   }
 }
